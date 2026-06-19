@@ -1,0 +1,401 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "language": "en+bn",
+    "term_count_note": "Core set of key DSE investing/trading terms. Extensible toward the 120+ target documented in references/GLOSSARY.md.",
+    "metric_key_map": {
+      "roe": "ROE", "roa": "ROA", "return_on_assets": "ROA", "pe": "PE", "pb": "PB",
+      "peg": "PEG", "eps": "EPS", "eps_ttm": "EPS", "debt_to_equity": "debt_to_equity",
+      "current_ratio": "current_ratio", "free_cash_flow": "free_cash_flow",
+      "dividend_yield": "dividend_yield", "profit_margin": "operating_margin",
+      "operating_margin": "operating_margin", "earnings_growth": "earnings_growth",
+      "interest_coverage": "interest_coverage", "beta": "beta", "market_cap": "market_cap",
+      "book_value_per_share": "book_value", "rsi_14": "RSI", "rsi": "RSI", "macd": "MACD",
+      "adx_14": "ADX", "adx": "ADX", "atr": "ATR", "mfi_14": "MFI", "obv": "OBV",
+      "roc_12": "ROC", "ncav_per_share": "NCAV", "intrinsic_value": "intrinsic_value",
+      "nav": "NAV"
+    }
+  },
+  "terms": {
+    "ROE": {
+      "term": "Return on Equity (ROE)", "term_bn": "ইকুইটির উপর রিটার্ন (ROE)",
+      "one_liner": "Profit earned per taka of shareholders' equity.",
+      "one_liner_bn": "শেয়ারহোল্ডারদের প্রতি টাকা ইকুইটিতে কোম্পানি কত মুনাফা করে।",
+      "analogy": "Like asking how much GP earns on every taka the owners left inside the business.",
+      "for_investor": "A core quality screen; consistently high ROE signals a durable franchise worth holding.",
+      "for_trader": "Less direct, but high-ROE leaders (e.g. Square Pharma) tend to attract institutional flow that fuels momentum.",
+      "good_vs_bad": "Good >15%, excellent >20%, weak <10%. Beware ROE inflated by heavy debt.",
+      "what_to_do": "Compare ROE across years and peers; check it is not propped up by leverage."
+    },
+    "ROA": {
+      "term": "Return on Assets (ROA)", "term_bn": "সম্পদের উপর রিটার্ন (ROA)",
+      "one_liner": "Profit earned per taka of total assets.",
+      "one_liner_bn": "মোট সম্পদের প্রতি টাকায় কোম্পানি কত মুনাফা করে।",
+      "analogy": "How efficiently BRAC Bank turns its whole balance sheet into profit, not just owners' money.",
+      "for_investor": "Shows asset efficiency; pairs with ROE to reveal how much leverage is doing the work.",
+      "for_trader": "Secondary; useful to confirm an earnings beat is real and not balance-sheet bloat.",
+      "good_vs_bad": "Good >8% (banks lower, ~1-2% is normal). Falling ROA warns of asset bloat.",
+      "what_to_do": "Use sector-relative benchmarks; banks and manufacturers are not comparable."
+    },
+    "PE": {
+      "term": "Price-to-Earnings Ratio (P/E)", "term_bn": "মূল্য-আয় অনুপাত (P/E)",
+      "one_liner": "Price you pay per taka of annual earnings.",
+      "one_liner_bn": "কোম্পানির বছরে প্রতি টাকা আয়ের জন্য আপনি কত দাম দিচ্ছেন।",
+      "analogy": "Paying 14 taka for a share earning 1 taka/year is a P/E of 14 — like a 14-year payback.",
+      "for_investor": "Central valuation gauge; a low P/E versus history and peers can flag value.",
+      "for_trader": "Expanding P/E often accompanies momentum runs; contracting P/E warns of de-rating.",
+      "good_vs_bad": "DSE context: <12 cheap, 12-20 fair, >25 rich. Compare to the stock's own history.",
+      "what_to_do": "Never use P/E alone; cross-check earnings quality and growth (see PEG)."
+    },
+    "PB": {
+      "term": "Price-to-Book Ratio (P/B)", "term_bn": "মূল্য-বুক অনুপাত (P/B)",
+      "one_liner": "Price relative to net asset (book) value per share.",
+      "one_liner_bn": "প্রতি শেয়ারের নিট সম্পদমূল্যের তুলনায় বাজারমূল্য।",
+      "analogy": "Buying BRAC Bank at 1.3x book means paying 1.30 taka for 1 taka of net assets.",
+      "for_investor": "Useful for banks and asset-heavy firms; low P/B with healthy ROE can mean value.",
+      "for_trader": "Minor; very low P/B sometimes precedes turnaround momentum.",
+      "good_vs_bad": "<1 potentially cheap, 1-3 normal, >3 demands strong growth. Banks often trade near 1.",
+      "what_to_do": "Pair P/B with ROE; cheap book + poor ROE is a value trap."
+    },
+    "PEG": {
+      "term": "Price/Earnings-to-Growth (PEG)", "term_bn": "মূল্য-আয়-বৃদ্ধি অনুপাত (PEG)",
+      "one_liner": "P/E divided by the earnings growth rate.",
+      "one_liner_bn": "আয় বৃদ্ধির হারের তুলনায় P/E অনুপাত।",
+      "analogy": "A high P/E is fine if earnings grow fast — PEG checks if growth justifies the price.",
+      "for_investor": "Lynch's favourite; PEG near 1 means price and growth are in balance.",
+      "for_trader": "Low PEG growth names are momentum favourites when earnings surprise upward.",
+      "good_vs_bad": "<1 attractive, ~1 fair, >2 expensive for the growth on offer.",
+      "what_to_do": "Use a realistic, sustainable growth estimate, not a one-off spike."
+    },
+    "EPS": {
+      "term": "Earnings Per Share (EPS)", "term_bn": "প্রতি শেয়ার আয় (EPS)",
+      "one_liner": "Net profit attributable to each share.",
+      "one_liner_bn": "প্রতিটি শেয়ারের ভাগে আসা নিট মুনাফা।",
+      "analogy": "If GP earns 1,000 crore over 135 crore shares, each share earns its slice as EPS.",
+      "for_investor": "The denominator of value; rising EPS over years is the engine of long-term returns.",
+      "for_trader": "EPS surprises are prime momentum catalysts around earnings dates.",
+      "good_vs_bad": "Direction matters more than level: steady growth good, erratic/declining bad.",
+      "what_to_do": "Track multi-year EPS trend and watch for dilution from new shares."
+    },
+    "debt_to_equity": {
+      "term": "Debt-to-Equity (D/E)", "term_bn": "ঋণ-ইকুইটি অনুপাত (D/E)",
+      "one_liner": "Borrowed money relative to shareholders' equity.",
+      "one_liner_bn": "শেয়ারহোল্ডারদের ইকুইটির তুলনায় কোম্পানির ঋণ কত।",
+      "analogy": "Like a household's loans versus its savings — more debt magnifies both gains and pain.",
+      "for_investor": "Key solvency check; high D/E raises risk in a rate-hike or downturn.",
+      "for_trader": "Highly leveraged names swing harder — sharper momentum but bigger drawdowns.",
+      "good_vs_bad": "Good <0.5, watch 0.5-1.0, risky >1.5 (banks excluded, they run higher by design).",
+      "what_to_do": "Combine with interest coverage; rising debt + falling coverage is a red flag."
+    },
+    "current_ratio": {
+      "term": "Current Ratio", "term_bn": "চলতি অনুপাত",
+      "one_liner": "Current assets divided by current liabilities.",
+      "one_liner_bn": "স্বল্পমেয়াদি সম্পদ ভাগ স্বল্পমেয়াদি দায়।",
+      "analogy": "Can the company cover the next year's bills with the next year's cash? Above 1 means yes.",
+      "for_investor": "Liquidity safety check; too low risks a cash crunch, too high may mean idle assets.",
+      "for_trader": "Low priority unless a liquidity scare is the trade thesis.",
+      "good_vs_bad": "Healthy 1.5-3.0, <1 is a warning, >3 may signal inefficient capital.",
+      "what_to_do": "Read alongside cash flow; a high ratio built on slow inventory is misleading."
+    },
+    "free_cash_flow": {
+      "term": "Free Cash Flow (FCF)", "term_bn": "মুক্ত নগদ প্রবাহ (FCF)",
+      "one_liner": "Cash left after running and reinvesting in the business.",
+      "one_liner_bn": "ব্যবসা চালানো ও বিনিয়োগের পর হাতে থাকা প্রকৃত নগদ।",
+      "analogy": "Your salary after rent and essentials — the cash truly free to use or pay out.",
+      "for_investor": "The hardest-to-fake quality metric; sustained positive FCF funds dividends and growth.",
+      "for_trader": "Indirect, but strong FCF underpins buybacks/dividends that support price.",
+      "good_vs_bad": "Positive and growing is good; persistently negative FCF needs a strong growth story.",
+      "what_to_do": "Prefer FCF over reported profit when judging earnings quality."
+    },
+    "dividend_yield": {
+      "term": "Dividend Yield", "term_bn": "লভ্যাংশ ফলন",
+      "one_liner": "Annual dividend as a percentage of share price.",
+      "one_liner_bn": "শেয়ারমূল্যের তুলনায় বার্ষিক লভ্যাংশের শতকরা হার।",
+      "analogy": "Like the interest rate on the cash you parked in the stock.",
+      "for_investor": "Income and a quality signal; many DSE investors prize steady cash dividends.",
+      "for_trader": "Yield can floor a price (support) but rarely drives momentum on its own.",
+      "good_vs_bad": "DSE context: 4-7% attractive if covered; an unusually high yield can signal trouble.",
+      "what_to_do": "Check the payout ratio — a yield the company cannot sustain will be cut."
+    },
+    "margin_of_safety": {
+      "term": "Margin of Safety", "term_bn": "নিরাপত্তা ব্যবধান",
+      "one_liner": "Discount of price below estimated intrinsic value.",
+      "one_liner_bn": "আনুমানিক প্রকৃত মূল্যের তুলনায় বাজারমূল্য কত কম।",
+      "analogy": "Building a bridge for 30-ton trucks but only allowing 20 — buffer against being wrong.",
+      "for_investor": "Graham's central idea; buy well below value so errors don't sink you.",
+      "for_trader": "Less relevant; traders use stops rather than valuation buffers.",
+      "good_vs_bad": "Aim for 25-50% below intrinsic value; near or above value offers little cushion.",
+      "what_to_do": "Demand a wider margin when your value estimate is uncertain."
+    },
+    "economic_moat": {
+      "term": "Economic Moat", "term_bn": "অর্থনৈতিক পরিখা (Moat)",
+      "one_liner": "A durable advantage that protects profits from rivals.",
+      "one_liner_bn": "প্রতিযোগীদের হাত থেকে মুনাফা রক্ষাকারী টেকসই সুবিধা।",
+      "analogy": "GP's network coverage or BATBC's brands act like a moat around a castle.",
+      "for_investor": "The reason a great business stays great; moats justify holding for years.",
+      "for_trader": "Background context; wide-moat leaders trend more cleanly.",
+      "good_vs_bad": "Wide and widening is best; eroding moats (new entrants, regulation) are a warning.",
+      "what_to_do": "Ask what would let a competitor steal share — if the answer is 'little', moat is wide."
+    },
+    "RSI": {
+      "term": "Relative Strength Index (RSI)", "term_bn": "আপেক্ষিক শক্তি সূচক (RSI)",
+      "one_liner": "0-100 oscillator of recent gain vs loss momentum.",
+      "one_liner_bn": "সাম্প্রতিক লাভ বনাম ক্ষতির গতিবেগ মাপা ০-১০০ সূচক।",
+      "analogy": "Like a speedometer for the stock — too fast (overbought) or stalled (oversold).",
+      "for_investor": "Minor; a low RSI can time an entry into an already-chosen quality name.",
+      "for_trader": "Core tool; overbought/oversold and divergences shape entries and exits.",
+      "good_vs_bad": "70 overbought, <30 oversold; 40-60 healthy trend. Context beats the raw level.",
+      "what_to_do": "Use RSI with trend; oversold in a downtrend is not automatically a buy zone."
+    },
+    "MACD": {
+      "term": "Moving Average Convergence Divergence (MACD)", "term_bn": "MACD",
+      "one_liner": "Difference between fast and slow EMAs, plus a signal line.",
+      "one_liner_bn": "দ্রুত ও ধীর EMA-এর পার্থক্য এবং একটি সিগন্যাল লাইন।",
+      "analogy": "Two runners (fast/slow averages) — MACD tracks the gap and who is pulling ahead.",
+      "for_investor": "Light use for confirming a trend turn before adding.",
+      "for_trader": "Crossovers and histogram shifts are classic momentum triggers.",
+      "good_vs_bad": "MACD above signal/zero is bullish; below is bearish. Whipsaws in flat markets.",
+      "what_to_do": "Favour MACD signals aligned with the higher-timeframe trend."
+    },
+    "ADX": {
+      "term": "Average Directional Index (ADX)", "term_bn": "গড় দিকনির্দেশক সূচক (ADX)",
+      "one_liner": "Measures trend strength (not direction) on a 0-100 scale.",
+      "one_liner_bn": "প্রবণতার দিক নয়, শক্তি মাপে (০-১০০ স্কেলে)।",
+      "analogy": "Tells you the wind's strength, while +DI/-DI tell you its direction.",
+      "for_investor": "Helps confirm a real trend before committing to a position.",
+      "for_trader": "Filters setups; momentum strategies work best when ADX is rising above 25.",
+      "good_vs_bad": ">25 strong trend, <20 choppy/range-bound, >40 very strong (may be late).",
+      "what_to_do": "Avoid trend strategies when ADX is low; switch to range tactics."
+    },
+    "ATR": {
+      "term": "Average True Range (ATR)", "term_bn": "গড় প্রকৃত পরিসর (ATR)",
+      "one_liner": "Average daily price range — a volatility gauge.",
+      "one_liner_bn": "দৈনিক মূল্যের গড় পরিসর — অস্থিরতার পরিমাপ।",
+      "analogy": "How much the stock 'breathes' each day — wider breath, wider stops needed.",
+      "for_investor": "Helps size positions so a normal wiggle doesn't scare you out.",
+      "for_trader": "Sets stop distance and position size; ATR-based stops adapt to volatility.",
+      "good_vs_bad": "No good/bad level — higher ATR means higher risk and wider stops.",
+      "what_to_do": "Place stops a multiple of ATR away so noise doesn't trigger them."
+    },
+    "moving_average": {
+      "term": "Moving Average (MA)", "term_bn": "চলমান গড় (MA)",
+      "one_liner": "Average price over a window that updates each bar.",
+      "one_liner_bn": "একটি নির্দিষ্ট সময়ের গড় মূল্য যা প্রতিদিন হালনাগাদ হয়।",
+      "analogy": "Smooths out daily noise to show the underlying direction, like a trend line.",
+      "for_investor": "The 200-day MA is a simple long-term health line — above it is constructive.",
+      "for_trader": "50/150/200 stacks and crossovers define trend regimes and pullback entries.",
+      "good_vs_bad": "Price above rising MAs is bullish; below falling MAs is bearish.",
+      "what_to_do": "Watch how price behaves at key MAs (support/resistance) more than the line itself."
+    },
+    "OBV": {
+      "term": "On-Balance Volume (OBV)", "term_bn": "অন-ব্যালেন্স ভলিউম (OBV)",
+      "one_liner": "Running volume total that adds up-days and subtracts down-days.",
+      "one_liner_bn": "আপ-দিনে ভলিউম যোগ ও ডাউন-দিনে বিয়োগ করে চলমান যোগফল।",
+      "analogy": "Tracks whether volume is quietly accumulating or distributing behind the price.",
+      "for_investor": "Confirms whether smart money is building a position you also like.",
+      "for_trader": "Rising OBV confirms a breakout; OBV divergence warns of a weak move.",
+      "good_vs_bad": "OBV rising with price is healthy; OBV falling while price rises is a warning.",
+      "what_to_do": "Use OBV to confirm price moves, not as a standalone signal."
+    },
+    "MFI": {
+      "term": "Money Flow Index (MFI)", "term_bn": "মানি ফ্লো ইনডেক্স (MFI)",
+      "one_liner": "Volume-weighted RSI of money flowing in vs out.",
+      "one_liner_bn": "ভলিউম-যুক্ত RSI — ভেতরে বনাম বাইরে যাওয়া অর্থপ্রবাহ মাপে।",
+      "analogy": "Like RSI but it also asks how much money rode along with each move.",
+      "for_investor": "Secondary confirmation of accumulation in a quality name.",
+      "for_trader": "Overbought/oversold with volume context; divergences flag exhaustion.",
+      "good_vs_bad": ">80 overbought, <20 oversold; 20-80 normal range.",
+      "what_to_do": "Trust MFI extremes more when volume is genuinely heavy."
+    },
+    "ROC": {
+      "term": "Rate of Change (ROC)", "term_bn": "পরিবর্তনের হার (ROC)",
+      "one_liner": "Percentage price change over a fixed lookback.",
+      "one_liner_bn": "একটি নির্দিষ্ট সময়ে শতকরা মূল্য পরিবর্তন।",
+      "analogy": "Pure speed reading — how fast the price has moved over N days.",
+      "for_investor": "Light use to gauge whether a long-term entry is chasing a hot move.",
+      "for_trader": "A momentum core; positive and rising ROC favours trend-following.",
+      "good_vs_bad": "Positive = upward momentum, negative = downward; extremes can mean-revert.",
+      "what_to_do": "Compare ROC across names to rank relative strength."
+    },
+    "bollinger_bands": {
+      "term": "Bollinger Bands", "term_bn": "বলিঞ্জার ব্যান্ড",
+      "one_liner": "A moving average with bands set at ±2 standard deviations.",
+      "one_liner_bn": "চলমান গড়ের সাথে ±২ স্ট্যান্ডার্ড ডেভিয়েশনে আঁকা ব্যান্ড।",
+      "analogy": "Elastic rails around price — squeezes precede big moves, edges mark extremes.",
+      "for_investor": "Minor; a band squeeze can hint a quiet name is about to move.",
+      "for_trader": "Squeezes signal coiling volatility; band rides confirm strong trends.",
+      "good_vs_bad": "Close near upper band = strength/overbought; near lower = weakness/oversold.",
+      "what_to_do": "Trade squeeze breakouts in the direction volume confirms."
+    },
+    "support_resistance": {
+      "term": "Support & Resistance", "term_bn": "সাপোর্ট ও রেজিস্ট্যান্স",
+      "one_liner": "Price levels where buying or selling has repeatedly clustered.",
+      "one_liner_bn": "যে মূল্যস্তরে বারবার ক্রয় বা বিক্রয় কেন্দ্রীভূত হয়।",
+      "analogy": "Floor (support) and ceiling (resistance) the price keeps bouncing between.",
+      "for_investor": "Helps choose a sensible entry near support rather than chasing.",
+      "for_trader": "Defines entries, stops and targets; breaks of these levels are key signals.",
+      "good_vs_bad": "Holding support is constructive; breaking it on volume is bearish (and vice versa).",
+      "what_to_do": "Place stops just beyond a level so a clean break, not noise, takes you out."
+    },
+    "breakout": {
+      "term": "Breakout", "term_bn": "ব্রেকআউট",
+      "one_liner": "Price moving decisively beyond a prior range or level.",
+      "one_liner_bn": "পূর্বের পরিসর বা স্তর জোরালোভাবে অতিক্রম করা।",
+      "analogy": "Water breaching a dam — once past resistance it can run fast.",
+      "for_investor": "Can confirm a thesis is being recognised by the market.",
+      "for_trader": "A primary momentum entry; volume separates real breaks from fakeouts.",
+      "good_vs_bad": "High-volume breakout = good; a low-volume break that fails (fakeout) = bad.",
+      "what_to_do": "Require volume confirmation and a plan for the failure case."
+    },
+    "momentum": {
+      "term": "Momentum", "term_bn": "মোমেন্টাম (গতিবেগ)",
+      "one_liner": "The tendency of recent strength or weakness to persist.",
+      "one_liner_bn": "সাম্প্রতিক শক্তি বা দুর্বলতা টিকে থাকার প্রবণতা।",
+      "analogy": "A rolling ball keeps rolling — winners often keep winning for a while.",
+      "for_investor": "Tilts timing toward already-healthy names within a quality watchlist.",
+      "for_trader": "The whole game: buy strength, ride the trend, exit when it fades.",
+      "good_vs_bad": "Strong, broad, volume-backed momentum good; narrow or fading momentum risky.",
+      "what_to_do": "Pair momentum with a stop — momentum reverses, sometimes sharply."
+    },
+    "volatility": {
+      "term": "Volatility", "term_bn": "অস্থিরতা",
+      "one_liner": "How much and how fast a price swings around.",
+      "one_liner_bn": "মূল্য কতটা ও কত দ্রুত ওঠানামা করে।",
+      "analogy": "A calm pond versus a choppy sea — same destination, very different ride.",
+      "for_investor": "Determines how much daily noise you must tolerate to hold for years.",
+      "for_trader": "Drives position size and stop width; opportunity and risk both rise with it.",
+      "good_vs_bad": "Neither good nor bad in itself; mismatched to your sizing it becomes dangerous.",
+      "what_to_do": "Size positions so a typical volatile day cannot ruin your account."
+    },
+    "market_cap": {
+      "term": "Market Capitalisation", "term_bn": "বাজার মূলধন",
+      "one_liner": "Total value of all shares (price x shares outstanding).",
+      "one_liner_bn": "সব শেয়ারের মোট মূল্য (মূল্য গুণ মোট শেয়ার)।",
+      "analogy": "The full price tag to buy the entire company at today's quote.",
+      "for_investor": "Frames scale and risk; large caps like GP are steadier than small caps.",
+      "for_trader": "Small caps move faster but are thinner and easier to manipulate.",
+      "good_vs_bad": "No good/bad level; match cap size to your liquidity and risk tolerance.",
+      "what_to_do": "Check that daily traded value supports the size you intend to trade."
+    },
+    "NAV": {
+      "term": "Net Asset Value (NAV)", "term_bn": "নিট সম্পদ মূল্য (NAV)",
+      "one_liner": "Net assets per share (assets minus liabilities).",
+      "one_liner_bn": "প্রতি শেয়ারে নিট সম্পদ (সম্পদ বিয়োগ দায়)।",
+      "analogy": "What each share would be worth if the company were wound up today.",
+      "for_investor": "A valuation floor for funds and asset-heavy firms; price below NAV can be value.",
+      "for_trader": "Minor; deep NAV discounts sometimes precede re-rating moves.",
+      "good_vs_bad": "Price well below NAV may be cheap; far above NAV needs strong earnings.",
+      "what_to_do": "Verify the assets are real and current, not stale or impaired."
+    },
+    "NCAV": {
+      "term": "Net Current Asset Value (NCAV)", "term_bn": "নিট চলতি সম্পদ মূল্য (NCAV)",
+      "one_liner": "Current assets minus all liabilities, per share.",
+      "one_liner_bn": "চলতি সম্পদ বিয়োগ সব দায়, প্রতি শেয়ারে।",
+      "analogy": "Graham's deep-value test: liquid assets alone covering the whole price.",
+      "for_investor": "A strict bargain screen; price below NCAV is a classic deep-value signal.",
+      "for_trader": "Rarely used; these are slow, illiquid situations.",
+      "good_vs_bad": "Price below NCAV is the rare bargain; far above means no liquidation cushion.",
+      "what_to_do": "Confirm current assets are liquid (cash/receivables), not slow inventory."
+    },
+    "intrinsic_value": {
+      "term": "Intrinsic Value", "term_bn": "প্রকৃত মূল্য",
+      "one_liner": "Estimated true worth from a company's future cash flows.",
+      "one_liner_bn": "ভবিষ্যৎ নগদ প্রবাহ থেকে অনুমান করা প্রকৃত মূল্য।",
+      "analogy": "What the business is worth on its merits, regardless of today's quote.",
+      "for_investor": "The anchor of value investing; buy below it with a margin of safety.",
+      "for_trader": "Background only; traders price action, not intrinsic value.",
+      "good_vs_bad": "Price below intrinsic value is attractive; above it is expensive.",
+      "what_to_do": "Use conservative assumptions; small input changes swing the estimate a lot."
+    },
+    "beta": {
+      "term": "Beta", "term_bn": "বিটা",
+      "one_liner": "Sensitivity of a stock's moves to the overall market.",
+      "one_liner_bn": "সামগ্রিক বাজারের তুলনায় শেয়ারের চলাচলের সংবেদনশীলতা।",
+      "analogy": "Beta 1.5 means when DSEX moves 1%, the stock tends to move ~1.5%.",
+      "for_investor": "Gauges how much market risk a holding adds to the portfolio.",
+      "for_trader": "High-beta names amplify index swings — more momentum, more risk.",
+      "good_vs_bad": "<1 defensive, =1 market-like, >1 aggressive; none is inherently good/bad.",
+      "what_to_do": "Blend betas so total portfolio risk matches your comfort."
+    },
+    "circuit_breaker": {
+      "term": "Circuit Breaker", "term_bn": "সার্কিট ব্রেকার",
+      "one_liner": "DSE daily price limit that caps how far a stock can move.",
+      "one_liner_bn": "DSE-র দৈনিক মূল্যসীমা যা শেয়ারের চলাচল সীমিত করে।",
+      "analogy": "A speed limiter — once price hits the band, trading at further prices stops.",
+      "for_investor": "Limits single-day damage but can trap you if you need to exit.",
+      "for_trader": "Critical: at limit-up/limit-down, signals are unreliable and exits may be blocked.",
+      "good_vs_bad": "Not good/bad; a name pinned at a limit is a liquidity/price-discovery warning.",
+      "what_to_do": "Treat indicators as suspect during circuit conditions; size for the gap risk."
+    },
+    "floor_price": {
+      "term": "Floor Price", "term_bn": "ফ্লোর প্রাইস",
+      "one_liner": "A regulatory minimum below which a stock may not trade.",
+      "one_liner_bn": "নিয়ন্ত্রক-নির্ধারিত সর্বনিম্ন মূল্য, যার নিচে লেনদেন হয় না।",
+      "analogy": "An artificial floor — sellers can't go lower, so trading can simply dry up.",
+      "for_investor": "A floor can freeze liquidity; 'cheap' is meaningless if you cannot sell.",
+      "for_trader": "Avoid: price discovery is broken and volume often vanishes at the floor.",
+      "good_vs_bad": "A stock stuck at its floor is a serious liquidity red flag.",
+      "what_to_do": "Check whether a floor is in force before sizing any position."
+    },
+    "DSEX": {
+      "term": "DSEX Index", "term_bn": "DSEX সূচক",
+      "one_liner": "The Dhaka Stock Exchange broad-market benchmark index.",
+      "one_liner_bn": "ঢাকা স্টক এক্সচেঞ্জের বিস্তৃত-বাজার সূচক।",
+      "analogy": "The market's thermometer — the headline number for 'how the market did'.",
+      "for_investor": "The benchmark to beat; sector and stock health are read against it.",
+      "for_trader": "Sets the regime; trading with the index trend raises the odds.",
+      "good_vs_bad": "Above rising moving averages = constructive market; below = defensive.",
+      "what_to_do": "Check the DSEX trend before trusting an individual stock's signal."
+    },
+    "book_value": {
+      "term": "Book Value (per share)", "term_bn": "বুক ভ্যালু (প্রতি শেয়ার)",
+      "one_liner": "Accounting net worth of the company per share.",
+      "one_liner_bn": "হিসাবমতে কোম্পানির প্রতি শেয়ারের নিট সম্পদমূল্য।",
+      "analogy": "The company's 'on-paper' net worth divided across all shares.",
+      "for_investor": "The denominator of P/B and a value reference for banks and asset plays.",
+      "for_trader": "Minor; mostly a backdrop to valuation.",
+      "good_vs_bad": "Rising book value over time is healthy; falling book value warns of losses.",
+      "what_to_do": "Pair with ROE — book growing through real earnings is the good kind."
+    },
+    "earnings_growth": {
+      "term": "Earnings Growth", "term_bn": "আয় বৃদ্ধি",
+      "one_liner": "The rate at which profits are increasing over time.",
+      "one_liner_bn": "সময়ের সাথে মুনাফা বৃদ্ধির হার।",
+      "analogy": "The engine of compounding — faster, steadier growth pulls the price up over years.",
+      "for_investor": "The single biggest long-term return driver for a quality business.",
+      "for_trader": "Accelerating growth fuels momentum, especially around earnings beats.",
+      "good_vs_bad": "Good >15% and consistent; lumpy or negative growth is a caution.",
+      "what_to_do": "Prefer sustainable, broad-based growth over one-off spikes."
+    },
+    "operating_margin": {
+      "term": "Operating Margin", "term_bn": "পরিচালন মার্জিন",
+      "one_liner": "Operating profit as a percentage of revenue.",
+      "one_liner_bn": "রাজস্বের শতকরা হিসেবে পরিচালন মুনাফা।",
+      "analogy": "How many taka of profit survive from each 100 taka of sales after running costs.",
+      "for_investor": "Profitability and pricing-power gauge; stable high margins suggest a moat.",
+      "for_trader": "Margin surprises move earnings and therefore price.",
+      "good_vs_bad": "Sector-dependent; rising margins good, shrinking margins warn of cost/pricing stress.",
+      "what_to_do": "Compare to peers and the firm's own trend, not an absolute cutoff."
+    },
+    "interest_coverage": {
+      "term": "Interest Coverage", "term_bn": "সুদ পরিশোধ সক্ষমতা",
+      "one_liner": "Operating profit divided by interest expense.",
+      "one_liner_bn": "পরিচালন মুনাফা ভাগ সুদ ব্যয়।",
+      "analogy": "How many times over the company can pay its loan interest from operations.",
+      "for_investor": "A solvency safety check; low coverage is dangerous if rates rise.",
+      "for_trader": "Background risk; thin coverage means sharper downside on bad news.",
+      "good_vs_bad": "Good >4x, watch 2-4x, distress <1.5x.",
+      "what_to_do": "Read with debt-to-equity; rising debt and falling coverage together are a red flag."
+    },
+    "position_sizing": {
+      "term": "Position Sizing", "term_bn": "পজিশন সাইজিং",
+      "one_liner": "Deciding how much capital to risk on a single trade or holding.",
+      "one_liner_bn": "একটি ট্রেড বা বিনিয়োগে কত মূলধন ঝুঁকিতে রাখবেন তা নির্ধারণ।",
+      "analogy": "Not putting all your eggs in one basket — and deciding how big each basket is.",
+      "for_investor": "Caps single-name risk so one bad call cannot wreck the portfolio.",
+      "for_trader": "The discipline that keeps you alive; risk a small, fixed % per trade.",
+      "good_vs_bad": "Risking ~1-2% of capital per trade is prudent; oversized bets are the usual ruin.",
+      "what_to_do": "Set size from your stop distance and a fixed risk-per-trade rule (see risk-manager)."
+    }
+  }
+}
