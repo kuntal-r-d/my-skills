@@ -7,9 +7,9 @@
       "id": "PRD-001",
       "name": "Stock Buddy Skills Suite",
       "path": "docs/rcf/prds/PRD-001.json",
-      "stories": [],
-      "tad": [],
-      "bs": [],
+      "stories": ["docs/rcf/user-stories/PRD-001.userstories.json"],
+      "tad": ["docs/rcf/tad/TAD-001.tad.json"],
+      "bs": ["docs/rcf/build-sequence/BS-001.buildsequence.json"],
       "fbs": [],
       "ts": [],
       "tc": []
