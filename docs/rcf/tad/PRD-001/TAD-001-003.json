@@ -1,0 +1,212 @@
+{
+  "tadId": "TAD-001-003",
+  "prdId": "PRD-001",
+  "version": "1.0.0",
+  "status": "draft",
+  "partInfo": {
+    "partNumber": 3,
+    "totalParts": 4,
+    "groupId": "data",
+    "groupName": "Data & Security",
+    "sections": [
+      "dataArchitecture",
+      "securityArchitecture"
+    ]
+  },
+  "extractedConcerns": {},
+  "systemOverview": {},
+  "architecturePrinciples": [],
+  "components": [],
+  "integrationArchitecture": {},
+  "dataArchitecture": {
+    "dataStores": [
+      {
+        "name": "Skill Fixtures",
+        "technology": "JSON files",
+        "purpose": "Test data for validation",
+        "dataTypes": [
+          "OHLCV",
+          "fundamentals",
+          "market data"
+        ]
+      },
+      {
+        "name": "Adapter Cache",
+        "technology": "File/Redis cache",
+        "purpose": "Reduce API calls",
+        "dataTypes": [
+          "Ticker data",
+          "Market snapshots"
+        ],
+        "accessPatterns": [
+          "Read-through cache",
+          "TTL expiry"
+        ]
+      }
+    ],
+    "coreEntities": [
+      {
+        "name": "TickerData",
+        "description": "Normalized market data for a stock",
+        "fields": [
+          {
+            "name": "ticker",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "ohlcv",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "fundamentals",
+            "type": "object",
+            "required": false
+          },
+          {
+            "name": "news",
+            "type": "array",
+            "required": false
+          }
+        ],
+        "relationships": [
+          "Input to all skills"
+        ]
+      },
+      {
+        "name": "ThinkingCard",
+        "description": "Standardized skill output",
+        "fields": [
+          {
+            "name": "score",
+            "type": "number",
+            "required": true
+          },
+          {
+            "name": "rating",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "confidence",
+            "type": "number",
+            "required": true
+          },
+          {
+            "name": "reasoning",
+            "type": "array",
+            "required": true
+          },
+          {
+            "name": "recommendations",
+            "type": "object",
+            "required": false
+          }
+        ],
+        "relationships": [
+          "Output from all skills"
+        ]
+      }
+    ],
+    "dataFlowDescription": "Data flows from external sources through the adapter (with caching), gets normalized into TickerData, passes to skills for analysis, produces ThinkingCards, which are aggregated by composite tools and returned to clients.",
+    "cachingStrategy": "Multi-level caching: adapter cache for external data (5-15 min TTL), result cache for computed analysis (1 min), with cache invalidation on market events.",
+    "dataRetention": "Cache-only retention for market data (no permanent storage), analysis results logged for performance tracking (30 day retention)."
+  },
+  "securityArchitecture": {
+    "securityBoundaries": "Trust boundary at skill subprocess execution; data adapter validates external input; MCP server sanitizes client input",
+    "authenticationPattern": {
+      "type": "Mixed",
+      "flow": "None for local stdio; API key for hosted HTTP; OAuth for future enhancements"
+    },
+    "authorizationModel": {
+      "type": "Simple",
+      "roleMapping": [
+        {
+          "role": "user",
+          "permissions": [
+            "execute_skills",
+            "view_results"
+          ]
+        },
+        {
+          "role": "admin",
+          "permissions": [
+            "all"
+          ]
+        }
+      ]
+    },
+    "securityControls": [
+      {
+        "control": "Input Validation",
+        "implementation": "JSON schema validation",
+        "location": "MCP server, Data adapter",
+        "relatedReqs": [
+          "REQ-005",
+          "REQ-006"
+        ]
+      },
+      {
+        "control": "Secret Scanning",
+        "implementation": "GitHub secret scanning",
+        "location": "Repository",
+        "relatedReqs": [
+          "REQ-010"
+        ]
+      },
+      {
+        "control": "Code Scanning",
+        "implementation": "CodeQL analysis",
+        "location": "CI/CD",
+        "relatedReqs": [
+          "REQ-010"
+        ]
+      },
+      {
+        "control": "Subprocess Isolation",
+        "implementation": "Restricted subprocess execution",
+        "location": "MCP server",
+        "relatedReqs": [
+          "REQ-005"
+        ]
+      },
+      {
+        "control": "Rate Limiting",
+        "implementation": "Token bucket algorithm",
+        "location": "Data adapter",
+        "relatedReqs": [
+          "REQ-006",
+          "REQ-020"
+        ]
+      }
+    ],
+    "sensitiveDataHandling": [
+      {
+        "dataType": "API Keys",
+        "classification": "Secret",
+        "handling": "Environment variables, never in code"
+      },
+      {
+        "dataType": "User Portfolio Data",
+        "classification": "Confidential",
+        "handling": "Process in memory only, no persistence"
+      }
+    ],
+    "complianceRequirements": [
+      "Educational-only disclaimers on all outputs",
+      "Public data sources only",
+      "GDPR compliance for any EU users",
+      "Bangladesh financial regulations"
+    ]
+  },
+  "deploymentArchitecture": {},
+  "operationalConcerns": {},
+  "architecturalDecisions": [],
+  "generationMetadata": {
+    "sectionsGenerated": []
+  },
+  "createdAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-19T00:00:00Z",
+  "_changesSummary": null
+}

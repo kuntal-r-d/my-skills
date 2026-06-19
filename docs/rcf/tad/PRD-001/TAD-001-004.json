@@ -1,0 +1,436 @@
+{
+  "tadId": "TAD-001-004",
+  "prdId": "PRD-001",
+  "version": "1.0.0",
+  "status": "draft",
+  "partInfo": {
+    "partNumber": 4,
+    "totalParts": 4,
+    "groupId": "operations",
+    "groupName": "Operations & Decisions",
+    "sections": [
+      "deploymentArchitecture",
+      "operationalConcerns",
+      "architecturalDecisions"
+    ]
+  },
+  "extractedConcerns": {},
+  "systemOverview": {},
+  "architecturePrinciples": [],
+  "components": [],
+  "integrationArchitecture": {},
+  "dataArchitecture": {},
+  "securityArchitecture": {},
+  "deploymentArchitecture": {
+    "targetEnvironment": {
+      "platform": "Multi-platform (Linux, macOS, Windows)",
+      "topology": "Distributed microservices",
+      "environmentVariables": [
+        {
+          "name": "STOCK_BUDDY_SKILLS_DIR",
+          "description": "Path to skills directory",
+          "sensitive": false
+        },
+        {
+          "name": "STOCK_BUDDY_TRANSPORT",
+          "description": "stdio or http",
+          "sensitive": false
+        },
+        {
+          "name": "STOCK_BUDDY_PORT",
+          "description": "HTTP port (default 8080)",
+          "sensitive": false
+        },
+        {
+          "name": "DSE_API_KEY",
+          "description": "API key for data source",
+          "sensitive": true
+        }
+      ]
+    },
+    "scalingStrategy": [
+      {
+        "component": "MCP Server",
+        "minInstances": 1,
+        "maxInstances": 10,
+        "scalingTrigger": "CPU > 70% or request queue > 100"
+      },
+      {
+        "component": "Data Adapter",
+        "minInstances": 1,
+        "maxInstances": 5,
+        "scalingTrigger": "Cache miss rate > 30%"
+      }
+    ],
+    "resourceRequirements": [
+      {
+        "component": "MCP Server",
+        "cpuRequest": "200m",
+        "cpuLimit": "1000m",
+        "memoryRequest": "256Mi",
+        "memoryLimit": "512Mi"
+      },
+      {
+        "component": "Skills (per subprocess)",
+        "cpuRequest": "100m",
+        "cpuLimit": "500m",
+        "memoryRequest": "128Mi",
+        "memoryLimit": "256Mi"
+      }
+    ],
+    "containerization": {
+      "enabled": true,
+      "baseImage": "python:3.11-slim",
+      "buildStrategy": "Multi-stage build with minimal runtime"
+    },
+    "cicdPipeline": "GitHub Actions with matrix testing across Python versions, automated releases on tags, security scanning on every push"
+  },
+  "operationalConcerns": {
+    "configurationManagement": {
+      "environmentVariables": [
+        "STOCK_BUDDY_SKILLS_DIR",
+        "STOCK_BUDDY_TRANSPORT",
+        "STOCK_BUDDY_PORT",
+        "DSE_API_KEY"
+      ],
+      "configFiles": [
+        "config/server.yml",
+        "config/adapters.yml"
+      ]
+    },
+    "healthChecks": [
+      {
+        "endpoint": "/health",
+        "purpose": "Liveness check",
+        "checks": [
+          "Server running",
+          "Skills directory accessible"
+        ]
+      },
+      {
+        "endpoint": "/ready",
+        "purpose": "Readiness check",
+        "checks": [
+          "All skills loaded",
+          "Data adapter connected"
+        ]
+      }
+    ],
+    "logging": {
+      "destination": "stdout/stderr",
+      "retention": "30 days",
+      "keyEvents": [
+        {
+          "event": "skill_execution",
+          "level": "info",
+          "trigger": "Every skill call",
+          "fields": [
+            "skill",
+            "duration",
+            "success"
+          ]
+        },
+        {
+          "event": "error",
+          "level": "error",
+          "trigger": "Any error",
+          "fields": [
+            "error_code",
+            "stack_trace",
+            "context"
+          ]
+        }
+      ]
+    },
+    "metrics": [
+      {
+        "name": "skill_execution_time",
+        "type": "histogram",
+        "description": "Time to execute each skill"
+      },
+      {
+        "name": "cache_hit_rate",
+        "type": "gauge",
+        "description": "Percentage of cache hits"
+      },
+      {
+        "name": "active_connections",
+        "type": "gauge",
+        "description": "Current MCP connections"
+      }
+    ],
+    "monitoring": {
+      "tools": [
+        "Prometheus",
+        "Grafana"
+      ],
+      "alerts": [
+        "Skill execution time > 5s",
+        "Error rate > 1%",
+        "Memory usage > 80%"
+      ]
+    }
+  },
+  "architecturalDecisions": [
+    {
+      "id": "ADR-001",
+      "title": "Python for all components",
+      "status": "accepted",
+      "context": "Need to choose implementation language for skills and server",
+      "optionsConsidered": [
+        {
+          "option": "Python only",
+          "pros": [
+            "Single language",
+            "Good for data science",
+            "Simple deployment"
+          ],
+          "cons": [
+            "Performance limitations"
+          ]
+        },
+        {
+          "option": "Python skills + Node server",
+          "pros": [
+            "Better MCP ecosystem support",
+            "Performance"
+          ],
+          "cons": [
+            "Two languages to maintain"
+          ]
+        }
+      ],
+      "decision": "Use Python for all components",
+      "rationale": "Simplicity and consistency outweigh performance concerns for this use case",
+      "consequences": [
+        "Single language expertise needed",
+        "Easier maintenance"
+      ],
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-005"
+      ],
+      "relatedDecisions": []
+    },
+    {
+      "id": "ADR-002",
+      "title": "Subprocess dispatch for skills",
+      "status": "accepted",
+      "context": "MCP server needs to execute skill logic",
+      "optionsConsidered": [
+        {
+          "option": "Import as modules",
+          "pros": [
+            "Faster",
+            "Shared memory"
+          ],
+          "cons": [
+            "No isolation",
+            "Memory leaks possible"
+          ]
+        },
+        {
+          "option": "Subprocess execution",
+          "pros": [
+            "Complete isolation",
+            "No memory leaks",
+            "Crash isolation"
+          ],
+          "cons": [
+            "Slower",
+            "IPC overhead"
+          ]
+        }
+      ],
+      "decision": "Use subprocess execution",
+      "rationale": "Isolation and stability more important than raw performance",
+      "consequences": [
+        "Each skill runs in isolated process",
+        "Clean error handling"
+      ],
+      "relatedReqs": [
+        "REQ-005"
+      ],
+      "relatedDecisions": [
+        "ADR-001"
+      ]
+    },
+    {
+      "id": "ADR-003",
+      "title": "Pluggable data adapter architecture",
+      "status": "accepted",
+      "context": "Skills need market data but should remain pure",
+      "optionsConsidered": [
+        {
+          "option": "Skills fetch directly",
+          "pros": [
+            "Simple",
+            "Direct control"
+          ],
+          "cons": [
+            "Not testable",
+            "Network in skills"
+          ]
+        },
+        {
+          "option": "Separate data layer",
+          "pros": [
+            "Testable",
+            "Skills stay pure",
+            "Multiple sources"
+          ],
+          "cons": [
+            "Additional component"
+          ]
+        }
+      ],
+      "decision": "Implement separate pluggable data adapter",
+      "rationale": "Separation of concerns and testability are critical",
+      "consequences": [
+        "Clean architecture",
+        "Easy to test",
+        "Multiple data sources possible"
+      ],
+      "relatedReqs": [
+        "REQ-006"
+      ],
+      "relatedDecisions": []
+    },
+    {
+      "id": "ADR-004",
+      "title": "Dual transport support",
+      "status": "accepted",
+      "context": "Need to support both desktop and hosted deployments",
+      "optionsConsidered": [
+        {
+          "option": "stdio only",
+          "pros": [
+            "Simple",
+            "Standard for MCP"
+          ],
+          "cons": [
+            "No remote access"
+          ]
+        },
+        {
+          "option": "HTTP only",
+          "pros": [
+            "Remote access",
+            "Standard REST"
+          ],
+          "cons": [
+            "Not native MCP"
+          ]
+        },
+        {
+          "option": "Both stdio and HTTP",
+          "pros": [
+            "Maximum flexibility",
+            "All use cases"
+          ],
+          "cons": [
+            "More complex"
+          ]
+        }
+      ],
+      "decision": "Support both stdio and HTTP transports",
+      "rationale": "Different deployment scenarios require different transports",
+      "consequences": [
+        "More complex server",
+        "Broader compatibility"
+      ],
+      "relatedReqs": [
+        "REQ-007"
+      ],
+      "relatedDecisions": []
+    },
+    {
+      "id": "ADR-005",
+      "title": "GitHub Actions for CI/CD",
+      "status": "accepted",
+      "context": "Need CI/CD pipeline for quality and releases",
+      "optionsConsidered": [
+        {
+          "option": "GitHub Actions",
+          "pros": [
+            "Integrated with GitHub",
+            "Free for public repos",
+            "Good ecosystem"
+          ],
+          "cons": [
+            "Vendor lock-in"
+          ]
+        },
+        {
+          "option": "Jenkins",
+          "pros": [
+            "Self-hosted",
+            "Full control"
+          ],
+          "cons": [
+            "Maintenance overhead"
+          ]
+        }
+      ],
+      "decision": "Use GitHub Actions",
+      "rationale": "Integration and simplicity outweigh lock-in concerns",
+      "consequences": [
+        "Easy setup",
+        "Good integration",
+        "Some vendor dependency"
+      ],
+      "relatedReqs": [
+        "REQ-009",
+        "REQ-010"
+      ],
+      "relatedDecisions": []
+    },
+    {
+      "id": "ADR-006",
+      "title": "Multi-agent architecture",
+      "status": "accepted",
+      "context": "Complex analysis requires different perspectives",
+      "optionsConsidered": [
+        {
+          "option": "Single monolithic analyzer",
+          "pros": [
+            "Simple",
+            "One decision point"
+          ],
+          "cons": [
+            "Complex logic",
+            "Hard to maintain"
+          ]
+        },
+        {
+          "option": "Specialized agents",
+          "pros": [
+            "Separation of concerns",
+            "Expert systems",
+            "Maintainable"
+          ],
+          "cons": [
+            "Coordination needed"
+          ]
+        }
+      ],
+      "decision": "Implement three specialized agents",
+      "rationale": "Different analysis types benefit from specialization",
+      "consequences": [
+        "Clear responsibilities",
+        "Better maintainability",
+        "Need orchestration"
+      ],
+      "relatedReqs": [
+        "REQ-013"
+      ],
+      "relatedDecisions": []
+    }
+  ],
+  "generationMetadata": {
+    "sectionsGenerated": []
+  },
+  "createdAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-19T00:00:00Z",
+  "_changesSummary": null
+}

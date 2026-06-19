@@ -1,0 +1,238 @@
+{
+  "tadId": "TAD-001-002",
+  "prdId": "PRD-001",
+  "version": "1.0.0",
+  "status": "draft",
+  "partInfo": {
+    "partNumber": 2,
+    "totalParts": 4,
+    "groupId": "components",
+    "groupName": "Components & Integration",
+    "sections": [
+      "components",
+      "integrationArchitecture"
+    ]
+  },
+  "extractedConcerns": {},
+  "systemOverview": {},
+  "architecturePrinciples": [],
+  "components": [
+    {
+      "name": "Skills Library",
+      "purpose": "Core analysis logic for DSE stocks",
+      "location": "skills/",
+      "dependencies": [],
+      "keyPatterns": [
+        "Pure functions",
+        "JSON I/O",
+        "Agent Skills spec"
+      ],
+      "interfaces": [
+        {
+          "name": "Skill CLI",
+          "type": "internal",
+          "description": "JSON stdin -> Thinking Card JSON stdout"
+        }
+      ],
+      "responsibilities": [
+        "Technical analysis calculations",
+        "Fundamental analysis",
+        "Pattern recognition",
+        "Signal generation"
+      ],
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-002",
+        "REQ-003"
+      ]
+    },
+    {
+      "name": "MCP Server",
+      "purpose": "Expose skills as MCP tools",
+      "location": "mcp-server/",
+      "dependencies": [
+        "Skills Library"
+      ],
+      "keyPatterns": [
+        "Tool registry",
+        "Subprocess dispatch",
+        "Composite orchestration"
+      ],
+      "interfaces": [
+        {
+          "name": "MCP Protocol",
+          "type": "api",
+          "description": "list_tools, call_tool via stdio/HTTP"
+        }
+      ],
+      "responsibilities": [
+        "Tool registration and discovery",
+        "Input validation",
+        "Subprocess management",
+        "Composite pipeline orchestration"
+      ],
+      "relatedReqs": [
+        "REQ-005",
+        "REQ-007"
+      ]
+    },
+    {
+      "name": "Data Adapter",
+      "purpose": "Fetch and normalize market data",
+      "location": "data-adapter/",
+      "dependencies": [
+        "External data sources"
+      ],
+      "keyPatterns": [
+        "Provider pattern",
+        "Caching",
+        "Rate limiting"
+      ],
+      "interfaces": [
+        {
+          "name": "Data API",
+          "type": "api",
+          "description": "get_ticker_data(ticker) -> normalized JSON"
+        }
+      ],
+      "responsibilities": [
+        "Data fetching",
+        "Normalization",
+        "Caching",
+        "Quality flags"
+      ],
+      "relatedReqs": [
+        "REQ-006"
+      ]
+    },
+    {
+      "name": "Agent Skills Distribution",
+      "purpose": "Enable gh skill installation",
+      "location": "skills/*/SKILL.md",
+      "dependencies": [
+        "GitHub"
+      ],
+      "keyPatterns": [
+        "Metadata frontmatter",
+        "Spec compliance"
+      ],
+      "interfaces": [
+        {
+          "name": "gh skill",
+          "type": "cli",
+          "description": "gh skill install/publish commands"
+        }
+      ],
+      "responsibilities": [
+        "Skill metadata",
+        "Installation instructions",
+        "Agent integration"
+      ],
+      "relatedReqs": [
+        "REQ-004"
+      ]
+    },
+    {
+      "name": "CI/CD Pipeline",
+      "purpose": "Automated testing and deployment",
+      "location": ".github/workflows/",
+      "dependencies": [
+        "GitHub Actions"
+      ],
+      "keyPatterns": [
+        "Matrix testing",
+        "Release automation"
+      ],
+      "interfaces": [
+        {
+          "name": "GitHub Actions",
+          "type": "event",
+          "description": "PR and tag triggers"
+        }
+      ],
+      "responsibilities": [
+        "Automated testing",
+        "Package publishing",
+        "Security scanning",
+        "Release creation"
+      ],
+      "relatedReqs": [
+        "REQ-009",
+        "REQ-010",
+        "REQ-011"
+      ]
+    }
+  ],
+  "integrationArchitecture": {
+    "apiDesign": {
+      "pattern": "RPC-style for MCP, REST-style for data adapter",
+      "conventions": [
+        "JSON request/response",
+        "Structured error responses",
+        "Versioned endpoints"
+      ],
+      "requestResponseFormat": "JSON with schema validation"
+    },
+    "integrationContracts": [
+      {
+        "systemName": "MCP Clients",
+        "purpose": "Consume analysis tools",
+        "protocol": "MCP",
+        "authentication": "None (local) / API key (hosted)",
+        "operations": [
+          {
+            "name": "list_tools",
+            "method": "MCP",
+            "endpoint": "list_tools"
+          },
+          {
+            "name": "call_tool",
+            "method": "MCP",
+            "endpoint": "call_tool"
+          }
+        ],
+        "errorHandling": "Structured error objects with codes",
+        "retryPolicy": {
+          "maxAttempts": 3,
+          "backoffType": "exponential",
+          "backoffBase": 2
+        }
+      },
+      {
+        "systemName": "DSE Data Sources",
+        "purpose": "Market data retrieval",
+        "protocol": "HTTPS",
+        "authentication": "API key (if required)",
+        "operations": [
+          {
+            "name": "fetch_ohlcv",
+            "method": "GET",
+            "endpoint": "/api/ohlcv"
+          },
+          {
+            "name": "fetch_fundamentals",
+            "method": "GET",
+            "endpoint": "/api/fundamentals"
+          }
+        ],
+        "errorHandling": "Graceful degradation with quality flags",
+        "retryPolicy": {
+          "maxAttempts": 3,
+          "backoffType": "exponential",
+          "backoffBase": 2
+        }
+      }
+    ]
+  },
+  "dataArchitecture": {},
+  "securityArchitecture": {},
+  "deploymentArchitecture": {},
+  "operationalConcerns": {},
+  "architecturalDecisions": [],
+  "generationMetadata": {
+    "sectionsGenerated": []
+  },
+  "createdAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-19T00:00:00Z",
+  "_changesSummary": null
+}

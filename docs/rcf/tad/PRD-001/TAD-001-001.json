@@ -1,0 +1,146 @@
+{
+  "tadId": "TAD-001-001",
+  "prdId": "PRD-001",
+  "version": "1.0.0",
+  "status": "draft",
+  "partInfo": {
+    "partNumber": 1,
+    "totalParts": 4,
+    "groupId": "overview",
+    "groupName": "Overview & Principles",
+    "sections": [
+      "systemOverview",
+      "architecturePrinciples",
+      "extractedConcerns"
+    ]
+  },
+  "extractedConcerns": null,
+  "systemOverview": {
+    "executiveSummary": "Stock Buddy Skills Suite is a comprehensive DSE stock analysis system combining 14 specialized AI-powered skills with multiple distribution channels (Agent Skills, MCP server, CLI) and robust data integration.",
+    "systemPurpose": "Provide Bangladesh stock market investors with AI-powered analysis tools for momentum trading, investment analysis, and business intelligence through modern agent interfaces and MCP clients.",
+    "architecturalApproach": "Microservice-style architecture with pure Python analysis skills as the core, thin distribution layers (gh skill, MCP server), pluggable data adapters, and comprehensive CI/CD infrastructure.",
+    "keyCapabilities": [
+      "14 specialized DSE analysis skills",
+      "Multi-channel distribution (Agent Skills, MCP, CLI)",
+      "Momentum and value investment analysis",
+      "Pluggable data adapter architecture",
+      "Real-time and batch processing",
+      "Bengali language support"
+    ],
+    "externalDependencies": [
+      {
+        "system": "GitHub",
+        "purpose": "Source hosting, gh skill distribution, CI/CD",
+        "protocol": "HTTPS/git",
+        "owner": "GitHub"
+      },
+      {
+        "system": "DSE Data Sources",
+        "purpose": "Market data for analysis",
+        "protocol": "HTTPS/API",
+        "owner": "DSE/Public sources"
+      },
+      {
+        "system": "MCP Clients",
+        "purpose": "Consume analysis tools",
+        "protocol": "MCP (stdio/HTTP)",
+        "owner": "Various (Claude, Cursor, etc.)"
+      },
+      {
+        "system": "Package Registries",
+        "purpose": "Distribution of MCP server",
+        "protocol": "HTTPS",
+        "owner": "npm/PyPI"
+      }
+    ],
+    "assumptionsAndConstraints": [
+      "Skills remain stdlib-only Python with no network calls",
+      "Public data sources only for compliance",
+      "Educational-only outputs with disclaimers",
+      "Must conform to agentskills.io spec",
+      "DSE market-specific adaptations required"
+    ]
+  },
+  "architecturePrinciples": [
+    {
+      "name": "Single Source of Truth",
+      "description": "Skill folders are canonical; all distribution channels dispatch to the same core skills",
+      "rationale": "Prevents logic drift and ensures consistency across all access methods",
+      "implications": [
+        "MCP server uses subprocess dispatch",
+        "No analysis logic in distribution layers",
+        "All improvements go to core skills"
+      ],
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-005"
+      ]
+    },
+    {
+      "name": "Pure Functions Architecture",
+      "description": "Skills are stateless, deterministic functions with JSON in/out",
+      "rationale": "Ensures reproducibility, testability, and portability",
+      "implications": [
+        "No network calls in skills",
+        "Data fetching isolated in adapter layer",
+        "Fixture-based testing possible"
+      ],
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-006"
+      ]
+    },
+    {
+      "name": "Pluggable Data Layer",
+      "description": "Data sources abstracted behind provider interface",
+      "rationale": "Allows testing, multiple data sources, and compliance with data policies",
+      "implications": [
+        "Provider interface must be stable",
+        "Caching and rate limiting in adapter",
+        "Skills receive normalized data"
+      ],
+      "relatedReqs": [
+        "REQ-006"
+      ]
+    },
+    {
+      "name": "Security by Design",
+      "description": "Supply chain hardening, scanning, and immutable releases",
+      "rationale": "Executable code distributed to users requires trust and verification",
+      "implications": [
+        "Automated security scanning",
+        "Signed releases with provenance",
+        "No secrets in code"
+      ],
+      "relatedReqs": [
+        "REQ-010"
+      ]
+    },
+    {
+      "name": "Multi-Agent Specialization",
+      "description": "Different agents for different analysis perspectives",
+      "rationale": "Complex analysis benefits from specialized expertise",
+      "implications": [
+        "Clear separation of concerns",
+        "Agent orchestration required",
+        "Consistent output format"
+      ],
+      "relatedReqs": [
+        "REQ-013"
+      ]
+    }
+  ],
+  "components": [],
+  "integrationArchitecture": {},
+  "dataArchitecture": {},
+  "securityArchitecture": {},
+  "deploymentArchitecture": {},
+  "operationalConcerns": {},
+  "architecturalDecisions": [],
+  "generationMetadata": {
+    "sectionsGenerated": []
+  },
+  "createdAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-19T00:00:00Z",
+  "_changesSummary": null
+}

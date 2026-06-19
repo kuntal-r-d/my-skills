@@ -15,8 +15,23 @@
       ],
       "tad": [
         {
-          "id": "TAD-001",
-          "path": "docs/rcf/tad/TAD-001.tad.json"
+          "id": "TAD-001-001",
+          "path": "docs/rcf/tad/PRD-001/TAD-001-001.json"
+        },
+        {
+          "id": "TAD-001-002",
+          "path": "docs/rcf/tad/PRD-001/TAD-001-002.json",
+          "name": "TAD Part 2"
+        },
+        {
+          "id": "TAD-001-003",
+          "path": "docs/rcf/tad/PRD-001/TAD-001-003.json",
+          "name": "TAD Part 3"
+        },
+        {
+          "id": "TAD-001-004",
+          "path": "docs/rcf/tad/PRD-001/TAD-001-004.json",
+          "name": "TAD Part 4"
         }
       ],
       "bs": [
