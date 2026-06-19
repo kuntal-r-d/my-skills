@@ -1,0 +1,6 @@
+{
+  "version": "2.0.0",
+  "projectName": "Stock Buddy Skills",
+  "description": "RCF-tracked repository exposing agent-skills-format skills for DSE stock analysis (investment and momentum trading) consumable by any MCP client.",
+  "prds": []
+}
