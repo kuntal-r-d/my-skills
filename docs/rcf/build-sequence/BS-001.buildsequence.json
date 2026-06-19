@@ -1,0 +1,539 @@
+{
+  "bsId": "BS-001",
+  "prdId": "PRD-001",
+  "version": "1.0.0",
+  "status": "draft",
+  "title": "Build Sequence: Stock Buddy Skills Suite",
+  "buildPhilosophy": "Foundation-first approach: establish core skills, then distribution channels, followed by data integration, and finally CI/CD hardening",
+  "generationStrategy": "dependency-first",
+  "buildSequence": [
+    {
+      "id": "FBS-001",
+      "title": "Core Skills Implementation",
+      "summary": "Implement and validate all 14 DSE analysis skills with fixtures",
+      "storyScope": [
+        {
+          "usId": "US-001",
+          "acIds": ["AC-001", "AC-002", "AC-003"]
+        }
+      ],
+      "dependencies": [],
+      "testableOutcomes": [
+        "14 skill folders with valid SKILL.md files",
+        "Each skill produces valid Thinking Card output",
+        "All skills pass fixture validation"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "large",
+        "estimatedHours": 40
+      },
+      "riskLevel": "medium",
+      "domain": "Core Skills"
+    },
+    {
+      "id": "FBS-002",
+      "title": "Momentum Trading Formulas",
+      "summary": "Implement comprehensive momentum indicators and strategies",
+      "storyScope": [
+        {
+          "usId": "US-002",
+          "acIds": ["AC-004", "AC-005", "AC-006"]
+        }
+      ],
+      "dependencies": ["FBS-001"],
+      "testableOutcomes": [
+        "RSI, MACD, ROC, MFI calculate correctly",
+        "Minervini SEPA criteria validated",
+        "Volume confirmation signals work"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "large",
+        "estimatedHours": 24
+      },
+      "riskLevel": "high",
+      "domain": "Technical Analysis"
+    },
+    {
+      "id": "FBS-003",
+      "title": "Investment Analysis Implementation",
+      "summary": "Build value investment criteria and scoring systems",
+      "storyScope": [
+        {
+          "usId": "US-003",
+          "acIds": ["AC-007", "AC-008", "AC-009"]
+        }
+      ],
+      "dependencies": ["FBS-001"],
+      "testableOutcomes": [
+        "Economic moat assessment functional",
+        "Financial ratios calculated accurately",
+        "Investment grade scoring works"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "large",
+        "estimatedHours": 24
+      },
+      "riskLevel": "high",
+      "domain": "Fundamental Analysis"
+    },
+    {
+      "id": "FBS-004",
+      "title": "Agent Skills Publication",
+      "summary": "Publish skills to GitHub and validate with gh skill",
+      "storyScope": [
+        {
+          "usId": "US-004",
+          "acIds": ["AC-010", "AC-011", "AC-012"]
+        }
+      ],
+      "dependencies": ["FBS-001", "FBS-002", "FBS-003"],
+      "testableOutcomes": [
+        "gh skill publish validates all skills",
+        "Skills installable via gh skill install",
+        "Skills trigger in supported agents"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 8
+      },
+      "riskLevel": "low",
+      "domain": "Distribution"
+    },
+    {
+      "id": "FBS-005",
+      "title": "MCP Server Core",
+      "summary": "Build MCP server with tool registration and subprocess dispatch",
+      "storyScope": [
+        {
+          "usId": "US-005",
+          "acIds": ["AC-013", "AC-014"]
+        }
+      ],
+      "dependencies": ["FBS-001"],
+      "testableOutcomes": [
+        "MCP server lists 14 skill tools",
+        "Tool calls dispatch to skills successfully",
+        "Error handling works properly"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "large",
+        "estimatedHours": 20
+      },
+      "riskLevel": "medium",
+      "domain": "MCP Integration"
+    },
+    {
+      "id": "FBS-006",
+      "title": "Composite Tools",
+      "summary": "Implement analyze_ticker and screen_market pipelines",
+      "storyScope": [
+        {
+          "usId": "US-005",
+          "acIds": ["AC-015"]
+        }
+      ],
+      "dependencies": ["FBS-005"],
+      "testableOutcomes": [
+        "analyze_ticker runs full pipeline",
+        "screen_market filters and ranks stocks",
+        "Graceful handling of partial failures"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 12
+      },
+      "riskLevel": "medium",
+      "domain": "MCP Integration"
+    },
+    {
+      "id": "FBS-007",
+      "title": "Data Adapter Layer",
+      "summary": "Build pluggable data adapter with provider interface",
+      "storyScope": [
+        {
+          "usId": "US-006",
+          "acIds": ["AC-016", "AC-017", "AC-018"]
+        }
+      ],
+      "dependencies": [],
+      "testableOutcomes": [
+        "Provider interface defined and stable",
+        "File provider returns valid data",
+        "DSE provider fetches real data",
+        "Caching and rate limiting work"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "large",
+        "estimatedHours": 20
+      },
+      "riskLevel": "high",
+      "domain": "Data Integration"
+    },
+    {
+      "id": "FBS-008",
+      "title": "Transport Implementation",
+      "summary": "Implement stdio and HTTP transports for MCP server",
+      "storyScope": [
+        {
+          "usId": "US-007",
+          "acIds": ["AC-019", "AC-020", "AC-021"]
+        }
+      ],
+      "dependencies": ["FBS-005"],
+      "testableOutcomes": [
+        "stdio transport works with desktop clients",
+        "HTTP transport accessible remotely",
+        "Transport switching works correctly"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 12
+      },
+      "riskLevel": "medium",
+      "domain": "MCP Server"
+    },
+    {
+      "id": "FBS-009",
+      "title": "Packaging and Distribution",
+      "summary": "Create npx/uvx runners and Docker containers",
+      "storyScope": [
+        {
+          "usId": "US-008",
+          "acIds": ["AC-022", "AC-023", "AC-024"]
+        }
+      ],
+      "dependencies": ["FBS-005", "FBS-008"],
+      "testableOutcomes": [
+        "npx/uvx runner starts server",
+        "Docker container runs successfully",
+        "Client config templates work"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 10
+      },
+      "riskLevel": "low",
+      "domain": "Packaging"
+    },
+    {
+      "id": "FBS-010",
+      "title": "CI/CD Pipeline",
+      "summary": "Set up GitHub Actions for testing and releases",
+      "storyScope": [
+        {
+          "usId": "US-009",
+          "acIds": ["AC-025", "AC-026", "AC-027"]
+        }
+      ],
+      "dependencies": ["FBS-004"],
+      "testableOutcomes": [
+        "PR validation workflow runs",
+        "Release automation works on tags",
+        "Immutable releases created"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 12
+      },
+      "riskLevel": "medium",
+      "domain": "DevOps"
+    },
+    {
+      "id": "FBS-011",
+      "title": "Security Hardening",
+      "summary": "Enable scanning and supply chain security",
+      "storyScope": [
+        {
+          "usId": "US-010",
+          "acIds": ["AC-028", "AC-029", "AC-030"]
+        }
+      ],
+      "dependencies": ["FBS-010"],
+      "testableOutcomes": [
+        "Secret and code scanning enabled",
+        "Immutable releases with tag protection",
+        "SBOM and provenance generated"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "small",
+        "estimatedHours": 6
+      },
+      "riskLevel": "low",
+      "domain": "Security"
+    },
+    {
+      "id": "FBS-012",
+      "title": "Test Infrastructure",
+      "summary": "Build comprehensive test suites",
+      "storyScope": [
+        {
+          "usId": "US-011",
+          "acIds": ["AC-031", "AC-032", "AC-033"]
+        }
+      ],
+      "dependencies": ["FBS-001", "FBS-005", "FBS-007"],
+      "testableOutcomes": [
+        "Unit test coverage > 80%",
+        "Integration tests for all tools",
+        "Performance benchmarks pass"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "large",
+        "estimatedHours": 20
+      },
+      "riskLevel": "medium",
+      "domain": "Quality"
+    },
+    {
+      "id": "FBS-013",
+      "title": "Documentation Suite",
+      "summary": "Create comprehensive documentation and examples",
+      "storyScope": [
+        {
+          "usId": "US-012",
+          "acIds": ["AC-034", "AC-035", "AC-036"]
+        }
+      ],
+      "dependencies": ["FBS-004", "FBS-009"],
+      "testableOutcomes": [
+        "README with clear installation guide",
+        "Each skill has examples and quickstart",
+        "Skills discoverable via gh skill search"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 12
+      },
+      "riskLevel": "low",
+      "domain": "Documentation"
+    },
+    {
+      "id": "FBS-014",
+      "title": "Multi-Agent System",
+      "summary": "Implement specialized analysis agents",
+      "storyScope": [
+        {
+          "usId": "US-013",
+          "acIds": ["AC-037", "AC-038", "AC-039"]
+        }
+      ],
+      "dependencies": ["FBS-002", "FBS-003"],
+      "testableOutcomes": [
+        "Momentum agent analyzes technical indicators",
+        "Investment agent evaluates fundamentals",
+        "Business agent assesses company viability"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "large",
+        "estimatedHours": 16
+      },
+      "riskLevel": "high",
+      "domain": "AI Agents"
+    },
+    {
+      "id": "FBS-015",
+      "title": "Interactive Checklists",
+      "summary": "Build visual criteria checklists with explanations",
+      "storyScope": [
+        {
+          "usId": "US-014",
+          "acIds": ["AC-040", "AC-041", "AC-042"]
+        }
+      ],
+      "dependencies": ["FBS-002", "FBS-003"],
+      "testableOutcomes": [
+        "25-point momentum checklist displays",
+        "30-point investment checklist works",
+        "Visual indicators and recommendations shown"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 12
+      },
+      "riskLevel": "low",
+      "domain": "User Interface"
+    },
+    {
+      "id": "FBS-016",
+      "title": "Price Prediction Engine",
+      "summary": "Calculate specific buy/sell price targets",
+      "storyScope": [
+        {
+          "usId": "US-015",
+          "acIds": ["AC-043", "AC-044", "AC-045"]
+        }
+      ],
+      "dependencies": ["FBS-002"],
+      "testableOutcomes": [
+        "Specific buy prices in BDT calculated",
+        "Sell targets and stop-loss computed",
+        "Confidence scores accompany predictions"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 10
+      },
+      "riskLevel": "high",
+      "domain": "Price Prediction"
+    },
+    {
+      "id": "FBS-017",
+      "title": "DSE Market Localization",
+      "summary": "Adapt analysis to Bangladesh market specifics",
+      "storyScope": [
+        {
+          "usId": "US-016",
+          "acIds": ["AC-046", "AC-047", "AC-048"]
+        }
+      ],
+      "dependencies": ["FBS-001", "FBS-002", "FBS-003"],
+      "testableOutcomes": [
+        "DSE P/E benchmarks applied",
+        "Bangladesh sector weightings used",
+        "Bengali language support available"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 12
+      },
+      "riskLevel": "medium",
+      "domain": "Localization"
+    },
+    {
+      "id": "FBS-018",
+      "title": "Educational Framework",
+      "summary": "Build beginner-friendly explanations and learning tools",
+      "storyScope": [
+        {
+          "usId": "US-017",
+          "acIds": ["AC-049", "AC-050", "AC-051"]
+        }
+      ],
+      "dependencies": ["FBS-015"],
+      "testableOutcomes": [
+        "Financial terms have explanations",
+        "Visual representations aid understanding",
+        "Decision impact examples provided"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 10
+      },
+      "riskLevel": "low",
+      "domain": "Education"
+    },
+    {
+      "id": "FBS-019",
+      "title": "Performance Optimization",
+      "summary": "Optimize response times and resource usage",
+      "storyScope": [
+        {
+          "usId": "US-018",
+          "acIds": ["AC-052", "AC-053", "AC-054"]
+        }
+      ],
+      "dependencies": ["FBS-005", "FBS-006", "FBS-012"],
+      "testableOutcomes": [
+        "Single skill < 2 second response",
+        "Composite pipeline < 10 seconds",
+        "100 connections with < 512MB memory"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "medium",
+        "estimatedHours": 12
+      },
+      "riskLevel": "medium",
+      "domain": "Performance"
+    },
+    {
+      "id": "FBS-020",
+      "title": "Version Management",
+      "summary": "Implement versioning and maintenance processes",
+      "storyScope": [
+        {
+          "usId": "US-019",
+          "acIds": ["AC-055", "AC-056", "AC-057"]
+        }
+      ],
+      "dependencies": ["FBS-010"],
+      "testableOutcomes": [
+        "Semver followed consistently",
+        "Changelog maintained",
+        "Deprecation policy documented"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "small",
+        "estimatedHours": 4
+      },
+      "riskLevel": "low",
+      "domain": "Maintenance"
+    },
+    {
+      "id": "FBS-021",
+      "title": "Compliance Framework",
+      "summary": "Ensure all legal and regulatory requirements met",
+      "storyScope": [
+        {
+          "usId": "US-020",
+          "acIds": ["AC-058", "AC-059", "AC-060"]
+        }
+      ],
+      "dependencies": ["FBS-001", "FBS-007"],
+      "testableOutcomes": [
+        "Educational disclaimers on all outputs",
+        "Only public data sources used",
+        "Rate limits respected"
+      ],
+      "status": "not-started",
+      "sessionMeta": {
+        "estimatedSize": "small",
+        "estimatedHours": 6
+      },
+      "riskLevel": "high",
+      "domain": "Compliance"
+    }
+  ],
+  "criticalPath": ["FBS-001", "FBS-002", "FBS-003", "FBS-005", "FBS-007", "FBS-010"],
+  "parallelOpportunities": [
+    ["FBS-002", "FBS-003"],
+    ["FBS-005", "FBS-007"],
+    ["FBS-015", "FBS-016", "FBS-017", "FBS-018"]
+  ],
+  "riskMitigation": {
+    "high": [
+      "FBS-002: Complex formulas - Use established libraries where possible",
+      "FBS-003: Financial calculations - Extensive testing with known values",
+      "FBS-007: External data - Multiple provider fallbacks",
+      "FBS-014: AI complexity - Start with simple rules, evolve to ML",
+      "FBS-016: Price accuracy - Clear disclaimers, confidence scores",
+      "FBS-021: Compliance - Legal review before release"
+    ],
+    "medium": [
+      "FBS-001: Skill validation - Comprehensive fixtures",
+      "FBS-005: MCP protocol - Follow spec exactly",
+      "FBS-019: Performance - Profile and optimize bottlenecks"
+    ]
+  },
+  "createdAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-19T00:00:00Z"
+}

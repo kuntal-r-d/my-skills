@@ -1,0 +1,335 @@
+{
+  "prdId": "PRD-001",
+  "productName": "Stock Buddy Skills Suite",
+  "version": "2.0.0",
+  "status": "draft",
+  "executiveSummary": "AI-powered DSE stock analysis skills providing comprehensive market analysis with momentum trading patterns, investment strategies, and business intelligence. Distributed via Agent Skills (gh skill), MCP server, and CLI with robust data integration and CI/CD infrastructure.",
+  "problemStatement": "Bangladesh stock market investors need intelligent analysis tools for DSE that combine momentum trading, fundamental investment analysis, and business intelligence. These tools must be accessible through modern AI agents and MCP clients while maintaining professional-grade quality and supply chain security.",
+  "targetUsers": [
+    "DSE investors using AI coding agents",
+    "MCP client developers integrating stock analysis",
+    "Retail traders seeking momentum opportunities",
+    "Portfolio managers wanting data-driven insights",
+    "Backend developers using CLI tools directly",
+    "Maintainers publishing the skill suite"
+  ],
+  "objectives": [
+    "Provide 14 specialized analysis skills for comprehensive DSE market analysis",
+    "Enable distribution through gh skill install for coding agents",
+    "Expose skills as MCP tools for MCP client consumption",
+    "Implement pluggable data adapters for DSE market data",
+    "Establish CI/CD pipeline with testing and security scanning",
+    "Ensure discoverability through documentation and registries"
+  ],
+  "inScope": [
+    "14 DSE analysis skills (technical, fundamental, momentum, risk, etc.)",
+    "Agent Skills format publication and validation",
+    "MCP server wrapping skills as tools",
+    "Composite pipeline tools for end-to-end analysis",
+    "Data adapter with provider interface",
+    "CI/CD with automated testing and releases",
+    "Multi-channel packaging (npx, uvx, Docker)",
+    "Documentation and sample data"
+  ],
+  "outOfScope": [
+    "Automated trading execution",
+    "Financial advice guarantees",
+    "International markets beyond DSE",
+    "Cryptocurrency trading",
+    "Direct broker integration",
+    "Tax calculation or advice"
+  ],
+  "constraints": [
+    "Skills must be stdlib-only Python with no network calls",
+    "Must comply with DSE data usage policies",
+    "Outputs carry educational-only disclaimers",
+    "Must conform to Agent Skills spec",
+    "Public data sources only"
+  ],
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Core DSE Analysis Skills",
+      "description": "Implement 14 specialized skills for DSE stock analysis including technical-analysis, fundamental-analysis, momentum-scanner, volume-analyzer, support-resistance, trend-detector, market-sentiment, risk-manager, position-sizer, signal-synthesizer, pattern-recognizer, market-screener, financial-analyzer, and pr-summarizer",
+      "category": "functional",
+      "domain": "Core Skills",
+      "priority": "must",
+      "rationale": "These skills form the analytical foundation of the entire system",
+      "tags": [
+        "skills",
+        "analysis",
+        "core"
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "title": "Momentum Trading Formulas",
+      "description": "Implement comprehensive momentum indicators including RSI, MACD, ROC, MFI, ADX, moving averages, Minervini SEPA criteria, Driehaus buy-high-sell-higher strategy, volume confirmation signals, and risk-adjusted position sizing",
+      "category": "functional",
+      "domain": "Technical Analysis",
+      "priority": "must",
+      "rationale": "Momentum trading is a key requirement for DSE traders",
+      "tags": [
+        "momentum",
+        "technical",
+        "formulas"
+      ]
+    },
+    {
+      "id": "REQ-003",
+      "title": "Investment Analysis Criteria",
+      "description": "Implement value investment criteria from Buffett, Graham, and Lynch including economic moat assessment, ROE analysis, PEG ratios, margin of safety calculations, and comprehensive scoring systems",
+      "category": "functional",
+      "domain": "Fundamental Analysis",
+      "priority": "must",
+      "rationale": "Long-term investors need fundamental analysis beyond momentum",
+      "tags": [
+        "investment",
+        "fundamental",
+        "value"
+      ]
+    },
+    {
+      "id": "REQ-004",
+      "title": "Agent Skills Publication",
+      "description": "Publish skills to default branch conforming to agentskills.io spec, enabling installation via gh skill install for Claude Code, GitHub Copilot, Cursor, and other supported hosts",
+      "category": "functional",
+      "domain": "Distribution",
+      "priority": "must",
+      "rationale": "Primary distribution channel for coding agents",
+      "tags": [
+        "distribution",
+        "gh-skill",
+        "agents"
+      ]
+    },
+    {
+      "id": "REQ-005",
+      "title": "MCP Server Implementation",
+      "description": "Provide MCP server exposing one tool per skill plus composite tools (analyze_ticker, screen_market) with subprocess dispatch to maintain single source of truth",
+      "category": "functional",
+      "domain": "MCP Integration",
+      "priority": "must",
+      "rationale": "Many clients consume MCP tools rather than Agent Skills",
+      "tags": [
+        "mcp",
+        "server",
+        "tools"
+      ]
+    },
+    {
+      "id": "REQ-006",
+      "title": "Data Adapter Layer",
+      "description": "Implement pluggable data adapter with provider interface supporting file/DB and DSE providers, producing shared input contract with caching and rate limiting",
+      "category": "functional",
+      "domain": "Data Integration",
+      "priority": "must",
+      "rationale": "Skills need data but must remain pure without network calls",
+      "tags": [
+        "data",
+        "adapter",
+        "providers"
+      ]
+    },
+    {
+      "id": "REQ-007",
+      "title": "Dual Transport Support",
+      "description": "Support both stdio transport for desktop/IDE clients and streamable HTTP for hosted deployments",
+      "category": "technical",
+      "domain": "MCP Server",
+      "priority": "should",
+      "rationale": "Covers both local and hosted consumption models",
+      "tags": [
+        "transport",
+        "stdio",
+        "http"
+      ]
+    },
+    {
+      "id": "REQ-008",
+      "title": "Zero-Install Packaging",
+      "description": "Distribute via npx/uvx runners and Docker containers with copy-paste configuration for Claude Desktop, Cursor, and other MCP clients",
+      "category": "technical",
+      "domain": "Packaging",
+      "priority": "must",
+      "rationale": "Low-friction setup drives adoption",
+      "tags": [
+        "packaging",
+        "docker",
+        "npx",
+        "uvx"
+      ]
+    },
+    {
+      "id": "REQ-009",
+      "title": "CI/CD Pipeline",
+      "description": "GitHub Actions for PR validation (lint, test, spec check) and release automation (package publishing, immutable releases, provenance)",
+      "category": "technical",
+      "domain": "DevOps",
+      "priority": "must",
+      "rationale": "Ensures quality and enables trusted releases",
+      "tags": [
+        "ci",
+        "cd",
+        "testing",
+        "automation"
+      ]
+    },
+    {
+      "id": "REQ-010",
+      "title": "Supply Chain Security",
+      "description": "Enable secret scanning, code scanning, immutable releases, tag protection, and provenance/SBOM generation",
+      "category": "security",
+      "domain": "Security",
+      "priority": "must",
+      "rationale": "Executable code requires supply chain hardening",
+      "tags": [
+        "security",
+        "scanning",
+        "supply-chain"
+      ]
+    },
+    {
+      "id": "REQ-011",
+      "title": "Comprehensive Testing",
+      "description": "Unit tests for skills, integration tests for MCP server, fixture-based validation, performance benchmarks, and security scanning",
+      "category": "technical",
+      "domain": "Quality",
+      "priority": "must",
+      "rationale": "Professional-grade quality requires comprehensive testing",
+      "tags": [
+        "testing",
+        "quality",
+        "validation"
+      ]
+    },
+    {
+      "id": "REQ-012",
+      "title": "Documentation and Discovery",
+      "description": "Maintain README with installation guides, USAGE documentation, sample data, skill quickstarts, and registry listings for discovery",
+      "category": "functional",
+      "domain": "Documentation",
+      "priority": "should",
+      "rationale": "Users need clear documentation to adopt the suite",
+      "tags": [
+        "docs",
+        "discovery",
+        "samples"
+      ]
+    },
+    {
+      "id": "REQ-013",
+      "title": "Multi-Agent Analysis System",
+      "description": "Implement three specialized agents: Momentum Trading Agent (technical indicators), Investment Analysis Agent (fundamentals), Business Analysis Agent (company evaluation) with clear separation of responsibilities",
+      "category": "functional",
+      "domain": "AI Agents",
+      "priority": "must",
+      "rationale": "Different perspectives provide comprehensive analysis",
+      "tags": [
+        "agents",
+        "analysis",
+        "specialization"
+      ]
+    },
+    {
+      "id": "REQ-014",
+      "title": "Criteria Checklists",
+      "description": "Provide interactive checklists for momentum (25 criteria) and investment (30 criteria) with visual indicators, explanations, and actionable recommendations",
+      "category": "functional",
+      "domain": "User Interface",
+      "priority": "must",
+      "rationale": "Beginners need clear criteria with explanations",
+      "tags": [
+        "checklist",
+        "ui",
+        "education"
+      ]
+    },
+    {
+      "id": "REQ-015",
+      "title": "Numerical Price Predictions",
+      "description": "Calculate specific buy prices, sell targets, and stop-loss levels using momentum formulas and risk management, not just signals",
+      "category": "functional",
+      "domain": "Price Prediction",
+      "priority": "must",
+      "rationale": "Users need actionable price points for trading decisions",
+      "tags": [
+        "prediction",
+        "prices",
+        "targets"
+      ]
+    },
+    {
+      "id": "REQ-016",
+      "title": "DSE Market Adaptation",
+      "description": "Adapt global criteria to Bangladesh market realities including local P/E benchmarks, sector-specific weightings, regulatory factors, and Bengali language support",
+      "category": "functional",
+      "domain": "Localization",
+      "priority": "must",
+      "rationale": "Global criteria must be adapted to DSE market conditions",
+      "tags": [
+        "dse",
+        "localization",
+        "bangladesh"
+      ]
+    },
+    {
+      "id": "REQ-017",
+      "title": "Educational Components",
+      "description": "Provide beginner-friendly explanations for all financial terms, interactive learning modes, visual indicators, and decision impact examples",
+      "category": "functional",
+      "domain": "Education",
+      "priority": "should",
+      "rationale": "Users need to understand analysis to make informed decisions",
+      "tags": [
+        "education",
+        "learning",
+        "explanations"
+      ]
+    },
+    {
+      "id": "REQ-018",
+      "title": "Performance Requirements",
+      "description": "Single skill execution < 2s, composite pipeline < 10s, support 100 concurrent MCP connections, memory usage < 512MB",
+      "category": "non-functional",
+      "domain": "Performance",
+      "priority": "should",
+      "rationale": "System must be responsive for real-time decision making",
+      "tags": [
+        "performance",
+        "speed",
+        "scalability"
+      ]
+    },
+    {
+      "id": "REQ-019",
+      "title": "Versioning and Maintenance",
+      "description": "Adopt semver, maintain changelog, implement deprecation policy, periodic re-validation against evolving specs",
+      "category": "non-functional",
+      "domain": "Maintenance",
+      "priority": "should",
+      "rationale": "Predictable evolution for downstream consumers",
+      "tags": [
+        "versioning",
+        "maintenance",
+        "compatibility"
+      ]
+    },
+    {
+      "id": "REQ-020",
+      "title": "Compliance and Disclaimers",
+      "description": "All outputs must include educational-only disclaimers, use public data only, respect rate limits, and comply with regulations",
+      "category": "non-functional",
+      "domain": "Compliance",
+      "priority": "must",
+      "rationale": "Legal and ethical requirements for financial analysis tools",
+      "tags": [
+        "compliance",
+        "disclaimers",
+        "legal"
+      ]
+    }
+  ],
+  "createdAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-19T16:00:51.123Z"
+}

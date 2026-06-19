@@ -1,0 +1,665 @@
+{
+  "tadId": "TAD-001",
+  "prdId": "PRD-001",
+  "version": "1.0.0",
+  "status": "draft",
+  "systemOverview": {
+    "executiveSummary": "Stock Buddy Skills Suite is a comprehensive DSE stock analysis system combining 14 specialized AI-powered skills with multiple distribution channels (Agent Skills, MCP server, CLI) and robust data integration.",
+    "systemPurpose": "Provide Bangladesh stock market investors with AI-powered analysis tools for momentum trading, investment analysis, and business intelligence through modern agent interfaces and MCP clients.",
+    "architecturalApproach": "Microservice-style architecture with pure Python analysis skills as the core, thin distribution layers (gh skill, MCP server), pluggable data adapters, and comprehensive CI/CD infrastructure.",
+    "keyCapabilities": [
+      "14 specialized DSE analysis skills",
+      "Multi-channel distribution (Agent Skills, MCP, CLI)",
+      "Momentum and value investment analysis",
+      "Pluggable data adapter architecture",
+      "Real-time and batch processing",
+      "Bengali language support"
+    ],
+    "externalDependencies": [
+      {
+        "system": "GitHub",
+        "purpose": "Source hosting, gh skill distribution, CI/CD",
+        "protocol": "HTTPS/git",
+        "owner": "GitHub"
+      },
+      {
+        "system": "DSE Data Sources",
+        "purpose": "Market data for analysis",
+        "protocol": "HTTPS/API",
+        "owner": "DSE/Public sources"
+      },
+      {
+        "system": "MCP Clients",
+        "purpose": "Consume analysis tools",
+        "protocol": "MCP (stdio/HTTP)",
+        "owner": "Various (Claude, Cursor, etc.)"
+      },
+      {
+        "system": "Package Registries",
+        "purpose": "Distribution of MCP server",
+        "protocol": "HTTPS",
+        "owner": "npm/PyPI"
+      }
+    ],
+    "assumptionsAndConstraints": [
+      "Skills remain stdlib-only Python with no network calls",
+      "Public data sources only for compliance",
+      "Educational-only outputs with disclaimers",
+      "Must conform to agentskills.io spec",
+      "DSE market-specific adaptations required"
+    ]
+  },
+  "architecturePrinciples": [
+    {
+      "name": "Single Source of Truth",
+      "description": "Skill folders are canonical; all distribution channels dispatch to the same core skills",
+      "rationale": "Prevents logic drift and ensures consistency across all access methods",
+      "implications": [
+        "MCP server uses subprocess dispatch",
+        "No analysis logic in distribution layers",
+        "All improvements go to core skills"
+      ],
+      "relatedReqs": ["REQ-001", "REQ-005"]
+    },
+    {
+      "name": "Pure Functions Architecture",
+      "description": "Skills are stateless, deterministic functions with JSON in/out",
+      "rationale": "Ensures reproducibility, testability, and portability",
+      "implications": [
+        "No network calls in skills",
+        "Data fetching isolated in adapter layer",
+        "Fixture-based testing possible"
+      ],
+      "relatedReqs": ["REQ-001", "REQ-006"]
+    },
+    {
+      "name": "Pluggable Data Layer",
+      "description": "Data sources abstracted behind provider interface",
+      "rationale": "Allows testing, multiple data sources, and compliance with data policies",
+      "implications": [
+        "Provider interface must be stable",
+        "Caching and rate limiting in adapter",
+        "Skills receive normalized data"
+      ],
+      "relatedReqs": ["REQ-006"]
+    },
+    {
+      "name": "Security by Design",
+      "description": "Supply chain hardening, scanning, and immutable releases",
+      "rationale": "Executable code distributed to users requires trust and verification",
+      "implications": [
+        "Automated security scanning",
+        "Signed releases with provenance",
+        "No secrets in code"
+      ],
+      "relatedReqs": ["REQ-010"]
+    },
+    {
+      "name": "Multi-Agent Specialization",
+      "description": "Different agents for different analysis perspectives",
+      "rationale": "Complex analysis benefits from specialized expertise",
+      "implications": [
+        "Clear separation of concerns",
+        "Agent orchestration required",
+        "Consistent output format"
+      ],
+      "relatedReqs": ["REQ-013"]
+    }
+  ],
+  "components": [
+    {
+      "name": "Skills Library",
+      "purpose": "Core analysis logic for DSE stocks",
+      "location": "skills/",
+      "dependencies": [],
+      "keyPatterns": ["Pure functions", "JSON I/O", "Agent Skills spec"],
+      "interfaces": [
+        {
+          "name": "Skill CLI",
+          "type": "internal",
+          "description": "JSON stdin -> Thinking Card JSON stdout"
+        }
+      ],
+      "responsibilities": [
+        "Technical analysis calculations",
+        "Fundamental analysis",
+        "Pattern recognition",
+        "Signal generation"
+      ],
+      "relatedReqs": ["REQ-001", "REQ-002", "REQ-003"]
+    },
+    {
+      "name": "MCP Server",
+      "purpose": "Expose skills as MCP tools",
+      "location": "mcp-server/",
+      "dependencies": ["Skills Library"],
+      "keyPatterns": ["Tool registry", "Subprocess dispatch", "Composite orchestration"],
+      "interfaces": [
+        {
+          "name": "MCP Protocol",
+          "type": "api",
+          "description": "list_tools, call_tool via stdio/HTTP"
+        }
+      ],
+      "responsibilities": [
+        "Tool registration and discovery",
+        "Input validation",
+        "Subprocess management",
+        "Composite pipeline orchestration"
+      ],
+      "relatedReqs": ["REQ-005", "REQ-007"]
+    },
+    {
+      "name": "Data Adapter",
+      "purpose": "Fetch and normalize market data",
+      "location": "data-adapter/",
+      "dependencies": ["External data sources"],
+      "keyPatterns": ["Provider pattern", "Caching", "Rate limiting"],
+      "interfaces": [
+        {
+          "name": "Data API",
+          "type": "api",
+          "description": "get_ticker_data(ticker) -> normalized JSON"
+        }
+      ],
+      "responsibilities": [
+        "Data fetching",
+        "Normalization",
+        "Caching",
+        "Quality flags"
+      ],
+      "relatedReqs": ["REQ-006"]
+    },
+    {
+      "name": "Agent Skills Distribution",
+      "purpose": "Enable gh skill installation",
+      "location": "skills/*/SKILL.md",
+      "dependencies": ["GitHub"],
+      "keyPatterns": ["Metadata frontmatter", "Spec compliance"],
+      "interfaces": [
+        {
+          "name": "gh skill",
+          "type": "cli",
+          "description": "gh skill install/publish commands"
+        }
+      ],
+      "responsibilities": [
+        "Skill metadata",
+        "Installation instructions",
+        "Agent integration"
+      ],
+      "relatedReqs": ["REQ-004"]
+    },
+    {
+      "name": "CI/CD Pipeline",
+      "purpose": "Automated testing and deployment",
+      "location": ".github/workflows/",
+      "dependencies": ["GitHub Actions"],
+      "keyPatterns": ["Matrix testing", "Release automation"],
+      "interfaces": [
+        {
+          "name": "GitHub Actions",
+          "type": "event",
+          "description": "PR and tag triggers"
+        }
+      ],
+      "responsibilities": [
+        "Automated testing",
+        "Package publishing",
+        "Security scanning",
+        "Release creation"
+      ],
+      "relatedReqs": ["REQ-009", "REQ-010", "REQ-011"]
+    }
+  ],
+  "dataArchitecture": {
+    "dataStores": [
+      {
+        "name": "Skill Fixtures",
+        "technology": "JSON files",
+        "purpose": "Test data for validation",
+        "dataTypes": ["OHLCV", "fundamentals", "market data"]
+      },
+      {
+        "name": "Adapter Cache",
+        "technology": "File/Redis cache",
+        "purpose": "Reduce API calls",
+        "dataTypes": ["Ticker data", "Market snapshots"],
+        "accessPatterns": ["Read-through cache", "TTL expiry"]
+      }
+    ],
+    "coreEntities": [
+      {
+        "name": "TickerData",
+        "description": "Normalized market data for a stock",
+        "fields": [
+          {"name": "ticker", "type": "string", "required": true},
+          {"name": "ohlcv", "type": "array", "required": false},
+          {"name": "fundamentals", "type": "object", "required": false},
+          {"name": "news", "type": "array", "required": false}
+        ],
+        "relationships": ["Input to all skills"]
+      },
+      {
+        "name": "ThinkingCard",
+        "description": "Standardized skill output",
+        "fields": [
+          {"name": "score", "type": "number", "required": true},
+          {"name": "rating", "type": "string", "required": true},
+          {"name": "confidence", "type": "number", "required": true},
+          {"name": "reasoning", "type": "array", "required": true},
+          {"name": "recommendations", "type": "object", "required": false}
+        ],
+        "relationships": ["Output from all skills"]
+      }
+    ],
+    "dataFlowDescription": "Data flows from external sources through the adapter (with caching), gets normalized into TickerData, passes to skills for analysis, produces ThinkingCards, which are aggregated by composite tools and returned to clients.",
+    "cachingStrategy": "Multi-level caching: adapter cache for external data (5-15 min TTL), result cache for computed analysis (1 min), with cache invalidation on market events.",
+    "dataRetention": "Cache-only retention for market data (no permanent storage), analysis results logged for performance tracking (30 day retention)."
+  },
+  "integrationArchitecture": {
+    "apiDesign": {
+      "pattern": "RPC-style for MCP, REST-style for data adapter",
+      "conventions": [
+        "JSON request/response",
+        "Structured error responses",
+        "Versioned endpoints"
+      ],
+      "requestResponseFormat": "JSON with schema validation"
+    },
+    "integrationContracts": [
+      {
+        "systemName": "MCP Clients",
+        "purpose": "Consume analysis tools",
+        "protocol": "MCP",
+        "authentication": "None (local) / API key (hosted)",
+        "operations": [
+          {
+            "name": "list_tools",
+            "method": "MCP",
+            "endpoint": "list_tools"
+          },
+          {
+            "name": "call_tool",
+            "method": "MCP",
+            "endpoint": "call_tool"
+          }
+        ],
+        "errorHandling": "Structured error objects with codes",
+        "retryPolicy": {
+          "maxAttempts": 3,
+          "backoffType": "exponential",
+          "backoffBase": 2
+        }
+      },
+      {
+        "systemName": "DSE Data Sources",
+        "purpose": "Market data retrieval",
+        "protocol": "HTTPS",
+        "authentication": "API key (if required)",
+        "operations": [
+          {
+            "name": "fetch_ohlcv",
+            "method": "GET",
+            "endpoint": "/api/ohlcv"
+          },
+          {
+            "name": "fetch_fundamentals",
+            "method": "GET",
+            "endpoint": "/api/fundamentals"
+          }
+        ],
+        "errorHandling": "Graceful degradation with quality flags",
+        "retryPolicy": {
+          "maxAttempts": 3,
+          "backoffType": "exponential",
+          "backoffBase": 2
+        }
+      }
+    ]
+  },
+  "securityArchitecture": {
+    "securityBoundaries": "Trust boundary at skill subprocess execution; data adapter validates external input; MCP server sanitizes client input",
+    "authenticationPattern": {
+      "type": "Mixed",
+      "flow": "None for local stdio; API key for hosted HTTP; OAuth for future enhancements"
+    },
+    "authorizationModel": {
+      "type": "Simple",
+      "roleMapping": [
+        {"role": "user", "permissions": ["execute_skills", "view_results"]},
+        {"role": "admin", "permissions": ["all"]}
+      ]
+    },
+    "securityControls": [
+      {
+        "control": "Input Validation",
+        "implementation": "JSON schema validation",
+        "location": "MCP server, Data adapter",
+        "relatedReqs": ["REQ-005", "REQ-006"]
+      },
+      {
+        "control": "Secret Scanning",
+        "implementation": "GitHub secret scanning",
+        "location": "Repository",
+        "relatedReqs": ["REQ-010"]
+      },
+      {
+        "control": "Code Scanning",
+        "implementation": "CodeQL analysis",
+        "location": "CI/CD",
+        "relatedReqs": ["REQ-010"]
+      },
+      {
+        "control": "Subprocess Isolation",
+        "implementation": "Restricted subprocess execution",
+        "location": "MCP server",
+        "relatedReqs": ["REQ-005"]
+      },
+      {
+        "control": "Rate Limiting",
+        "implementation": "Token bucket algorithm",
+        "location": "Data adapter",
+        "relatedReqs": ["REQ-006", "REQ-020"]
+      }
+    ],
+    "sensitiveDataHandling": [
+      {
+        "dataType": "API Keys",
+        "classification": "Secret",
+        "handling": "Environment variables, never in code"
+      },
+      {
+        "dataType": "User Portfolio Data",
+        "classification": "Confidential",
+        "handling": "Process in memory only, no persistence"
+      }
+    ],
+    "complianceRequirements": [
+      "Educational-only disclaimers on all outputs",
+      "Public data sources only",
+      "GDPR compliance for any EU users",
+      "Bangladesh financial regulations"
+    ]
+  },
+  "deploymentArchitecture": {
+    "targetEnvironment": {
+      "platform": "Multi-platform (Linux, macOS, Windows)",
+      "topology": "Distributed microservices",
+      "environmentVariables": [
+        {
+          "name": "STOCK_BUDDY_SKILLS_DIR",
+          "description": "Path to skills directory",
+          "sensitive": false
+        },
+        {
+          "name": "STOCK_BUDDY_TRANSPORT",
+          "description": "stdio or http",
+          "sensitive": false
+        },
+        {
+          "name": "STOCK_BUDDY_PORT",
+          "description": "HTTP port (default 8080)",
+          "sensitive": false
+        },
+        {
+          "name": "DSE_API_KEY",
+          "description": "API key for data source",
+          "sensitive": true
+        }
+      ]
+    },
+    "scalingStrategy": [
+      {
+        "component": "MCP Server",
+        "minInstances": 1,
+        "maxInstances": 10,
+        "scalingTrigger": "CPU > 70% or request queue > 100"
+      },
+      {
+        "component": "Data Adapter",
+        "minInstances": 1,
+        "maxInstances": 5,
+        "scalingTrigger": "Cache miss rate > 30%"
+      }
+    ],
+    "resourceRequirements": [
+      {
+        "component": "MCP Server",
+        "cpuRequest": "200m",
+        "cpuLimit": "1000m",
+        "memoryRequest": "256Mi",
+        "memoryLimit": "512Mi"
+      },
+      {
+        "component": "Skills (per subprocess)",
+        "cpuRequest": "100m",
+        "cpuLimit": "500m",
+        "memoryRequest": "128Mi",
+        "memoryLimit": "256Mi"
+      }
+    ],
+    "containerization": {
+      "enabled": true,
+      "baseImage": "python:3.11-slim",
+      "buildStrategy": "Multi-stage build with minimal runtime"
+    },
+    "cicdPipeline": "GitHub Actions with matrix testing across Python versions, automated releases on tags, security scanning on every push"
+  },
+  "operationalConcerns": {
+    "configurationManagement": {
+      "environmentVariables": [
+        "STOCK_BUDDY_SKILLS_DIR",
+        "STOCK_BUDDY_TRANSPORT",
+        "STOCK_BUDDY_PORT",
+        "DSE_API_KEY"
+      ],
+      "configFiles": [
+        "config/server.yml",
+        "config/adapters.yml"
+      ]
+    },
+    "healthChecks": [
+      {
+        "endpoint": "/health",
+        "purpose": "Liveness check",
+        "checks": ["Server running", "Skills directory accessible"]
+      },
+      {
+        "endpoint": "/ready",
+        "purpose": "Readiness check",
+        "checks": ["All skills loaded", "Data adapter connected"]
+      }
+    ],
+    "logging": {
+      "destination": "stdout/stderr",
+      "retention": "30 days",
+      "keyEvents": [
+        {
+          "event": "skill_execution",
+          "level": "info",
+          "trigger": "Every skill call",
+          "fields": ["skill", "duration", "success"]
+        },
+        {
+          "event": "error",
+          "level": "error",
+          "trigger": "Any error",
+          "fields": ["error_code", "stack_trace", "context"]
+        }
+      ]
+    },
+    "metrics": [
+      {
+        "name": "skill_execution_time",
+        "type": "histogram",
+        "description": "Time to execute each skill"
+      },
+      {
+        "name": "cache_hit_rate",
+        "type": "gauge",
+        "description": "Percentage of cache hits"
+      },
+      {
+        "name": "active_connections",
+        "type": "gauge",
+        "description": "Current MCP connections"
+      }
+    ],
+    "monitoring": {
+      "tools": ["Prometheus", "Grafana"],
+      "alerts": [
+        "Skill execution time > 5s",
+        "Error rate > 1%",
+        "Memory usage > 80%"
+      ]
+    }
+  },
+  "architecturalDecisions": [
+    {
+      "id": "ADR-001",
+      "title": "Python for all components",
+      "status": "accepted",
+      "context": "Need to choose implementation language for skills and server",
+      "optionsConsidered": [
+        {
+          "option": "Python only",
+          "pros": ["Single language", "Good for data science", "Simple deployment"],
+          "cons": ["Performance limitations"]
+        },
+        {
+          "option": "Python skills + Node server",
+          "pros": ["Better MCP ecosystem support", "Performance"],
+          "cons": ["Two languages to maintain"]
+        }
+      ],
+      "decision": "Use Python for all components",
+      "rationale": "Simplicity and consistency outweigh performance concerns for this use case",
+      "consequences": ["Single language expertise needed", "Easier maintenance"],
+      "relatedReqs": ["REQ-001", "REQ-005"],
+      "relatedDecisions": []
+    },
+    {
+      "id": "ADR-002",
+      "title": "Subprocess dispatch for skills",
+      "status": "accepted",
+      "context": "MCP server needs to execute skill logic",
+      "optionsConsidered": [
+        {
+          "option": "Import as modules",
+          "pros": ["Faster", "Shared memory"],
+          "cons": ["No isolation", "Memory leaks possible"]
+        },
+        {
+          "option": "Subprocess execution",
+          "pros": ["Complete isolation", "No memory leaks", "Crash isolation"],
+          "cons": ["Slower", "IPC overhead"]
+        }
+      ],
+      "decision": "Use subprocess execution",
+      "rationale": "Isolation and stability more important than raw performance",
+      "consequences": ["Each skill runs in isolated process", "Clean error handling"],
+      "relatedReqs": ["REQ-005"],
+      "relatedDecisions": ["ADR-001"]
+    },
+    {
+      "id": "ADR-003",
+      "title": "Pluggable data adapter architecture",
+      "status": "accepted",
+      "context": "Skills need market data but should remain pure",
+      "optionsConsidered": [
+        {
+          "option": "Skills fetch directly",
+          "pros": ["Simple", "Direct control"],
+          "cons": ["Not testable", "Network in skills"]
+        },
+        {
+          "option": "Separate data layer",
+          "pros": ["Testable", "Skills stay pure", "Multiple sources"],
+          "cons": ["Additional component"]
+        }
+      ],
+      "decision": "Implement separate pluggable data adapter",
+      "rationale": "Separation of concerns and testability are critical",
+      "consequences": ["Clean architecture", "Easy to test", "Multiple data sources possible"],
+      "relatedReqs": ["REQ-006"],
+      "relatedDecisions": []
+    },
+    {
+      "id": "ADR-004",
+      "title": "Dual transport support",
+      "status": "accepted",
+      "context": "Need to support both desktop and hosted deployments",
+      "optionsConsidered": [
+        {
+          "option": "stdio only",
+          "pros": ["Simple", "Standard for MCP"],
+          "cons": ["No remote access"]
+        },
+        {
+          "option": "HTTP only",
+          "pros": ["Remote access", "Standard REST"],
+          "cons": ["Not native MCP"]
+        },
+        {
+          "option": "Both stdio and HTTP",
+          "pros": ["Maximum flexibility", "All use cases"],
+          "cons": ["More complex"]
+        }
+      ],
+      "decision": "Support both stdio and HTTP transports",
+      "rationale": "Different deployment scenarios require different transports",
+      "consequences": ["More complex server", "Broader compatibility"],
+      "relatedReqs": ["REQ-007"],
+      "relatedDecisions": []
+    },
+    {
+      "id": "ADR-005",
+      "title": "GitHub Actions for CI/CD",
+      "status": "accepted",
+      "context": "Need CI/CD pipeline for quality and releases",
+      "optionsConsidered": [
+        {
+          "option": "GitHub Actions",
+          "pros": ["Integrated with GitHub", "Free for public repos", "Good ecosystem"],
+          "cons": ["Vendor lock-in"]
+        },
+        {
+          "option": "Jenkins",
+          "pros": ["Self-hosted", "Full control"],
+          "cons": ["Maintenance overhead"]
+        }
+      ],
+      "decision": "Use GitHub Actions",
+      "rationale": "Integration and simplicity outweigh lock-in concerns",
+      "consequences": ["Easy setup", "Good integration", "Some vendor dependency"],
+      "relatedReqs": ["REQ-009", "REQ-010"],
+      "relatedDecisions": []
+    },
+    {
+      "id": "ADR-006",
+      "title": "Multi-agent architecture",
+      "status": "accepted",
+      "context": "Complex analysis requires different perspectives",
+      "optionsConsidered": [
+        {
+          "option": "Single monolithic analyzer",
+          "pros": ["Simple", "One decision point"],
+          "cons": ["Complex logic", "Hard to maintain"]
+        },
+        {
+          "option": "Specialized agents",
+          "pros": ["Separation of concerns", "Expert systems", "Maintainable"],
+          "cons": ["Coordination needed"]
+        }
+      ],
+      "decision": "Implement three specialized agents",
+      "rationale": "Different analysis types benefit from specialization",
+      "consequences": ["Clear responsibilities", "Better maintainability", "Need orchestration"],
+      "relatedReqs": ["REQ-013"],
+      "relatedDecisions": []
+    }
+  ],
+  "createdAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-19T00:00:00Z"
+}
