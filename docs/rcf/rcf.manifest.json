@@ -2,5 +2,18 @@
   "version": "2.0.0",
   "projectName": "Stock Buddy Skills",
   "description": "RCF-tracked repository exposing agent-skills-format skills for DSE stock analysis (investment and momentum trading) consumable by any MCP client.",
-  "prds": []
+  "prds": [
+    {
+      "id": "PRD-001",
+      "name": "Stock Buddy Skills Suite",
+      "path": "docs/rcf/prds/PRD-001.json",
+      "stories": [],
+      "tad": [],
+      "bs": [],
+      "fbs": [],
+      "ts": [],
+      "tc": []
+    }
+  ],
+  "activePrdId": "PRD-001"
 }

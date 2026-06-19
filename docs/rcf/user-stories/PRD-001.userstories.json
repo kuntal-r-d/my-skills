@@ -1,0 +1,529 @@
+{
+  "prdId": "PRD-001",
+  "version": "1.0.0",
+  "status": "draft",
+  "stories": [
+    {
+      "id": "US-001",
+      "reqId": "REQ-001",
+      "title": "Deploy Core DSE Analysis Skills",
+      "description": "As a maintainer, I want to deploy 14 specialized DSE analysis skills so that users can perform comprehensive stock analysis",
+      "asA": "maintainer",
+      "iWant": "to deploy 14 specialized DSE analysis skills",
+      "soThat": "users can perform comprehensive stock analysis",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-001",
+          "description": "Given the skills directory, when I list all skills, then 14 skill folders are present with valid SKILL.md files",
+          "testable": true
+        },
+        {
+          "id": "AC-002",
+          "description": "Given a skill script, when I run it with valid input JSON, then it returns a valid Thinking Card structure",
+          "testable": true
+        },
+        {
+          "id": "AC-003",
+          "description": "Given all skills, when I validate against fixtures, then each produces correct analysis output",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-002",
+      "reqId": "REQ-002",
+      "title": "Implement Momentum Trading Formulas",
+      "description": "As a trader, I want momentum indicators calculated accurately so that I can identify trading opportunities",
+      "asA": "trader",
+      "iWant": "momentum indicators calculated accurately",
+      "soThat": "I can identify trading opportunities",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-004",
+          "description": "Given price data, when momentum-scanner runs, then RSI, MACD, ROC, and MFI are calculated correctly",
+          "testable": true
+        },
+        {
+          "id": "AC-005",
+          "description": "Given Minervini criteria, when evaluated, then all 8 SEPA conditions are checked properly",
+          "testable": true
+        },
+        {
+          "id": "AC-006",
+          "description": "Given volume data, when analyzed, then volume confirmation signals are generated",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-003",
+      "reqId": "REQ-003",
+      "title": "Implement Investment Analysis",
+      "description": "As an investor, I want value investment criteria evaluated so that I can make long-term investment decisions",
+      "asA": "investor",
+      "iWant": "value investment criteria evaluated",
+      "soThat": "I can make long-term investment decisions",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-007",
+          "description": "Given fundamental data, when analyzed, then economic moat assessment is provided",
+          "testable": true
+        },
+        {
+          "id": "AC-008",
+          "description": "Given financial ratios, when calculated, then ROE, PEG, and margin of safety are accurate",
+          "testable": true
+        },
+        {
+          "id": "AC-009",
+          "description": "Given scoring criteria, when applied, then comprehensive investment grade is generated",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-004",
+      "reqId": "REQ-004",
+      "title": "Publish Skills via gh skill",
+      "description": "As a coding agent user, I want to install skills via gh skill so that they work in my agent",
+      "asA": "coding agent user",
+      "iWant": "to install skills via gh skill",
+      "soThat": "they work in my agent",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-010",
+          "description": "Given the repo, when gh skill publish runs, then all skills validate against spec",
+          "testable": true
+        },
+        {
+          "id": "AC-011",
+          "description": "Given gh CLI, when I run gh skill install, then skill lands in correct agent directory",
+          "testable": true
+        },
+        {
+          "id": "AC-012",
+          "description": "Given installed skill, when triggered in agent, then it executes successfully",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-005",
+      "reqId": "REQ-005",
+      "title": "MCP Server with Tools",
+      "description": "As an MCP client developer, I want skills exposed as MCP tools so that my client can use them",
+      "asA": "MCP client developer",
+      "iWant": "skills exposed as MCP tools",
+      "soThat": "my client can use them",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-013",
+          "description": "Given MCP server running, when client lists tools, then 14 skill tools plus 2 composites appear",
+          "testable": true
+        },
+        {
+          "id": "AC-014",
+          "description": "Given tool call with valid input, when executed, then subprocess returns skill output",
+          "testable": true
+        },
+        {
+          "id": "AC-015",
+          "description": "Given analyze_ticker call, when executed, then pipeline runs leaf skills to completion",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-006",
+      "reqId": "REQ-006",
+      "title": "Data Adapter Implementation",
+      "description": "As a developer, I want a pluggable data adapter so that skills can get market data",
+      "asA": "developer",
+      "iWant": "a pluggable data adapter",
+      "soThat": "skills can get market data",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-016",
+          "description": "Given file provider, when requesting data, then contract-valid JSON is returned",
+          "testable": true
+        },
+        {
+          "id": "AC-017",
+          "description": "Given DSE provider, when fetching, then OHLCV and fundamentals are retrieved",
+          "testable": true
+        },
+        {
+          "id": "AC-018",
+          "description": "Given cache settings, when data requested, then caching and rate limits are respected",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-007",
+      "reqId": "REQ-007",
+      "title": "Dual Transport Support",
+      "description": "As an operator, I want both stdio and HTTP transports so that desktop and hosted clients work",
+      "asA": "operator",
+      "iWant": "both stdio and HTTP transports",
+      "soThat": "desktop and hosted clients work",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-019",
+          "description": "Given stdio mode, when desktop client connects, then MCP protocol works",
+          "testable": true
+        },
+        {
+          "id": "AC-020",
+          "description": "Given HTTP mode, when client connects, then streamable MCP over HTTP works",
+          "testable": true
+        },
+        {
+          "id": "AC-021",
+          "description": "Given transport config, when switching, then server handles both modes correctly",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-008",
+      "reqId": "REQ-008",
+      "title": "Zero-Install Packaging",
+      "description": "As a user, I want zero-install runners so that setup is quick and easy",
+      "asA": "user",
+      "iWant": "zero-install runners",
+      "soThat": "setup is quick and easy",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-022",
+          "description": "Given npx/uvx installed, when running npx stock-buddy-mcp, then server starts immediately",
+          "testable": true
+        },
+        {
+          "id": "AC-023",
+          "description": "Given Docker, when running container, then server is accessible on configured port",
+          "testable": true
+        },
+        {
+          "id": "AC-024",
+          "description": "Given config template, when pasted to Claude Desktop, then tools appear",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-009",
+      "reqId": "REQ-009",
+      "title": "CI/CD Pipeline Setup",
+      "description": "As a maintainer, I want automated CI/CD so that quality is ensured",
+      "asA": "maintainer",
+      "iWant": "automated CI/CD",
+      "soThat": "quality is ensured",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-025",
+          "description": "Given PR, when pushed, then GitHub Actions runs lint, test, and validation",
+          "testable": true
+        },
+        {
+          "id": "AC-026",
+          "description": "Given version tag, when created, then packages are published automatically",
+          "testable": true
+        },
+        {
+          "id": "AC-027",
+          "description": "Given release, when created, then immutable with provenance attached",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-010",
+      "reqId": "REQ-010",
+      "title": "Supply Chain Security",
+      "description": "As a security officer, I want supply chain hardening so that code is trustworthy",
+      "asA": "security officer",
+      "iWant": "supply chain hardening",
+      "soThat": "code is trustworthy",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-028",
+          "description": "Given repo settings, when configured, then secret and code scanning are enabled",
+          "testable": true
+        },
+        {
+          "id": "AC-029",
+          "description": "Given release, when created, then it's immutable with tag protection",
+          "testable": true
+        },
+        {
+          "id": "AC-030",
+          "description": "Given build, when completed, then SBOM and provenance are generated",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-011",
+      "reqId": "REQ-011",
+      "title": "Comprehensive Testing",
+      "description": "As a QA engineer, I want comprehensive tests so that quality is maintained",
+      "asA": "QA engineer",
+      "iWant": "comprehensive tests",
+      "soThat": "quality is maintained",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-031",
+          "description": "Given skill code, when tested, then unit test coverage exceeds 80%",
+          "testable": true
+        },
+        {
+          "id": "AC-032",
+          "description": "Given MCP server, when tested, then integration tests validate all tools",
+          "testable": true
+        },
+        {
+          "id": "AC-033",
+          "description": "Given performance tests, when run, then response times meet requirements",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-012",
+      "reqId": "REQ-012",
+      "title": "Documentation and Discovery",
+      "description": "As a new user, I want clear documentation so that I can adopt the skills quickly",
+      "asA": "new user",
+      "iWant": "clear documentation",
+      "soThat": "I can adopt the skills quickly",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-034",
+          "description": "Given README, when read, then installation and usage are clearly explained",
+          "testable": true
+        },
+        {
+          "id": "AC-035",
+          "description": "Given skill docs, when reviewed, then each has examples and sample data",
+          "testable": true
+        },
+        {
+          "id": "AC-036",
+          "description": "Given gh skill search, when run, then this repo's skills are discoverable",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-013",
+      "reqId": "REQ-013",
+      "title": "Multi-Agent Analysis",
+      "description": "As an analyst, I want specialized agents so that I get comprehensive analysis",
+      "asA": "analyst",
+      "iWant": "specialized agents",
+      "soThat": "I get comprehensive analysis",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-037",
+          "description": "Given momentum agent, when analyzing, then technical indicators are evaluated",
+          "testable": true
+        },
+        {
+          "id": "AC-038",
+          "description": "Given investment agent, when analyzing, then fundamentals are assessed",
+          "testable": true
+        },
+        {
+          "id": "AC-039",
+          "description": "Given business agent, when analyzing, then company viability is evaluated",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-014",
+      "reqId": "REQ-014",
+      "title": "Interactive Criteria Checklists",
+      "description": "As a beginner, I want visual checklists so that I understand the analysis",
+      "asA": "beginner",
+      "iWant": "visual checklists",
+      "soThat": "I understand the analysis",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-040",
+          "description": "Given momentum checklist, when displayed, then 25 criteria show with status",
+          "testable": true
+        },
+        {
+          "id": "AC-041",
+          "description": "Given investment checklist, when displayed, then 30 criteria show with explanations",
+          "testable": true
+        },
+        {
+          "id": "AC-042",
+          "description": "Given criteria status, when shown, then visual indicators and recommendations appear",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-015",
+      "reqId": "REQ-015",
+      "title": "Numerical Price Predictions",
+      "description": "As a trader, I want specific price targets so that I know when to buy and sell",
+      "asA": "trader",
+      "iWant": "specific price targets",
+      "soThat": "I know when to buy and sell",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-043",
+          "description": "Given analysis, when completed, then specific buy price in BDT is provided",
+          "testable": true
+        },
+        {
+          "id": "AC-044",
+          "description": "Given position, when analyzed, then sell target and stop-loss prices are calculated",
+          "testable": true
+        },
+        {
+          "id": "AC-045",
+          "description": "Given predictions, when shown, then confidence scores accompany each price",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-016",
+      "reqId": "REQ-016",
+      "title": "DSE Market Adaptation",
+      "description": "As a Bangladesh investor, I want DSE-specific analysis so that it's relevant to my market",
+      "asA": "Bangladesh investor",
+      "iWant": "DSE-specific analysis",
+      "soThat": "it's relevant to my market",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-046",
+          "description": "Given criteria, when applied, then DSE P/E benchmarks are used not US ones",
+          "testable": true
+        },
+        {
+          "id": "AC-047",
+          "description": "Given sectors, when analyzed, then Bangladesh-specific weightings are applied",
+          "testable": true
+        },
+        {
+          "id": "AC-048",
+          "description": "Given interface, when displayed, then Bengali language option is available",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-017",
+      "reqId": "REQ-017",
+      "title": "Educational Components",
+      "description": "As a beginner, I want educational explanations so that I can learn while using",
+      "asA": "beginner",
+      "iWant": "educational explanations",
+      "soThat": "I can learn while using",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-049",
+          "description": "Given financial term, when displayed, then beginner-friendly explanation is available",
+          "testable": true
+        },
+        {
+          "id": "AC-050",
+          "description": "Given indicator, when shown, then visual representation helps understanding",
+          "testable": true
+        },
+        {
+          "id": "AC-051",
+          "description": "Given analysis, when presented, then decision impact examples are provided",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-018",
+      "reqId": "REQ-018",
+      "title": "Performance Optimization",
+      "description": "As a user, I want fast response times so that analysis is timely",
+      "asA": "user",
+      "iWant": "fast response times",
+      "soThat": "analysis is timely",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-052",
+          "description": "Given single skill, when executed, then response time is under 2 seconds",
+          "testable": true
+        },
+        {
+          "id": "AC-053",
+          "description": "Given composite pipeline, when run, then completes within 10 seconds",
+          "testable": true
+        },
+        {
+          "id": "AC-054",
+          "description": "Given 100 concurrent connections, when handled, then memory stays under 512MB",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-019",
+      "reqId": "REQ-019",
+      "title": "Version Management",
+      "description": "As a consumer, I want predictable versioning so that I can manage updates",
+      "asA": "consumer",
+      "iWant": "predictable versioning",
+      "soThat": "I can manage updates",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-055",
+          "description": "Given releases, when published, then semver is followed consistently",
+          "testable": true
+        },
+        {
+          "id": "AC-056",
+          "description": "Given changelog, when updated, then all changes are documented",
+          "testable": true
+        },
+        {
+          "id": "AC-057",
+          "description": "Given deprecation, when announced, then migration path is provided",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-020",
+      "reqId": "REQ-020",
+      "title": "Compliance and Disclaimers",
+      "description": "As a compliance officer, I want proper disclaimers so that legal requirements are met",
+      "asA": "compliance officer",
+      "iWant": "proper disclaimers",
+      "soThat": "legal requirements are met",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-058",
+          "description": "Given output, when generated, then educational-only disclaimer is included",
+          "testable": true
+        },
+        {
+          "id": "AC-059",
+          "description": "Given data source, when used, then only public data is accessed",
+          "testable": true
+        },
+        {
+          "id": "AC-060",
+          "description": "Given API usage, when accessing, then rate limits are respected",
+          "testable": true
+        }
+      ]
+    }
+  ],
+  "createdAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-19T00:00:00Z"
+}
