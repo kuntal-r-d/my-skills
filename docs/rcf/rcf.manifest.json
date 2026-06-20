@@ -80,7 +80,19 @@
       "fbs": [],
       "ts": [],
       "tc": []
+    },
+    {
+      "id": "PRD-004",
+      "name": "Stock Buddy Financial Analysis Platform - Unified System",
+      "path": "docs/rcf/prds/PRD-004.json",
+      "description": "Comprehensive unified PRD merging all requirements for a financial-grade stock analysis platform with client data support, storage, and analytics dashboard",
+      "stories": [],
+      "tad": [],
+      "bs": [],
+      "fbs": [],
+      "ts": [],
+      "tc": []
     }
   ],
-  "activePrdId": "PRD-003"
+  "activePrdId": "PRD-004"
 }

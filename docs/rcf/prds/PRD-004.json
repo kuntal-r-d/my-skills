@@ -1,0 +1,420 @@
+{
+  "prdId": "PRD-004",
+  "productName": "Stock Buddy Financial Analysis Platform - Unified System",
+  "version": "1.0.0",
+  "status": "draft",
+  "executiveSummary": "A comprehensive financial-grade stock analysis platform that provides pure, reusable analysis skills via MCP protocol. The system enables clients to provide their own market data for analysis, automatically stores all results in a database with complete audit trail, and provides a professional analytics dashboard for visualization and insights. Built with financial accuracy, regulatory compliance, and risk management as core principles.",
+  "problemStatement": "Financial institutions, traders, and analysts need a professional-grade stock analysis system that: (1) Works with their existing data sources without vendor lock-in, (2) Provides accurate, auditable analysis suitable for real money decisions, (3) Maintains complete history for compliance and pattern analysis, (4) Offers transparent calculations with proper risk warnings, and (5) Scales to handle institutional volumes while maintaining precision.",
+  "targetUsers": [
+    "Institutional traders making real money decisions",
+    "Portfolio managers requiring auditable analysis",
+    "Risk managers monitoring exposure and limits",
+    "Compliance officers tracking decision basis",
+    "Quantitative analysts with custom data pipelines",
+    "Trading platforms integrating analysis capabilities",
+    "MCP client developers building financial applications",
+    "Retail investors seeking professional-grade tools"
+  ],
+  "objectives": [
+    "Provide 14 pure, financial-grade analysis skills via MCP protocol",
+    "Enable clients to use any data source while maintaining analysis quality",
+    "Ensure 6+ decimal precision with complete calculation transparency",
+    "Store all analyses with immutable audit trail for compliance",
+    "Display comprehensive risk warnings and mandatory disclaimers",
+    "Deliver professional web dashboard with real-time updates",
+    "Support institutional scale with sub-second response times",
+    "Maintain regulatory compliance with proper documentation",
+    "Enable backtesting and scenario analysis with clear boundaries",
+    "Provide position sizing and risk management calculations"
+  ],
+  "inScope": [
+    "14 financial-grade analysis skills (technical, fundamental, momentum, risk)",
+    "Client data provider interface with validation",
+    "High-precision calculation engine with audit trail",
+    "PostgreSQL database for analysis storage",
+    "React/Next.js analytics dashboard",
+    "REST API and WebSocket for real-time updates",
+    "Risk assessment and position sizing module",
+    "Compliance engine with mandatory disclaimers",
+    "Data quality validation and anomaly detection",
+    "Backtesting framework with historical analysis",
+    "Model versioning and governance system",
+    "Stress testing for extreme scenarios",
+    "Complete data lineage tracking",
+    "Multi-client support with isolation",
+    "Export functionality in multiple formats",
+    "Regulatory reporting capabilities"
+  ],
+  "outOfScope": [
+    "Automated trading execution",
+    "Personalized financial advice",
+    "Guaranteed returns or performance",
+    "Server-side data source integration",
+    "Cryptocurrency trading",
+    "International markets beyond DSE",
+    "Tax calculation or advice",
+    "Real-time streaming prices",
+    "Mobile application development",
+    "Direct broker integration for order placement"
+  ],
+  "constraints": [
+    "ALL OUTPUTS MUST INCLUDE 'NOT FINANCIAL ADVICE' DISCLAIMER",
+    "Must maintain 6+ decimal precision in all calculations",
+    "Cannot store client credentials or API keys",
+    "Must follow Anthropic Agent Skills specification",
+    "Skills must be pure, stateless, and deterministic",
+    "Analysis must be reproducible from audit trail",
+    "Must comply with financial regulations (MiFID II where applicable)",
+    "Risk warnings must be prominent and clear",
+    "Calculations must be fully transparent and explainable",
+    "Data quality must be validated before processing",
+    "System must handle 10M+ analysis records",
+    "Response time must be under 5 seconds for full analysis",
+    "Audit logs must be immutable and timestamped",
+    "Client data must be isolated (multi-tenant)",
+    "Must support point-in-time reproduction of analyses"
+  ],
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Financial-Grade Analysis Skills",
+      "description": "Implement 14 specialized analysis skills with financial-grade accuracy, including technical analysis with 6+ decimal precision, fundamental analysis with proper ratios, momentum screening with risk-adjusted metrics, value investment checklists, smart money flow tracking, sentiment analysis, macro regime assessment, signal synthesis, risk management, pattern recognition, market screening, backtesting, portfolio analysis, and position sizing. All skills must include confidence scores, uncertainty bounds, and calculation transparency.",
+      "category": "functional",
+      "domain": "Core Skills",
+      "priority": "must",
+      "rationale": "Core analytical capability for financial decision-making",
+      "tags": ["skills", "analysis", "financial", "accuracy"]
+    },
+    {
+      "id": "REQ-002",
+      "title": "Client Data Provider Interface",
+      "description": "Enable MCP clients to provide their own market data (OHLCV, fundamentals, news, shareholding, macro) directly in tool calls, with comprehensive validation, type checking, range verification, and data quality scoring. Support both real-time and historical data with proper timestamping and market hours awareness.",
+      "category": "functional",
+      "domain": "Data Integration",
+      "priority": "must",
+      "rationale": "Enables client data sovereignty and flexibility",
+      "tags": ["data", "client", "validation"]
+    },
+    {
+      "id": "REQ-003",
+      "title": "High-Precision Calculation Engine",
+      "description": "Implement calculation engine maintaining minimum 6 decimal places precision with IEEE 754 compliance, proper rounding rules, compound error prevention, edge case handling, and full audit trail of all calculation steps. Every calculation must be traceable, reproducible, and explainable with intermediate values logged.",
+      "category": "functional",
+      "domain": "Financial Accuracy",
+      "priority": "must",
+      "rationale": "Financial decisions require precise, auditable calculations",
+      "tags": ["calculations", "precision", "audit"]
+    },
+    {
+      "id": "REQ-004",
+      "title": "Mandatory Risk Disclaimers",
+      "description": "Display prominent, legally-compliant disclaimers on ALL outputs including 'NOT FINANCIAL ADVICE', 'PAST PERFORMANCE DOES NOT GUARANTEE FUTURE RESULTS', 'ALL INVESTMENTS CARRY RISK OF LOSS', 'CONSULT LICENSED FINANCIAL ADVISOR', and 'EDUCATIONAL PURPOSES ONLY'. Disclaimers must be unmissable and repeated in summaries.",
+      "category": "compliance",
+      "domain": "Legal Compliance",
+      "priority": "must",
+      "rationale": "Legal requirement to prevent liability and protect users",
+      "tags": ["compliance", "disclaimers", "legal"]
+    },
+    {
+      "id": "REQ-005",
+      "title": "Analysis Result Storage",
+      "description": "Store all analysis requests and results in PostgreSQL with immutable audit trail including client ID, timestamp, input data, calculations performed, results generated, confidence scores, data quality metrics, and model versions used. Support efficient querying of historical analyses with complex filters.",
+      "category": "functional",
+      "domain": "Data Persistence",
+      "priority": "must",
+      "rationale": "Required for compliance, audit, and pattern analysis",
+      "tags": ["storage", "database", "audit"]
+    },
+    {
+      "id": "REQ-006",
+      "title": "Professional Analytics Dashboard",
+      "description": "Create React/Next.js dashboard displaying analysis history, trends, risk metrics, portfolio overview, and compliance reports. Include interactive charts, real-time updates via WebSocket, advanced filtering, comparison tools, and customizable layouts. Dashboard must load in under 2 seconds with millions of records.",
+      "category": "functional",
+      "domain": "User Interface",
+      "priority": "must",
+      "rationale": "Visual analysis and monitoring of financial decisions",
+      "tags": ["dashboard", "ui", "visualization"]
+    },
+    {
+      "id": "REQ-007",
+      "title": "Risk Assessment and Position Sizing",
+      "description": "Calculate Value at Risk (VaR), implement Kelly Criterion for optimal position sizing, generate stop-loss recommendations based on ATR, enforce maximum exposure limits, assess portfolio risk, and provide Monte Carlo simulations for risk scenarios. Include confidence intervals and worst-case analysis.",
+      "category": "functional",
+      "domain": "Risk Management",
+      "priority": "must",
+      "rationale": "Prevent catastrophic losses through proper risk management",
+      "tags": ["risk", "position-sizing", "var"]
+    },
+    {
+      "id": "REQ-008",
+      "title": "Data Quality Validation",
+      "description": "Implement comprehensive data quality checks including outlier detection using statistical methods, missing data handling with clear warnings, stale data identification based on market hours, anomaly detection using historical patterns, and data completeness scoring. Reject or warn on low-quality data.",
+      "category": "functional",
+      "domain": "Data Quality",
+      "priority": "must",
+      "rationale": "Bad data leads to bad financial decisions",
+      "tags": ["data-quality", "validation", "anomaly"]
+    },
+    {
+      "id": "REQ-009",
+      "title": "Confidence Scoring System",
+      "description": "Provide confidence scores (0-100%) for every analysis component based on data quality, calculation certainty, market conditions, and model limitations. Include detailed explanation of factors affecting confidence, uncertainty bounds, and recommendations when confidence is low.",
+      "category": "functional",
+      "domain": "Transparency",
+      "priority": "must",
+      "rationale": "Users must understand reliability of analysis for decisions",
+      "tags": ["confidence", "transparency", "uncertainty"]
+    },
+    {
+      "id": "REQ-010",
+      "title": "Backtesting Framework",
+      "description": "Support historical backtesting with clear separation between historical facts and forward projections. Handle survivorship bias, include transaction costs, provide performance metrics (Sharpe, Sortino, max drawdown), and display confidence bands. Clearly label all assumptions and limitations.",
+      "category": "functional",
+      "domain": "Analytics",
+      "priority": "must",
+      "rationale": "Validate strategies before risking real money",
+      "tags": ["backtesting", "historical", "validation"]
+    },
+    {
+      "id": "REQ-011",
+      "title": "Regulatory Compliance Logging",
+      "description": "Maintain immutable, timestamped audit logs of all analyses, data sources, calculations, decisions, and user actions for regulatory review. Support compliance reporting for MiFID II, best execution, and suitability requirements. Retain logs per regulatory requirements with automated archival.",
+      "category": "compliance",
+      "domain": "Regulatory",
+      "priority": "must",
+      "rationale": "Meet regulatory requirements for financial services",
+      "tags": ["compliance", "audit", "regulatory"]
+    },
+    {
+      "id": "REQ-012",
+      "title": "Model Version Control",
+      "description": "Maintain complete version history of all analysis models, formulas, algorithms, and configurations. Enable point-in-time reproduction of any historical analysis using the exact model version that was used. Track model changes with approval workflow and rollback capability.",
+      "category": "functional",
+      "domain": "Model Governance",
+      "priority": "must",
+      "rationale": "Ensure consistency and enable investigation of past decisions",
+      "tags": ["versioning", "governance", "models"]
+    },
+    {
+      "id": "REQ-013",
+      "title": "Stress Testing Framework",
+      "description": "Implement comprehensive stress testing for extreme market conditions including black swan events, correlation breakdowns, liquidity crises, and systemic shocks. Provide clear warnings about model limitations, assumptions breaking down, and tail risks. Include historical crisis scenarios.",
+      "category": "functional",
+      "domain": "Risk Analysis",
+      "priority": "should",
+      "rationale": "Understand behavior in extreme conditions before they occur",
+      "tags": ["stress-testing", "risk", "scenarios"]
+    },
+    {
+      "id": "REQ-014",
+      "title": "Data Lineage Tracking",
+      "description": "Track complete data lineage from source through all transformations to final analysis. Record data provider, fetch timestamp, transformations applied, validation results, and quality scores. Enable full traceability of how each result was derived for audit and debugging.",
+      "category": "functional",
+      "domain": "Data Governance",
+      "priority": "must",
+      "rationale": "Required for audit trail and debugging analysis issues",
+      "tags": ["lineage", "traceability", "governance"]
+    },
+    {
+      "id": "REQ-015",
+      "title": "Multi-Client Isolation",
+      "description": "Support multiple clients with complete data isolation using row-level security. Each client sees only their own analyses, configurations, and reports. Implement client-specific rate limiting, usage tracking, and billing metrics. Ensure no data leakage between clients.",
+      "category": "functional",
+      "domain": "Multi-tenancy",
+      "priority": "must",
+      "rationale": "Essential for SaaS deployment and data privacy",
+      "tags": ["multi-tenant", "isolation", "security"]
+    },
+    {
+      "id": "REQ-016",
+      "title": "REST API and WebSocket",
+      "description": "Provide comprehensive REST API for programmatic access to analyses, reports, and configurations. Implement WebSocket connections for real-time updates of new analyses, risk alerts, and market events. Include OpenAPI documentation and client SDKs.",
+      "category": "functional",
+      "domain": "Integration",
+      "priority": "must",
+      "rationale": "Enable integration with existing systems and tools",
+      "tags": ["api", "integration", "realtime"]
+    },
+    {
+      "id": "REQ-017",
+      "title": "Export and Reporting",
+      "description": "Enable export of analyses and reports in CSV, JSON, Excel, and PDF formats. Include charts, tables, and summaries in exports. Support scheduled report generation and automated distribution. Maintain export audit trail for compliance.",
+      "category": "functional",
+      "domain": "Reporting",
+      "priority": "should",
+      "rationale": "Required for external reporting and documentation",
+      "tags": ["export", "reporting", "documentation"]
+    },
+    {
+      "id": "REQ-018",
+      "title": "Performance Optimization",
+      "description": "Optimize system to handle 10M+ analysis records with sub-second query response. Implement caching strategies, database indexing, query optimization, and CDN for static assets. Support 1000+ concurrent users with horizontal scaling.",
+      "category": "non-functional",
+      "domain": "Performance",
+      "priority": "must",
+      "rationale": "Required for institutional scale operations",
+      "tags": ["performance", "scalability", "optimization"]
+    },
+    {
+      "id": "REQ-019",
+      "title": "Market Hours Awareness",
+      "description": "Implement market hours checks for DSE (Sunday-Thursday, 10:30 AM - 2:30 PM BST). Label pre/post-market data clearly, warn when using stale data, and adjust analysis based on market session. Include holiday calendar and trading halts awareness.",
+      "category": "functional",
+      "domain": "Market Timing",
+      "priority": "should",
+      "rationale": "Market timing affects data relevance and decisions",
+      "tags": ["market-hours", "timing", "calendar"]
+    },
+    {
+      "id": "REQ-020",
+      "title": "Error Bounds and Uncertainty",
+      "description": "Calculate and display error bounds, standard deviations, confidence intervals, and uncertainty ranges for all statistical calculations and projections. Use Monte Carlo simulation for complex uncertainties. Clearly communicate limitations of analysis.",
+      "category": "functional",
+      "domain": "Statistical Accuracy",
+      "priority": "must",
+      "rationale": "Financial decisions must account for uncertainty",
+      "tags": ["statistics", "uncertainty", "confidence"]
+    },
+    {
+      "id": "REQ-021",
+      "title": "Conflict of Interest Disclosure",
+      "description": "Require disclosure of any conflicts of interest, data source biases, commercial relationships, or incentives that might affect analysis objectivity. Display prominently when conflicts exist. Maintain transparency about analysis limitations and potential biases.",
+      "category": "compliance",
+      "domain": "Ethics",
+      "priority": "must",
+      "rationale": "Transparency essential for trust and compliance",
+      "tags": ["ethics", "disclosure", "transparency"]
+    },
+    {
+      "id": "REQ-022",
+      "title": "Calculation Transparency",
+      "description": "Provide complete calculation breakdown showing formulas used, input values, intermediate steps, and final results. Enable step-by-step verification of all calculations. Include references to academic papers or industry standards for formulas used.",
+      "category": "functional",
+      "domain": "Transparency",
+      "priority": "must",
+      "rationale": "Users must be able to verify and understand calculations",
+      "tags": ["transparency", "calculations", "verification"]
+    },
+    {
+      "id": "REQ-023",
+      "title": "Data Retention Policies",
+      "description": "Implement configurable data retention policies compliant with financial regulations. Automatically archive old analyses to cold storage after configurable period. Support legal holds for litigation. Provide secure deletion with audit trail.",
+      "category": "functional",
+      "domain": "Data Management",
+      "priority": "should",
+      "rationale": "Balance storage costs with compliance requirements",
+      "tags": ["retention", "archival", "compliance"]
+    },
+    {
+      "id": "REQ-024",
+      "title": "Scenario Analysis",
+      "description": "Support what-if scenarios with multiple parameter sets, sensitivity analysis showing impact of variable changes, and scenario comparison tools. Include pre-defined scenarios for common market conditions and ability to save custom scenarios.",
+      "category": "functional",
+      "domain": "Analytics",
+      "priority": "should",
+      "rationale": "Understand impact of different assumptions on outcomes",
+      "tags": ["scenarios", "sensitivity", "analysis"]
+    },
+    {
+      "id": "REQ-025",
+      "title": "Security Implementation",
+      "description": "Implement comprehensive security including encryption at rest and in transit, API authentication via JWT/API keys, rate limiting per client, input sanitization to prevent injection, and regular security audits. Follow OWASP guidelines for financial applications.",
+      "category": "security",
+      "domain": "Security",
+      "priority": "must",
+      "rationale": "Protect sensitive financial data and prevent attacks",
+      "tags": ["security", "encryption", "authentication"]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Pure Skill",
+      "definition": "A stateless, deterministic analysis function that accepts input data and returns consistent results without side effects, following Anthropic Agent Skills specification"
+    },
+    {
+      "term": "Financial-Grade",
+      "definition": "Meeting the accuracy, auditability, and compliance standards required for systems making real money decisions"
+    },
+    {
+      "term": "Confidence Score",
+      "definition": "A percentage (0-100%) indicating the reliability of an analysis based on data quality, market conditions, and model limitations"
+    },
+    {
+      "term": "Data Lineage",
+      "definition": "Complete tracking of data from source through all transformations to final result, enabling full traceability"
+    },
+    {
+      "term": "Position Sizing",
+      "definition": "Calculation of optimal trade size based on account value, risk tolerance, and Kelly Criterion"
+    },
+    {
+      "term": "Value at Risk (VaR)",
+      "definition": "Statistical measure of potential loss in value of a portfolio over a defined period for a given confidence interval"
+    },
+    {
+      "term": "Audit Trail",
+      "definition": "Immutable, timestamped record of all system actions, calculations, and decisions for regulatory compliance"
+    },
+    {
+      "term": "Multi-tenant Isolation",
+      "definition": "Architecture ensuring complete data separation between different clients using the same system"
+    }
+  ],
+  "successCriteria": [
+    "All financial calculations accurate to 6+ decimal places",
+    "100% of outputs include mandatory disclaimers",
+    "Audit trail enables complete reproduction of any analysis",
+    "System handles 10M+ records with <1s query response",
+    "Zero data leakage between clients",
+    "All regulatory compliance requirements met",
+    "Risk warnings clear and prominent",
+    "Confidence scores provided for all analyses",
+    "Backtesting results reproducible and verifiable",
+    "Dashboard loads in under 2 seconds"
+  ],
+  "risks": [
+    {
+      "description": "Calculation errors leading to financial losses",
+      "mitigation": "Extensive testing, validation, and precision requirements",
+      "severity": "critical"
+    },
+    {
+      "description": "Regulatory non-compliance resulting in fines",
+      "mitigation": "Comprehensive audit trail and compliance engine",
+      "severity": "high"
+    },
+    {
+      "description": "Data quality issues causing incorrect analysis",
+      "mitigation": "Multi-layer validation and quality scoring",
+      "severity": "high"
+    },
+    {
+      "description": "System used for unauthorized financial advice",
+      "mitigation": "Prominent disclaimers and usage restrictions",
+      "severity": "critical"
+    },
+    {
+      "description": "Performance degradation at scale",
+      "mitigation": "Optimization, caching, and horizontal scaling",
+      "severity": "medium"
+    }
+  ],
+  "dependencies": [
+    "PostgreSQL 15+ for data storage",
+    "React/Next.js for dashboard",
+    "MCP protocol for skill communication",
+    "Docker/Kubernetes for deployment",
+    "Redis for caching and sessions"
+  ],
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2024-06-20",
+      "changes": [
+        "Unified PRD combining client data, storage, and financial requirements",
+        "Comprehensive financial-grade requirements for real money decisions",
+        "Complete system specification for production deployment"
+      ]
+    }
+  ]
+}
