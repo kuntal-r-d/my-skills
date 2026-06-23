@@ -17,10 +17,10 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@stock-buddy/db": "file:../db",
     "@stock-buddy/ingest": "file:../ingest",
-    "express": "^4.21.2"
+    "express": "^5.2.1"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.13.10",
     "tsup": "^8.4.0",
     "typescript": "^5.8.2"
