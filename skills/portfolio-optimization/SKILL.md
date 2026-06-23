@@ -1,98 +1,73 @@
+---
+name: portfolio-optimization
+description: Optimizes allocation across a portfolio of DSE stocks using Modern Portfolio Theory — expected return/covariance, the efficient frontier, max-Sharpe and min-variance portfolios, risk parity and Kelly sizing — plus correlation/diversification analysis and rebalancing gaps. Use when the user asks how to allocate/weight a portfolio, optimize allocation, efficient frontier, Sharpe-optimal weights, diversification, or rebalancing for Dhaka Stock Exchange holdings.
+license: Apache-2.0
+compatibility: Prompt-first Agent Skill. Pure-prompt — math-heavy; for exact optimisation prefer a numeric tool.
+metadata:
+  author: stock-buddy
+  version: "0.2.0"
+  prd_refs: ["PRD-001:REQ-027", "PRD-001:REQ-007"]
+  mode: ["investment"]
+---
+
 # Portfolio Optimization
 
-Optimize portfolio allocation using Modern Portfolio Theory and risk-adjusted metrics.
+> **Prompt-first, pure-prompt skill.** No script is bundled. The matrix math (covariance,
+> efficient frontier) is heavy — reason carefully and **state assumptions**; for precise weights,
+> compute the covariance/optimisation in a numeric environment and feed results back.
 
-## Overview
+## Role & objective
+Recommend a risk-aware target allocation across supplied holdings and quantify the portfolio's
+risk/return, returning the optimal weights, key risk metrics and rebalancing gaps.
 
-This skill analyzes a portfolio of DSE stocks to optimize allocation based on risk-return trade-offs, implementing Markowitz efficient frontier, Sharpe ratio optimization, and Kelly Criterion for position sizing. **NOT FINANCIAL ADVICE** - all recommendations are for educational purposes only.
+## When to use
+"How should I weight my portfolio?", "optimize my allocation", "efficient frontier",
+"Sharpe-optimal weights", "am I diversified?", "rebalancing". Use `risk-manager` for per-trade sizing.
 
-## Usage
+## Inputs you need
+- **`portfolio`** — holdings `{ticker, qty, price}` (and current weights).
+- **`ohlcv` per holding** (or a returns series) for expected return + covariance.
+- **`risk_free_rate`**; optional **constraints** (min/max weight per name), transaction costs.
 
-The skill expects client-provided portfolio data including:
-- Current holdings with quantities and prices
-- Historical price data for correlation analysis
-- Risk-free rate for Sharpe ratio calculations
-- Investment constraints (min/max allocations)
+## Method (follow in order)
+1. **Inputs** — per-asset expected return and volatility; pairwise correlations → covariance matrix.
+2. **Frontier** — describe the efficient frontier; identify the **max-Sharpe** and **min-variance** portfolios.
+3. **Strategy** — present the objective the user wants: max-Sharpe, min-variance, risk-parity
+   (equal risk contribution), or Kelly-scaled sizing.
+4. **Diversification** — correlation clusters, diversification ratio, concentration.
+5. **Rebalancing** — gap between current and target weights; note transaction-cost drag.
 
-## Core Functions
+## Scoring rubric
+No single −1..+1 score; the deliverable is the **target weights** plus risk metrics (Sharpe,
+volatility, VaR, max drawdown, beta). Rank candidate portfolios by Sharpe for the chosen risk
+level. Confidence depends on history length (≥252 trading days) and return-estimate stability.
 
-### 1. Efficient Frontier Analysis
-- Calculate expected returns and covariance matrix
-- Generate efficient frontier curve
-- Identify optimal portfolios for different risk levels
-
-### 2. Risk-Adjusted Metrics
-- **Sharpe Ratio**: (Return - Risk-free rate) / Standard deviation
-- **Sortino Ratio**: Focus on downside deviation
-- **Calmar Ratio**: Return / Maximum drawdown
-- **Information Ratio**: Active return / Tracking error
-
-### 3. Optimization Strategies
-- **Maximum Sharpe Ratio**: Best risk-adjusted returns
-- **Minimum Variance**: Lowest portfolio volatility
-- **Risk Parity**: Equal risk contribution
-- **Kelly Criterion**: Optimal position sizing
-
-### 4. Correlation Analysis
-- Asset correlation matrix
-- Diversification ratio
-- Principal component analysis
-- Cluster identification
-
-### 5. Rebalancing Recommendations
-- Target vs current allocation gaps
-- Transaction cost optimization
-- Tax-aware rebalancing
-- Periodic vs threshold rebalancing
-
-## Output Format
-
+## Output (emit this Thinking Card)
 ```json
-{
-  "thinkingCard": {
-    "portfolioStats": {
-      "expectedReturn": 0.156789,
-      "annualizedVolatility": 0.234567,
-      "sharpeRatio": 0.567890,
-      "maxDrawdown": -0.123456,
-      "diversificationRatio": 1.456789
-    },
-    "optimalAllocation": {
-      "SYMBOL1": 0.234567,
-      "SYMBOL2": 0.345678,
-      "SYMBOL3": 0.419755
-    },
-    "efficientFrontier": [
-      {"risk": 0.123456, "return": 0.098765},
-      {"risk": 0.234567, "return": 0.156789}
-    ],
-    "rebalancingActions": [
-      {"symbol": "SYMBOL1", "action": "BUY", "quantity": 100, "targetWeight": 0.234567}
-    ],
-    "riskAnalysis": {
-      "valueAtRisk95": -0.045678,
-      "conditionalVaR95": -0.067890,
-      "betaToMarket": 0.987654
-    },
-    "disclaimer": "NOT FINANCIAL ADVICE - Educational purposes only"
-  }
-}
+{ "skill": "portfolio-optimization", "as_of": "..",
+  "key_metrics": { "expected_return": 0.0, "volatility": 0.0, "sharpe_ratio": 0.0,
+    "max_drawdown": 0.0, "diversification_ratio": 0.0, "var_95": 0.0 },
+  "optimal_allocation": { "TICKER1": 0.0, "TICKER2": 0.0 },
+  "rebalancing_actions": [ { "ticker": "..", "from_weight": 0.0, "to_weight": 0.0 } ],
+  "reasoning": ["assumptions + objective used"], "flags": ["short_history?", "estimates_unstable?"],
+  "disclaimer": "Educational analysis only. Not financial advice." }
 ```
 
-## Implementation Notes
+## DSE pitfalls
+- DSE correlations spike in stress (everything falls together) and liquidity is uneven — a
+  mean-variance optimum can be untradeable; sanity-check weights against daily traded value.
+- Expected returns from short, noisy DSE history are unreliable — prefer min-variance/risk-parity
+  and wide assumptions over precise max-Sharpe point estimates.
+- Respect single-name and sector caps; don't output a concentrated "optimal" weight.
 
-- All calculations use 6+ decimal precision
-- Historical data minimum: 252 trading days
-- Correlation window: 60-day rolling
-- Rebalancing frequency: Quarterly recommended
-- Transaction costs: Include in optimization
-- Tax considerations: Track holding periods
+## Optional precision helper
+No bundled script — pure-prompt skill. For exact covariance/efficient-frontier solving, run a
+numeric optimiser (e.g. NumPy/cvxpy) and pass the weights back for interpretation.
 
-## Dependencies
+## Worked example
+3 holdings, 1y returns, rf 6.5% → max-Sharpe weights ~ {A 0.45, B 0.35, C 0.20}, portfolio
+Sharpe ≈ 0.6, vol ≈ 23%; current over-weights A by 10pp → rebalance toward target (note costs).
 
-Requires client to provide:
-- Portfolio holdings data
-- Historical price series
-- Risk-free rate
-- Investment constraints
-- Transaction cost model
+## References
+See `risk-manager/references/RISK.md` for sizing/Kelly context.
+Output is educational analysis only, never financial advice.

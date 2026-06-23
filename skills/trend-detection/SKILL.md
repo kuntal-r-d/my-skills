@@ -1,84 +1,68 @@
+---
+name: trend-detection
+description: Detects trend direction, strength, and reversal risk for a DSE stock from OHLCV using moving averages, ADX, price structure (higher highs/lower lows), and multi-timeframe alignment. Use when the user asks "what's the trend", "is GP trending up or down", trend strength, MA crossover, higher-highs/lower-lows read, or reversal warning for a Dhaka Stock Exchange ticker.
+license: Apache-2.0
+compatibility: Prompt-first Agent Skill. Pure-prompt — no bundled script; the model computes from supplied data.
+metadata:
+  author: stock-buddy
+  version: "0.2.0"
+  prd_refs: ["PRD-001:REQ-027"]
+  mode: ["momentum", "investment"]
+---
+
 # Trend Detection
 
-Identify and analyze market trends using multiple technical indicators and timeframes.
+> **Prompt-first, pure-prompt skill.** No script is bundled — reason directly over the data
+> using the method below and emit the Thinking Card. Pairs with `technical-analysis`.
 
-## Overview
+## Role & objective
+Determine the prevailing trend's direction, strength and reversal risk, returning a score
+(−1..+1 = down..up), confidence and a rating.
 
-This skill detects trend direction, strength, and potential reversals in DSE stocks using moving averages, trend lines, and momentum indicators. **NOT FINANCIAL ADVICE** - all analysis is for educational purposes only.
+## When to use
+"What's the trend on GP?", "is this trending up?", "trend strength / ADX read", "any reversal
+signs?", "MA crossover". Feed the score into `signal-synthesizer` as a technical input.
 
-## Usage
+## Inputs you need
+**`ohlcv`** — daily bars, oldest-first, **≥50** (more for weekly/monthly context). Optional
+higher-timeframe series for multi-timeframe alignment.
 
-Requires client-provided OHLCV data across multiple timeframes for comprehensive trend analysis.
+## Method (follow in order)
+1. **Direction** — price vs 50/150/200 SMA; MA stack 50>150>200 (up) or 50<150<200 (down).
+2. **Structure** — higher-highs & higher-lows (uptrend) vs lower-highs & lower-lows (downtrend).
+3. **Strength** — ADX(14): ≥25 strong, 20–25 borderline, <20 weak/range; +DI vs −DI for direction.
+4. **Multi-timeframe** — note daily/weekly/monthly agreement (confluence) or conflict.
+5. **Reversal risk** — price-vs-momentum divergence, volume climax, break of trendline/structure.
 
-## Core Functions
+## Scoring rubric
+Combine: direction (±0.4 by MA stack & price), structure (±0.3), strength (×ADX gate: full
+weight if ADX≥25, half if 20–25, near-zero if <20). Clamp to −1..+1.
+Rating: ≥0.5 strong_uptrend · ≥0.15 uptrend · −0.15..0.15 sideways · ≤−0.15 downtrend · ≤−0.5 strong_downtrend.
+Confidence rises with timeframe agreement and ADX; cut it on divergence or <50 bars.
 
-### 1. Trend Identification
-- **Moving Average Analysis**: SMA, EMA, WMA crossovers
-- **Trend Line Detection**: Support/resistance trend lines
-- **Higher Highs/Lower Lows**: Price structure analysis
-- **ADX Indicator**: Trend strength measurement
-
-### 2. Multi-Timeframe Analysis
-- Daily, weekly, monthly trend alignment
-- Timeframe confluence zones
-- Dominant trend identification
-- Trend conflict resolution
-
-### 3. Trend Strength Metrics
-- ADX value and direction
-- Trend duration analysis
-- Volume confirmation
-- Momentum alignment
-
-### 4. Reversal Detection
-- Divergence analysis (price vs indicators)
-- Chart pattern recognition
-- Volume climax identification
-- Sentiment extremes
-
-### 5. Trend Projection
-- Fibonacci extensions
-- Measured moves
-- Channel projections
-- Time cycle analysis
-
-## Output Format
-
+## Output (emit this Thinking Card)
 ```json
-{
-  "thinkingCard": {
-    "primaryTrend": {
-      "direction": "UPTREND",
-      "strength": 0.789012,
-      "duration": 45,
-      "adxValue": 34.567890
-    },
-    "timeframeAnalysis": {
-      "daily": "UPTREND",
-      "weekly": "UPTREND",
-      "monthly": "SIDEWAYS"
-    },
-    "trendLines": [
-      {"type": "support", "slope": 0.023456, "touches": 4}
-    ],
-    "reversalSignals": {
-      "divergence": false,
-      "patternDetected": null,
-      "volumeClimactic": false
-    },
-    "projection": {
-      "targetPrice": 125.678901,
-      "supportLevel": 98.765432,
-      "timeframe": "2-3 weeks"
-    },
-    "disclaimer": "NOT FINANCIAL ADVICE - Educational purposes only"
-  }
-}
+{ "skill": "trend-detection", "ticker": "..", "mode": "..", "as_of": "..",
+  "score": 0.0, "confidence": 0.0, "rating": "uptrend|sideways|downtrend|..",
+  "key_metrics": { "adx_14": 0, "ma_stack": "50>150>200", "structure": "HH/HL",
+    "timeframes": {"daily": "..", "weekly": ".."} },
+  "reasoning": ["..."], "flags": ["limited_history_<50_bars?", "reversal_divergence?"],
+  "disclaimer": "Educational analysis only. Not financial advice." }
 ```
 
-## Implementation Notes
+## DSE pitfalls
+- Low ADX (<20) means no real trend — don't read direction into chop; say "sideways".
+- Monthly trends on DSE can lag thin trading — weight daily/weekly, note the monthly caveat.
+- A reversal signal without volume/structure confirmation is weak — flag, don't over-call.
 
-- Minimum 50 data points for reliable trends
-- Use log scale for long-term trends
-- Validate with volume confirmation
-- All calculations use 6+ decimal precision
+## Optional precision helper
+No bundled script — this is a pure-prompt skill. For exact ADX/MA values, use the
+`technical-analysis` script, which computes the same indicators.
+
+## Worked example
+Price above a rising 50>150>200 stack, ADX 30 (+DI leading), HH/HL structure, daily+weekly up,
+monthly sideways → score ≈ +0.7 → **uptrend (strong)**, confidence ≈ 0.8.
+
+## References
+See `technical-analysis/references/INDICATORS.md` for indicator formulas.
+Output is educational analysis only, never financial advice.
