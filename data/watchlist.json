@@ -1,0 +1,188 @@
+{
+  "stocks": [
+    "BSCPLC",
+    "BATBC",
+    "BXPHARMA",
+    "BRACBANK",
+    "BSC",
+    "BSRMSTEEL",
+    "CITYBANK",
+    "EBL",
+    "GIB",
+    "GP",
+    "LHB",
+    "MIDLANDBNK",
+    "PRIMEBANK",
+    "PUBALIBANK",
+    "ROBI",
+    "SQURPHARMA",
+    "UPGDCL",
+    "WALTONHIL"
+  ],
+  "alerts": [
+    {
+      "ticker": "BSCPLC",
+      "type": "stop_loss",
+      "price": 140.67000000000002,
+      "created": "2026-06-20T11:50:40.700242"
+    },
+    {
+      "ticker": "BSCPLC",
+      "type": "target",
+      "price": 170.31499999999997,
+      "created": "2026-06-20T11:50:40.700244"
+    },
+    {
+      "ticker": "BATBC",
+      "type": "stop_loss",
+      "price": 333.63,
+      "created": "2026-06-20T11:50:40.700248"
+    },
+    {
+      "ticker": "BATBC",
+      "type": "target",
+      "price": 245.41,
+      "created": "2026-06-20T11:50:40.700249"
+    },
+    {
+      "ticker": "BRACBANK",
+      "type": "stop_loss",
+      "price": 57.69,
+      "created": "2026-06-20T11:50:40.700252"
+    },
+    {
+      "ticker": "BRACBANK",
+      "type": "target",
+      "price": 75.785,
+      "created": "2026-06-20T11:50:40.700253"
+    },
+    {
+      "ticker": "BSRMSTEEL",
+      "type": "stop_loss",
+      "price": 70.28999999999999,
+      "created": "2026-06-20T11:50:40.700256"
+    },
+    {
+      "ticker": "BSRMSTEEL",
+      "type": "target",
+      "price": 91.655,
+      "created": "2026-06-20T11:50:40.700257"
+    },
+    {
+      "ticker": "EBL",
+      "type": "stop_loss",
+      "price": 22.95,
+      "created": "2026-06-20T11:50:40.700258"
+    },
+    {
+      "ticker": "EBL",
+      "type": "target",
+      "price": 28.749999999999996,
+      "created": "2026-06-20T11:50:40.700259"
+    },
+    {
+      "ticker": "LHB",
+      "type": "stop_loss",
+      "price": 47.43000000000001,
+      "created": "2026-06-20T11:50:40.700262"
+    },
+    {
+      "ticker": "LHB",
+      "type": "target",
+      "price": 64.16999999999999,
+      "created": "2026-06-20T11:50:40.700263"
+    },
+    {
+      "ticker": "MIDLANDBNK",
+      "type": "stop_loss",
+      "price": 15.57,
+      "created": "2026-06-20T11:50:40.700265"
+    },
+    {
+      "ticker": "MIDLANDBNK",
+      "type": "target",
+      "price": 18.745,
+      "created": "2026-06-20T11:50:40.700265"
+    },
+    {
+      "ticker": "ROBI",
+      "type": "stop_loss",
+      "price": 25.92,
+      "created": "2026-06-20T11:50:40.700268"
+    },
+    {
+      "ticker": "ROBI",
+      "type": "target",
+      "price": 37.71999999999999,
+      "created": "2026-06-20T11:50:40.700268"
+    },
+    {
+      "ticker": "SQURPHARMA",
+      "type": "stop_loss",
+      "price": 191.52,
+      "created": "2026-06-20T11:50:40.700270"
+    },
+    {
+      "ticker": "SQURPHARMA",
+      "type": "target",
+      "price": 253.575,
+      "created": "2026-06-20T11:50:40.700270"
+    },
+    {
+      "ticker": "WALTONHIL",
+      "type": "stop_loss",
+      "price": 348.21,
+      "created": "2026-06-20T11:50:40.700272"
+    },
+    {
+      "ticker": "WALTONHIL",
+      "type": "target",
+      "price": 441.025,
+      "created": "2026-06-20T11:50:40.700273"
+    },
+    {
+      "ticker": "GP",
+      "type": "target",
+      "price": 310,
+      "created": "2026-06-20T13:41:38.997916"
+    },
+    {
+      "ticker": "GP",
+      "type": "stop_loss",
+      "price": 280,
+      "created": "2026-06-20T13:41:38.997920"
+    },
+    {
+      "ticker": "SQURPHARMA",
+      "type": "target",
+      "price": 230,
+      "created": "2026-06-20T13:41:38.998295"
+    },
+    {
+      "ticker": "SQURPHARMA",
+      "type": "stop_loss",
+      "price": 200,
+      "created": "2026-06-20T13:41:38.998298"
+    }
+  ],
+  "notes": {
+    "BSCPLC": "Stable position (+5.5%)",
+    "BATBC": "\ud83d\udfe2 Strong performer (+73.7%)",
+    "BXPHARMA": "\ud83d\udd34 Underperformer (-12.5%)",
+    "BRACBANK": "Stable position (-2.7%)",
+    "BSC": "Stable position (-8.1%)",
+    "BSRMSTEEL": "Stable position (-2.0%)",
+    "CITYBANK": "Stable position (-7.2%)",
+    "EBL": "Stable position (+2.0%)",
+    "GIB": "\ud83d\udfe2 Strong performer (+205.9%)",
+    "GP": "Telecom leader, stable dividends",
+    "LHB": "Stable position (-5.6%)",
+    "MIDLANDBNK": "Stable position (+6.1%)",
+    "PRIMEBANK": "Stable position (-3.6%)",
+    "PUBALIBANK": "Stable position (-8.1%)",
+    "ROBI": "\ud83d\udd34 Underperformer (-12.2%)",
+    "SQURPHARMA": "Pharma growth story",
+    "UPGDCL": "Stable position (-5.8%)",
+    "WALTONHIL": "Stable position (+0.9%)"
+  }
+}

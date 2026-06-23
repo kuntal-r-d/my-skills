@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__rcf-tools__rcf_status",
+      "mcp__rcf-tools__rcf_prd_view",
+      "mcp__rcf-tools__rcf_stories_view",
+      "mcp__rcf-tools__rcf_build_sequence_view"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,246 @@
+{
+  "holdings": {
+    "BSCPLC": {
+      "shares": 155,
+      "avg_cost": 148.1,
+      "total_cost": 22955.5
+    },
+    "BATBC": {
+      "shares": 178,
+      "avg_cost": 213.4,
+      "total_cost": 37985.200000000004
+    },
+    "BXPHARMA": {
+      "shares": 1,
+      "avg_cost": 141.7,
+      "total_cost": 141.7
+    },
+    "BRACBANK": {
+      "shares": 300,
+      "avg_cost": 65.9,
+      "total_cost": 19770.0
+    },
+    "BSC": {
+      "shares": 1,
+      "avg_cost": 111.4,
+      "total_cost": 111.4
+    },
+    "BSRMSTEEL": {
+      "shares": 151,
+      "avg_cost": 79.7,
+      "total_cost": 12034.7
+    },
+    "CITYBANK": {
+      "shares": 1,
+      "avg_cost": 30.7,
+      "total_cost": 30.7
+    },
+    "EBL": {
+      "shares": 631,
+      "avg_cost": 25.0,
+      "total_cost": 15775.0
+    },
+    "GP": {
+      "shares": 1,
+      "avg_cost": 252.3,
+      "total_cost": 252.3
+    },
+    "LHB": {
+      "shares": 875,
+      "avg_cost": 55.8,
+      "total_cost": 48825.0
+    },
+    "MIDLANDBNK": {
+      "shares": 600,
+      "avg_cost": 16.3,
+      "total_cost": 9780.0
+    },
+    "PRIMEBANK": {
+      "shares": 1,
+      "avg_cost": 30.6,
+      "total_cost": 30.6
+    },
+    "PUBALIBANK": {
+      "shares": 10,
+      "avg_cost": 36.9,
+      "total_cost": 369.0
+    },
+    "ROBI": {
+      "shares": 375,
+      "avg_cost": 32.8,
+      "total_cost": 12299.999999999998
+    },
+    "SQURPHARMA": {
+      "shares": 632,
+      "avg_cost": 220.5,
+      "total_cost": 139356.0
+    },
+    "UPGDCL": {
+      "shares": 100,
+      "avg_cost": 125.3,
+      "total_cost": 12530.0
+    },
+    "WALTONHIL": {
+      "shares": 128,
+      "avg_cost": 383.5,
+      "total_cost": 49088.0
+    }
+  },
+  "transactions": [
+    {
+      "type": "BUY",
+      "ticker": "BSCPLC",
+      "shares": 155,
+      "price": 148.1,
+      "total": 22955.5,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699880"
+    },
+    {
+      "type": "BUY",
+      "ticker": "BATBC",
+      "shares": 178,
+      "price": 213.4,
+      "total": 37985.200000000004,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699883"
+    },
+    {
+      "type": "BUY",
+      "ticker": "BXPHARMA",
+      "shares": 1,
+      "price": 141.7,
+      "total": 141.7,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699885"
+    },
+    {
+      "type": "BUY",
+      "ticker": "BRACBANK",
+      "shares": 300,
+      "price": 65.9,
+      "total": 19770.0,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699886"
+    },
+    {
+      "type": "BUY",
+      "ticker": "BSC",
+      "shares": 1,
+      "price": 111.4,
+      "total": 111.4,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699887"
+    },
+    {
+      "type": "BUY",
+      "ticker": "BSRMSTEEL",
+      "shares": 151,
+      "price": 79.7,
+      "total": 12034.7,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699889"
+    },
+    {
+      "type": "BUY",
+      "ticker": "CITYBANK",
+      "shares": 1,
+      "price": 30.7,
+      "total": 30.7,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699890"
+    },
+    {
+      "type": "BUY",
+      "ticker": "EBL",
+      "shares": 631,
+      "price": 25.0,
+      "total": 15775.0,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699891"
+    },
+    {
+      "type": "BUY",
+      "ticker": "GP",
+      "shares": 1,
+      "price": 252.3,
+      "total": 252.3,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699892"
+    },
+    {
+      "type": "BUY",
+      "ticker": "LHB",
+      "shares": 875,
+      "price": 55.8,
+      "total": 48825.0,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699893"
+    },
+    {
+      "type": "BUY",
+      "ticker": "MIDLANDBNK",
+      "shares": 600,
+      "price": 16.3,
+      "total": 9780.0,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699895"
+    },
+    {
+      "type": "BUY",
+      "ticker": "PRIMEBANK",
+      "shares": 1,
+      "price": 30.6,
+      "total": 30.6,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699896"
+    },
+    {
+      "type": "BUY",
+      "ticker": "PUBALIBANK",
+      "shares": 10,
+      "price": 36.9,
+      "total": 369.0,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699897"
+    },
+    {
+      "type": "BUY",
+      "ticker": "ROBI",
+      "shares": 375,
+      "price": 32.8,
+      "total": 12299.999999999998,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699898"
+    },
+    {
+      "type": "BUY",
+      "ticker": "SQURPHARMA",
+      "shares": 632,
+      "price": 220.5,
+      "total": 139356.0,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699899"
+    },
+    {
+      "type": "BUY",
+      "ticker": "UPGDCL",
+      "shares": 100,
+      "price": 125.3,
+      "total": 12530.0,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699900"
+    },
+    {
+      "type": "BUY",
+      "ticker": "WALTONHIL",
+      "shares": 128,
+      "price": 383.5,
+      "total": 49088.0,
+      "date": "2024-01-01",
+      "timestamp": "2026-06-20T11:50:40.699901"
+    }
+  ],
+  "cash_balance": 0.0,
+  "created_date": "2026-06-20T11:50:40.699869"
+}
