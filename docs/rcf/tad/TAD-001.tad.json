@@ -59,7 +59,10 @@
         "No analysis logic in distribution layers",
         "All improvements go to core skills"
       ],
-      "relatedReqs": ["REQ-001", "REQ-005"]
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-005"
+      ]
     },
     {
       "name": "Pure Functions Architecture",
@@ -70,7 +73,10 @@
         "Data fetching isolated in adapter layer",
         "Fixture-based testing possible"
       ],
-      "relatedReqs": ["REQ-001", "REQ-006"]
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-006"
+      ]
     },
     {
       "name": "Pluggable Data Layer",
@@ -81,7 +87,9 @@
         "Caching and rate limiting in adapter",
         "Skills receive normalized data"
       ],
-      "relatedReqs": ["REQ-006"]
+      "relatedReqs": [
+        "REQ-006"
+      ]
     },
     {
       "name": "Security by Design",
@@ -92,7 +100,9 @@
         "Signed releases with provenance",
         "No secrets in code"
       ],
-      "relatedReqs": ["REQ-010"]
+      "relatedReqs": [
+        "REQ-010"
+      ]
     },
     {
       "name": "Multi-Agent Specialization",
@@ -103,7 +113,9 @@
         "Agent orchestration required",
         "Consistent output format"
       ],
-      "relatedReqs": ["REQ-013"]
+      "relatedReqs": [
+        "REQ-013"
+      ]
     }
   ],
   "components": [
@@ -112,7 +124,11 @@
       "purpose": "Core analysis logic for DSE stocks",
       "location": "skills/",
       "dependencies": [],
-      "keyPatterns": ["Pure functions", "JSON I/O", "Agent Skills spec"],
+      "keyPatterns": [
+        "Pure functions",
+        "JSON I/O",
+        "Agent Skills spec"
+      ],
       "interfaces": [
         {
           "name": "Skill CLI",
@@ -126,14 +142,24 @@
         "Pattern recognition",
         "Signal generation"
       ],
-      "relatedReqs": ["REQ-001", "REQ-002", "REQ-003"]
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-002",
+        "REQ-003"
+      ]
     },
     {
       "name": "MCP Server",
       "purpose": "Expose skills as MCP tools",
       "location": "mcp-server/",
-      "dependencies": ["Skills Library"],
-      "keyPatterns": ["Tool registry", "Subprocess dispatch", "Composite orchestration"],
+      "dependencies": [
+        "Skills Library"
+      ],
+      "keyPatterns": [
+        "Tool registry",
+        "Subprocess dispatch",
+        "Composite orchestration"
+      ],
       "interfaces": [
         {
           "name": "MCP Protocol",
@@ -147,14 +173,23 @@
         "Subprocess management",
         "Composite pipeline orchestration"
       ],
-      "relatedReqs": ["REQ-005", "REQ-007"]
+      "relatedReqs": [
+        "REQ-005",
+        "REQ-007"
+      ]
     },
     {
       "name": "Data Adapter",
       "purpose": "Fetch and normalize market data",
       "location": "data-adapter/",
-      "dependencies": ["External data sources"],
-      "keyPatterns": ["Provider pattern", "Caching", "Rate limiting"],
+      "dependencies": [
+        "External data sources"
+      ],
+      "keyPatterns": [
+        "Provider pattern",
+        "Caching",
+        "Rate limiting"
+      ],
       "interfaces": [
         {
           "name": "Data API",
@@ -168,14 +203,21 @@
         "Caching",
         "Quality flags"
       ],
-      "relatedReqs": ["REQ-006"]
+      "relatedReqs": [
+        "REQ-006"
+      ]
     },
     {
       "name": "Agent Skills Distribution",
       "purpose": "Enable gh skill installation",
       "location": "skills/*/SKILL.md",
-      "dependencies": ["GitHub"],
-      "keyPatterns": ["Metadata frontmatter", "Spec compliance"],
+      "dependencies": [
+        "GitHub"
+      ],
+      "keyPatterns": [
+        "Metadata frontmatter",
+        "Spec compliance"
+      ],
       "interfaces": [
         {
           "name": "gh skill",
@@ -188,14 +230,21 @@
         "Installation instructions",
         "Agent integration"
       ],
-      "relatedReqs": ["REQ-004"]
+      "relatedReqs": [
+        "REQ-004"
+      ]
     },
     {
       "name": "CI/CD Pipeline",
       "purpose": "Automated testing and deployment",
       "location": ".github/workflows/",
-      "dependencies": ["GitHub Actions"],
-      "keyPatterns": ["Matrix testing", "Release automation"],
+      "dependencies": [
+        "GitHub Actions"
+      ],
+      "keyPatterns": [
+        "Matrix testing",
+        "Release automation"
+      ],
       "interfaces": [
         {
           "name": "GitHub Actions",
@@ -209,7 +258,11 @@
         "Security scanning",
         "Release creation"
       ],
-      "relatedReqs": ["REQ-009", "REQ-010", "REQ-011"]
+      "relatedReqs": [
+        "REQ-009",
+        "REQ-010",
+        "REQ-011"
+      ]
     }
   ],
   "dataArchitecture": {
@@ -218,14 +271,24 @@
         "name": "Skill Fixtures",
         "technology": "JSON files",
         "purpose": "Test data for validation",
-        "dataTypes": ["OHLCV", "fundamentals", "market data"]
+        "dataTypes": [
+          "OHLCV",
+          "fundamentals",
+          "market data"
+        ]
       },
       {
         "name": "Adapter Cache",
         "technology": "File/Redis cache",
         "purpose": "Reduce API calls",
-        "dataTypes": ["Ticker data", "Market snapshots"],
-        "accessPatterns": ["Read-through cache", "TTL expiry"]
+        "dataTypes": [
+          "Ticker data",
+          "Market snapshots"
+        ],
+        "accessPatterns": [
+          "Read-through cache",
+          "TTL expiry"
+        ]
       }
     ],
     "coreEntities": [
@@ -233,24 +296,64 @@
         "name": "TickerData",
         "description": "Normalized market data for a stock",
         "fields": [
-          {"name": "ticker", "type": "string", "required": true},
-          {"name": "ohlcv", "type": "array", "required": false},
-          {"name": "fundamentals", "type": "object", "required": false},
-          {"name": "news", "type": "array", "required": false}
+          {
+            "name": "ticker",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "ohlcv",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "fundamentals",
+            "type": "object",
+            "required": false
+          },
+          {
+            "name": "news",
+            "type": "array",
+            "required": false
+          }
         ],
-        "relationships": ["Input to all skills"]
+        "relationships": [
+          "Input to all skills"
+        ]
       },
       {
         "name": "ThinkingCard",
         "description": "Standardized skill output",
         "fields": [
-          {"name": "score", "type": "number", "required": true},
-          {"name": "rating", "type": "string", "required": true},
-          {"name": "confidence", "type": "number", "required": true},
-          {"name": "reasoning", "type": "array", "required": true},
-          {"name": "recommendations", "type": "object", "required": false}
+          {
+            "name": "score",
+            "type": "number",
+            "required": true
+          },
+          {
+            "name": "rating",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "confidence",
+            "type": "number",
+            "required": true
+          },
+          {
+            "name": "reasoning",
+            "type": "array",
+            "required": true
+          },
+          {
+            "name": "recommendations",
+            "type": "object",
+            "required": false
+          }
         ],
-        "relationships": ["Output from all skills"]
+        "relationships": [
+          "Output from all skills"
+        ]
       }
     ],
     "dataFlowDescription": "Data flows from external sources through the adapter (with caching), gets normalized into TickerData, passes to skills for analysis, produces ThinkingCards, which are aggregated by composite tools and returned to clients.",
@@ -327,8 +430,19 @@
     "authorizationModel": {
       "type": "Simple",
       "roleMapping": [
-        {"role": "user", "permissions": ["execute_skills", "view_results"]},
-        {"role": "admin", "permissions": ["all"]}
+        {
+          "role": "user",
+          "permissions": [
+            "execute_skills",
+            "view_results"
+          ]
+        },
+        {
+          "role": "admin",
+          "permissions": [
+            "all"
+          ]
+        }
       ]
     },
     "securityControls": [
@@ -336,31 +450,43 @@
         "control": "Input Validation",
         "implementation": "JSON schema validation",
         "location": "MCP server, Data adapter",
-        "relatedReqs": ["REQ-005", "REQ-006"]
+        "relatedReqs": [
+          "REQ-005",
+          "REQ-006"
+        ]
       },
       {
         "control": "Secret Scanning",
         "implementation": "GitHub secret scanning",
         "location": "Repository",
-        "relatedReqs": ["REQ-010"]
+        "relatedReqs": [
+          "REQ-010"
+        ]
       },
       {
         "control": "Code Scanning",
         "implementation": "CodeQL analysis",
         "location": "CI/CD",
-        "relatedReqs": ["REQ-010"]
+        "relatedReqs": [
+          "REQ-010"
+        ]
       },
       {
         "control": "Subprocess Isolation",
         "implementation": "Restricted subprocess execution",
         "location": "MCP server",
-        "relatedReqs": ["REQ-005"]
+        "relatedReqs": [
+          "REQ-005"
+        ]
       },
       {
         "control": "Rate Limiting",
         "implementation": "Token bucket algorithm",
         "location": "Data adapter",
-        "relatedReqs": ["REQ-006", "REQ-020"]
+        "relatedReqs": [
+          "REQ-006",
+          "REQ-020"
+        ]
       }
     ],
     "sensitiveDataHandling": [
@@ -463,12 +589,18 @@
       {
         "endpoint": "/health",
         "purpose": "Liveness check",
-        "checks": ["Server running", "Skills directory accessible"]
+        "checks": [
+          "Server running",
+          "Skills directory accessible"
+        ]
       },
       {
         "endpoint": "/ready",
         "purpose": "Readiness check",
-        "checks": ["All skills loaded", "Data adapter connected"]
+        "checks": [
+          "All skills loaded",
+          "Data adapter connected"
+        ]
       }
     ],
     "logging": {
@@ -479,13 +611,21 @@
           "event": "skill_execution",
           "level": "info",
           "trigger": "Every skill call",
-          "fields": ["skill", "duration", "success"]
+          "fields": [
+            "skill",
+            "duration",
+            "success"
+          ]
         },
         {
           "event": "error",
           "level": "error",
           "trigger": "Any error",
-          "fields": ["error_code", "stack_trace", "context"]
+          "fields": [
+            "error_code",
+            "stack_trace",
+            "context"
+          ]
         }
       ]
     },
@@ -507,7 +647,10 @@
       }
     ],
     "monitoring": {
-      "tools": ["Prometheus", "Grafana"],
+      "tools": [
+        "Prometheus",
+        "Grafana"
+      ],
       "alerts": [
         "Skill execution time > 5s",
         "Error rate > 1%",
@@ -524,19 +667,36 @@
       "optionsConsidered": [
         {
           "option": "Python only",
-          "pros": ["Single language", "Good for data science", "Simple deployment"],
-          "cons": ["Performance limitations"]
+          "pros": [
+            "Single language",
+            "Good for data science",
+            "Simple deployment"
+          ],
+          "cons": [
+            "Performance limitations"
+          ]
         },
         {
           "option": "Python skills + Node server",
-          "pros": ["Better MCP ecosystem support", "Performance"],
-          "cons": ["Two languages to maintain"]
+          "pros": [
+            "Better MCP ecosystem support",
+            "Performance"
+          ],
+          "cons": [
+            "Two languages to maintain"
+          ]
         }
       ],
       "decision": "Use Python for all components",
       "rationale": "Simplicity and consistency outweigh performance concerns for this use case",
-      "consequences": ["Single language expertise needed", "Easier maintenance"],
-      "relatedReqs": ["REQ-001", "REQ-005"],
+      "consequences": [
+        "Single language expertise needed",
+        "Easier maintenance"
+      ],
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-005"
+      ],
       "relatedDecisions": []
     },
     {
@@ -547,20 +707,40 @@
       "optionsConsidered": [
         {
           "option": "Import as modules",
-          "pros": ["Faster", "Shared memory"],
-          "cons": ["No isolation", "Memory leaks possible"]
+          "pros": [
+            "Faster",
+            "Shared memory"
+          ],
+          "cons": [
+            "No isolation",
+            "Memory leaks possible"
+          ]
         },
         {
           "option": "Subprocess execution",
-          "pros": ["Complete isolation", "No memory leaks", "Crash isolation"],
-          "cons": ["Slower", "IPC overhead"]
+          "pros": [
+            "Complete isolation",
+            "No memory leaks",
+            "Crash isolation"
+          ],
+          "cons": [
+            "Slower",
+            "IPC overhead"
+          ]
         }
       ],
       "decision": "Use subprocess execution",
       "rationale": "Isolation and stability more important than raw performance",
-      "consequences": ["Each skill runs in isolated process", "Clean error handling"],
-      "relatedReqs": ["REQ-005"],
-      "relatedDecisions": ["ADR-001"]
+      "consequences": [
+        "Each skill runs in isolated process",
+        "Clean error handling"
+      ],
+      "relatedReqs": [
+        "REQ-005"
+      ],
+      "relatedDecisions": [
+        "ADR-001"
+      ]
     },
     {
       "id": "ADR-003",
@@ -570,19 +750,37 @@
       "optionsConsidered": [
         {
           "option": "Skills fetch directly",
-          "pros": ["Simple", "Direct control"],
-          "cons": ["Not testable", "Network in skills"]
+          "pros": [
+            "Simple",
+            "Direct control"
+          ],
+          "cons": [
+            "Not testable",
+            "Network in skills"
+          ]
         },
         {
           "option": "Separate data layer",
-          "pros": ["Testable", "Skills stay pure", "Multiple sources"],
-          "cons": ["Additional component"]
+          "pros": [
+            "Testable",
+            "Skills stay pure",
+            "Multiple sources"
+          ],
+          "cons": [
+            "Additional component"
+          ]
         }
       ],
       "decision": "Implement separate pluggable data adapter",
       "rationale": "Separation of concerns and testability are critical",
-      "consequences": ["Clean architecture", "Easy to test", "Multiple data sources possible"],
-      "relatedReqs": ["REQ-006"],
+      "consequences": [
+        "Clean architecture",
+        "Easy to test",
+        "Multiple data sources possible"
+      ],
+      "relatedReqs": [
+        "REQ-006"
+      ],
       "relatedDecisions": []
     },
     {
@@ -593,24 +791,44 @@
       "optionsConsidered": [
         {
           "option": "stdio only",
-          "pros": ["Simple", "Standard for MCP"],
-          "cons": ["No remote access"]
+          "pros": [
+            "Simple",
+            "Standard for MCP"
+          ],
+          "cons": [
+            "No remote access"
+          ]
         },
         {
           "option": "HTTP only",
-          "pros": ["Remote access", "Standard REST"],
-          "cons": ["Not native MCP"]
+          "pros": [
+            "Remote access",
+            "Standard REST"
+          ],
+          "cons": [
+            "Not native MCP"
+          ]
         },
         {
           "option": "Both stdio and HTTP",
-          "pros": ["Maximum flexibility", "All use cases"],
-          "cons": ["More complex"]
+          "pros": [
+            "Maximum flexibility",
+            "All use cases"
+          ],
+          "cons": [
+            "More complex"
+          ]
         }
       ],
       "decision": "Support both stdio and HTTP transports",
       "rationale": "Different deployment scenarios require different transports",
-      "consequences": ["More complex server", "Broader compatibility"],
-      "relatedReqs": ["REQ-007"],
+      "consequences": [
+        "More complex server",
+        "Broader compatibility"
+      ],
+      "relatedReqs": [
+        "REQ-007"
+      ],
       "relatedDecisions": []
     },
     {
@@ -621,19 +839,37 @@
       "optionsConsidered": [
         {
           "option": "GitHub Actions",
-          "pros": ["Integrated with GitHub", "Free for public repos", "Good ecosystem"],
-          "cons": ["Vendor lock-in"]
+          "pros": [
+            "Integrated with GitHub",
+            "Free for public repos",
+            "Good ecosystem"
+          ],
+          "cons": [
+            "Vendor lock-in"
+          ]
         },
         {
           "option": "Jenkins",
-          "pros": ["Self-hosted", "Full control"],
-          "cons": ["Maintenance overhead"]
+          "pros": [
+            "Self-hosted",
+            "Full control"
+          ],
+          "cons": [
+            "Maintenance overhead"
+          ]
         }
       ],
       "decision": "Use GitHub Actions",
       "rationale": "Integration and simplicity outweigh lock-in concerns",
-      "consequences": ["Easy setup", "Good integration", "Some vendor dependency"],
-      "relatedReqs": ["REQ-009", "REQ-010"],
+      "consequences": [
+        "Easy setup",
+        "Good integration",
+        "Some vendor dependency"
+      ],
+      "relatedReqs": [
+        "REQ-009",
+        "REQ-010"
+      ],
       "relatedDecisions": []
     },
     {
@@ -644,22 +880,58 @@
       "optionsConsidered": [
         {
           "option": "Single monolithic analyzer",
-          "pros": ["Simple", "One decision point"],
-          "cons": ["Complex logic", "Hard to maintain"]
+          "pros": [
+            "Simple",
+            "One decision point"
+          ],
+          "cons": [
+            "Complex logic",
+            "Hard to maintain"
+          ]
         },
         {
           "option": "Specialized agents",
-          "pros": ["Separation of concerns", "Expert systems", "Maintainable"],
-          "cons": ["Coordination needed"]
+          "pros": [
+            "Separation of concerns",
+            "Expert systems",
+            "Maintainable"
+          ],
+          "cons": [
+            "Coordination needed"
+          ]
         }
       ],
       "decision": "Implement three specialized agents",
       "rationale": "Different analysis types benefit from specialization",
-      "consequences": ["Clear responsibilities", "Better maintainability", "Need orchestration"],
-      "relatedReqs": ["REQ-013"],
+      "consequences": [
+        "Clear responsibilities",
+        "Better maintainability",
+        "Need orchestration"
+      ],
+      "relatedReqs": [
+        "REQ-013"
+      ],
       "relatedDecisions": []
     }
   ],
   "createdAt": "2026-06-19T00:00:00Z",
-  "updatedAt": "2026-06-19T00:00:00Z"
+  "updatedAt": "2026-06-19T00:00:00Z",
+  "generationMetadata": {
+    "comprehensiveness": "standard",
+    "sectionsGenerated": [
+      "systemOverview",
+      "architecturePrinciples",
+      "components",
+      "dataArchitecture",
+      "integrationArchitecture",
+      "securityArchitecture",
+      "deploymentArchitecture",
+      "operationalConcerns",
+      "architecturalDecisions"
+    ],
+    "totalLlmCalls": 0,
+    "totalInputTokens": 0,
+    "totalOutputTokens": 0,
+    "generatedAt": "2026-06-19T00:00:00Z"
+  }
 }

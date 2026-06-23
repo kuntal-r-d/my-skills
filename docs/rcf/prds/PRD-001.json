@@ -83,7 +83,12 @@
       "domain": "Core Skills",
       "priority": "must",
       "rationale": "Core analytical capability for financial decision-making",
-      "tags": ["skills", "analysis", "financial", "accuracy"]
+      "tags": [
+        "skills",
+        "analysis",
+        "financial",
+        "accuracy"
+      ]
     },
     {
       "id": "REQ-002",
@@ -93,7 +98,11 @@
       "domain": "Data Integration",
       "priority": "must",
       "rationale": "Enables client data sovereignty and flexibility",
-      "tags": ["data", "client", "validation"]
+      "tags": [
+        "data",
+        "client",
+        "validation"
+      ]
     },
     {
       "id": "REQ-003",
@@ -103,17 +112,25 @@
       "domain": "Financial Accuracy",
       "priority": "must",
       "rationale": "Financial decisions require precise, auditable calculations",
-      "tags": ["calculations", "precision", "audit"]
+      "tags": [
+        "calculations",
+        "precision",
+        "audit"
+      ]
     },
     {
       "id": "REQ-004",
       "title": "Mandatory Risk Disclaimers",
       "description": "Display prominent, legally-compliant disclaimers on ALL outputs including 'NOT FINANCIAL ADVICE', 'PAST PERFORMANCE DOES NOT GUARANTEE FUTURE RESULTS', 'ALL INVESTMENTS CARRY RISK OF LOSS', 'CONSULT LICENSED FINANCIAL ADVISOR', and 'EDUCATIONAL PURPOSES ONLY'. Disclaimers must be unmissable and repeated in summaries.",
-      "category": "compliance",
+      "category": "non-functional",
       "domain": "Legal Compliance",
       "priority": "must",
       "rationale": "Legal requirement to prevent liability and protect users",
-      "tags": ["compliance", "disclaimers", "legal"]
+      "tags": [
+        "compliance",
+        "disclaimers",
+        "legal"
+      ]
     },
     {
       "id": "REQ-005",
@@ -123,7 +140,11 @@
       "domain": "Data Persistence",
       "priority": "must",
       "rationale": "Required for compliance, audit, and pattern analysis",
-      "tags": ["storage", "database", "audit"]
+      "tags": [
+        "storage",
+        "database",
+        "audit"
+      ]
     },
     {
       "id": "REQ-006",
@@ -133,7 +154,11 @@
       "domain": "User Interface",
       "priority": "must",
       "rationale": "Visual analysis and monitoring of financial decisions",
-      "tags": ["dashboard", "ui", "visualization"]
+      "tags": [
+        "dashboard",
+        "ui",
+        "visualization"
+      ]
     },
     {
       "id": "REQ-007",
@@ -143,7 +168,11 @@
       "domain": "Risk Management",
       "priority": "must",
       "rationale": "Prevent catastrophic losses through proper risk management",
-      "tags": ["risk", "position-sizing", "var"]
+      "tags": [
+        "risk",
+        "position-sizing",
+        "var"
+      ]
     },
     {
       "id": "REQ-008",
@@ -153,7 +182,11 @@
       "domain": "Data Quality",
       "priority": "must",
       "rationale": "Bad data leads to bad financial decisions",
-      "tags": ["data-quality", "validation", "anomaly"]
+      "tags": [
+        "data-quality",
+        "validation",
+        "anomaly"
+      ]
     },
     {
       "id": "REQ-009",
@@ -163,7 +196,11 @@
       "domain": "Transparency",
       "priority": "must",
       "rationale": "Users must understand reliability of analysis for decisions",
-      "tags": ["confidence", "transparency", "uncertainty"]
+      "tags": [
+        "confidence",
+        "transparency",
+        "uncertainty"
+      ]
     },
     {
       "id": "REQ-010",
@@ -173,17 +210,25 @@
       "domain": "Analytics",
       "priority": "must",
       "rationale": "Validate strategies before risking real money",
-      "tags": ["backtesting", "historical", "validation"]
+      "tags": [
+        "backtesting",
+        "historical",
+        "validation"
+      ]
     },
     {
       "id": "REQ-011",
       "title": "Regulatory Compliance Logging",
       "description": "Maintain immutable, timestamped audit logs of all analyses, data sources, calculations, decisions, and user actions for regulatory review. Support compliance reporting for MiFID II, best execution, and suitability requirements. Retain logs per regulatory requirements with automated archival.",
-      "category": "compliance",
+      "category": "non-functional",
       "domain": "Regulatory",
       "priority": "must",
       "rationale": "Meet regulatory requirements for financial services",
-      "tags": ["compliance", "audit", "regulatory"]
+      "tags": [
+        "compliance",
+        "audit",
+        "regulatory"
+      ]
     },
     {
       "id": "REQ-012",
@@ -193,7 +238,11 @@
       "domain": "Model Governance",
       "priority": "must",
       "rationale": "Ensure consistency and enable investigation of past decisions",
-      "tags": ["versioning", "governance", "models"]
+      "tags": [
+        "versioning",
+        "governance",
+        "models"
+      ]
     },
     {
       "id": "REQ-013",
@@ -203,7 +252,11 @@
       "domain": "Risk Analysis",
       "priority": "should",
       "rationale": "Understand behavior in extreme conditions before they occur",
-      "tags": ["stress-testing", "risk", "scenarios"]
+      "tags": [
+        "stress-testing",
+        "risk",
+        "scenarios"
+      ]
     },
     {
       "id": "REQ-014",
@@ -213,7 +266,11 @@
       "domain": "Data Governance",
       "priority": "must",
       "rationale": "Required for audit trail and debugging analysis issues",
-      "tags": ["lineage", "traceability", "governance"]
+      "tags": [
+        "lineage",
+        "traceability",
+        "governance"
+      ]
     },
     {
       "id": "REQ-015",
@@ -223,7 +280,11 @@
       "domain": "Multi-tenancy",
       "priority": "must",
       "rationale": "Essential for SaaS deployment and data privacy",
-      "tags": ["multi-tenant", "isolation", "security"]
+      "tags": [
+        "multi-tenant",
+        "isolation",
+        "security"
+      ]
     },
     {
       "id": "REQ-016",
@@ -233,7 +294,11 @@
       "domain": "Integration",
       "priority": "must",
       "rationale": "Enable integration with existing systems and tools",
-      "tags": ["api", "integration", "realtime"]
+      "tags": [
+        "api",
+        "integration",
+        "realtime"
+      ]
     },
     {
       "id": "REQ-017",
@@ -243,7 +308,11 @@
       "domain": "Reporting",
       "priority": "should",
       "rationale": "Required for external reporting and documentation",
-      "tags": ["export", "reporting", "documentation"]
+      "tags": [
+        "export",
+        "reporting",
+        "documentation"
+      ]
     },
     {
       "id": "REQ-018",
@@ -253,7 +322,11 @@
       "domain": "Performance",
       "priority": "must",
       "rationale": "Required for institutional scale operations",
-      "tags": ["performance", "scalability", "optimization"]
+      "tags": [
+        "performance",
+        "scalability",
+        "optimization"
+      ]
     },
     {
       "id": "REQ-019",
@@ -263,7 +336,11 @@
       "domain": "Market Timing",
       "priority": "should",
       "rationale": "Market timing affects data relevance and decisions",
-      "tags": ["market-hours", "timing", "calendar"]
+      "tags": [
+        "market-hours",
+        "timing",
+        "calendar"
+      ]
     },
     {
       "id": "REQ-020",
@@ -273,17 +350,25 @@
       "domain": "Statistical Accuracy",
       "priority": "must",
       "rationale": "Financial decisions must account for uncertainty",
-      "tags": ["statistics", "uncertainty", "confidence"]
+      "tags": [
+        "statistics",
+        "uncertainty",
+        "confidence"
+      ]
     },
     {
       "id": "REQ-021",
       "title": "Conflict of Interest Disclosure",
       "description": "Require disclosure of any conflicts of interest, data source biases, commercial relationships, or incentives that might affect analysis objectivity. Display prominently when conflicts exist. Maintain transparency about analysis limitations and potential biases.",
-      "category": "compliance",
+      "category": "non-functional",
       "domain": "Ethics",
       "priority": "must",
       "rationale": "Transparency essential for trust and compliance",
-      "tags": ["ethics", "disclosure", "transparency"]
+      "tags": [
+        "ethics",
+        "disclosure",
+        "transparency"
+      ]
     },
     {
       "id": "REQ-022",
@@ -293,7 +378,11 @@
       "domain": "Transparency",
       "priority": "must",
       "rationale": "Users must be able to verify and understand calculations",
-      "tags": ["transparency", "calculations", "verification"]
+      "tags": [
+        "transparency",
+        "calculations",
+        "verification"
+      ]
     },
     {
       "id": "REQ-023",
@@ -303,7 +392,11 @@
       "domain": "Data Management",
       "priority": "should",
       "rationale": "Balance storage costs with compliance requirements",
-      "tags": ["retention", "archival", "compliance"]
+      "tags": [
+        "retention",
+        "archival",
+        "compliance"
+      ]
     },
     {
       "id": "REQ-024",
@@ -313,7 +406,11 @@
       "domain": "Analytics",
       "priority": "should",
       "rationale": "Understand impact of different assumptions on outcomes",
-      "tags": ["scenarios", "sensitivity", "analysis"]
+      "tags": [
+        "scenarios",
+        "sensitivity",
+        "analysis"
+      ]
     },
     {
       "id": "REQ-025",
@@ -323,43 +420,23 @@
       "domain": "Security",
       "priority": "must",
       "rationale": "Protect sensitive financial data and prevent attacks",
-      "tags": ["security", "encryption", "authentication"]
+      "tags": [
+        "security",
+        "encryption",
+        "authentication"
+      ]
     }
   ],
-  "glossary": [
-    {
-      "term": "Pure Skill",
-      "definition": "A stateless, deterministic analysis function that accepts input data and returns consistent results without side effects, following Anthropic Agent Skills specification"
-    },
-    {
-      "term": "Financial-Grade",
-      "definition": "Meeting the accuracy, auditability, and compliance standards required for systems making real money decisions"
-    },
-    {
-      "term": "Confidence Score",
-      "definition": "A percentage (0-100%) indicating the reliability of an analysis based on data quality, market conditions, and model limitations"
-    },
-    {
-      "term": "Data Lineage",
-      "definition": "Complete tracking of data from source through all transformations to final result, enabling full traceability"
-    },
-    {
-      "term": "Position Sizing",
-      "definition": "Calculation of optimal trade size based on account value, risk tolerance, and Kelly Criterion"
-    },
-    {
-      "term": "Value at Risk (VaR)",
-      "definition": "Statistical measure of potential loss in value of a portfolio over a defined period for a given confidence interval"
-    },
-    {
-      "term": "Audit Trail",
-      "definition": "Immutable, timestamped record of all system actions, calculations, and decisions for regulatory compliance"
-    },
-    {
-      "term": "Multi-tenant Isolation",
-      "definition": "Architecture ensuring complete data separation between different clients using the same system"
-    }
-  ],
+  "glossary": {
+    "Pure Skill": "A stateless, deterministic analysis function that accepts input data and returns consistent results without side effects, following Anthropic Agent Skills specification",
+    "Financial-Grade": "Meeting the accuracy, auditability, and compliance standards required for systems making real money decisions",
+    "Confidence Score": "A percentage (0-100%) indicating the reliability of an analysis based on data quality, market conditions, and model limitations",
+    "Data Lineage": "Complete tracking of data from source through all transformations to final result, enabling full traceability",
+    "Position Sizing": "Calculation of optimal trade size based on account value, risk tolerance, and Kelly Criterion",
+    "Value at Risk (VaR)": "Statistical measure of potential loss in value of a portfolio over a defined period for a given confidence interval",
+    "Audit Trail": "Immutable, timestamped record of all system actions, calculations, and decisions for regulatory compliance",
+    "Multi-tenant Isolation": "Architecture ensuring complete data separation between different clients using the same system"
+  },
   "successCriteria": [
     "All financial calculations accurate to 6+ decimal places",
     "100% of outputs include mandatory disclaimers",
