@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stock Buddy Dashboard</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <h1>Stock Buddy</h1>
+      <p class="subtitle">DSE market data &amp; portfolio explorer</p>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button type="button" class="tab active" data-panel="overview">Overview</button>
+      <button type="button" class="tab" data-panel="tickers">Tickers</button>
+      <button type="button" class="tab" data-panel="ticker-detail">Ticker detail</button>
+      <button type="button" class="tab" data-panel="portfolio">Portfolio</button>
+      <button type="button" class="tab" data-panel="news">News</button>
+      <button type="button" class="tab" data-panel="macro">Macro</button>
+      <button type="button" class="tab" data-panel="ops">Ingest &amp; freshness</button>
+    </nav>
+  </header>
+
+  <main class="main">
+    <section id="panel-overview" class="panel active">
+      <div class="cards" id="stat-cards"></div>
+      <h2>Recent ingest runs</h2>
+      <div class="table-wrap" id="overview-runs"></div>
+    </section>
+
+    <section id="panel-tickers" class="panel">
+      <div class="toolbar">
+        <input type="search" id="ticker-search" placeholder="Filter symbols…" />
+      </div>
+      <div class="table-wrap" id="tickers-table"></div>
+    </section>
+
+    <section id="panel-ticker-detail" class="panel">
+      <div class="toolbar">
+        <select id="ticker-select"></select>
+        <button type="button" id="load-ticker">Load</button>
+      </div>
+      <div id="ticker-meta" class="meta-bar"></div>
+      <div class="chart-row">
+        <div class="chart-box"><canvas id="ohlcv-chart"></canvas></div>
+      </div>
+      <div class="grid-2">
+        <div><h3>Fundamentals</h3><pre id="fundamentals-json" class="json-block"></pre></div>
+        <div><h3>Shareholding</h3><div class="chart-box sm"><canvas id="share-chart"></canvas></div></div>
+      </div>
+      <h3>News</h3>
+      <div class="table-wrap" id="ticker-news"></div>
+    </section>
+
+    <section id="panel-portfolio" class="panel">
+      <div id="portfolio-summary" class="meta-bar"></div>
+      <div class="grid-2">
+        <div class="chart-box sm"><canvas id="sector-chart"></canvas></div>
+        <div class="table-wrap" id="portfolio-table"></div>
+      </div>
+    </section>
+
+    <section id="panel-news" class="panel">
+      <div class="table-wrap" id="all-news"></div>
+    </section>
+
+    <section id="panel-macro" class="panel">
+      <div id="macro-meta" class="meta-bar"></div>
+      <pre id="macro-json" class="json-block"></pre>
+    </section>
+
+    <section id="panel-ops" class="panel">
+      <h2>Data freshness</h2>
+      <div class="table-wrap" id="freshness-table"></div>
+      <h2>Ingest runs</h2>
+      <div class="table-wrap" id="ingest-table"></div>
+    </section>
+  </main>
+
+  <footer class="footer">Educational use only — not financial advice</footer>
+  <script src="/app.js"></script>
+</body>
+</html>

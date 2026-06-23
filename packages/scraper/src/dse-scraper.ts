@@ -7,8 +7,10 @@ import {
   readJsonCache,
   sleep,
   writeJsonCache,
+  yahooChartToOhlcv,
   type OhlcvRow,
 } from './utils.js';
+import { fetchYahooOhlcv, parseDseArchiveHtml, parseDseCompanyHtml, parseDseShareholdingHtml, fetchStockAnalysisOhlcv } from './sources.js';
 
 export interface LatestPrice {
   ticker: string;
@@ -59,6 +61,8 @@ export class DSEScraper {
       return cached;
     }
 
+    let historical: OhlcvRow[] = [];
+
     try {
       const endDate = new Date();
       const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000);
@@ -74,15 +78,34 @@ export class DSEScraper {
       const responseText = await fetchText(url);
 
       if (responseText) {
-        const data = this.parseHistoricalCsv(responseText, ticker);
-        writeJsonCache(cacheFile, data);
-        return data;
+        historical = this.parseHistoricalCsv(responseText, ticker);
+        if (historical.length === 0) {
+          historical = parseDseArchiveHtml(responseText, ticker);
+        }
+        if (historical.length > 0) {
+          writeJsonCache(cacheFile, historical);
+          return historical;
+        }
       }
     } catch (e) {
       console.error('Historical data error:', e);
     }
 
-    return this.fetchDailyPrices(ticker, days);
+    if (historical.length === 0) {
+      historical = await fetchYahooOhlcv(ticker, 'DHA', days > 365 ? '2y' : '1y');
+      if (historical.length > 0) {
+        writeJsonCache(cacheFile, historical);
+      }
+    }
+
+    if (historical.length === 0) {
+      historical = await fetchStockAnalysisOhlcv(ticker);
+      if (historical.length > 0) {
+        writeJsonCache(cacheFile, historical);
+      }
+    }
+
+    return historical;
   }
 
   async getMarketSummary(): Promise<Record<string, unknown>> {
@@ -207,13 +230,19 @@ export class DSEScraper {
     return [];
   }
 
-  parseCompanyInfo(_html: string): Record<string, unknown> {
+  parseCompanyInfo(html: string): Record<string, unknown> {
+    const fundamentals = parseDseCompanyHtml(html);
+    const shareholding = parseDseShareholdingHtml(html);
     return {
-      pe_ratio: 0,
-      eps: 0,
-      nav: 0,
-      market_cap: 0,
+      ...fundamentals,
+      shareholding,
     };
+  }
+
+  async fetchFundamentalsAndShareholding(ticker: string): Promise<Record<string, unknown>> {
+    const html = await fetchText(`${this.baseUrl}/displayCompany.php?name=${ticker}`);
+    if (!html) return {};
+    return this.parseCompanyInfo(html);
   }
 }
 
@@ -322,8 +351,8 @@ export class DataManager {
     }
   }
 
-  convertAltData(_data: Record<string, unknown>): OhlcvRow[] {
-    return [];
+  convertAltData(data: Record<string, unknown>): OhlcvRow[] {
+    return yahooChartToOhlcv(data);
   }
 }
 

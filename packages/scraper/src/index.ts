@@ -29,6 +29,23 @@ export {
   formatDate,
   fetchText,
   parseHistoricalCsv,
+  yahooChartToOhlcv,
+  normalizeDate,
   DEFAULT_HEADERS,
   type OhlcvRow,
 } from './utils.js';
+
+export {
+  fetchYahooOhlcv,
+  fetchDseCompanyHtml,
+  fetchStockAnalysisFundamentals,
+  fetchStockAnalysisOhlcv,
+  parseDseCompanyHtml,
+  parseDseShareholdingHtml,
+  parseDseArchiveHtml,
+  parseDseNewsHtml,
+  DEFAULT_MACRO,
+  type FundamentalsPayload,
+  type ShareholdingRow,
+  type NewsRow,
+} from './sources.js';

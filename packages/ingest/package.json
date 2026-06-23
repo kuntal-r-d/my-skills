@@ -1,7 +1,7 @@
 {
-  "name": "@stock-buddy/data-adapter",
+  "name": "@stock-buddy/ingest",
   "version": "2.0.0",
-  "description": "Pluggable DSE data providers with caching and rate limiting",
+  "description": "DSE data ingestion jobs and contract builder for Stock Buddy",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,16 +13,16 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@stock-buddy/core": "file:../core",
-    "@stock-buddy/db": "file:../db"
+    "@stock-buddy/db": "file:../db",
+    "@stock-buddy/scraper": "file:../scraper"
   },
   "devDependencies": {
+    "@types/node": "^22.13.10",
     "tsup": "^8.4.0",
-    "typescript": "^5.8.2",
-    "vitest": "^3.0.6"
+    "typescript": "^5.8.2"
   }
 }

@@ -2,6 +2,48 @@
 
 Stock Buddy v2 is **TypeScript / Node.js only**. Python (`python -m stock_buddy_mcp.server`) was removed in v2.0.0.
 
+## Data platform (PostgreSQL + dual MCP)
+
+Market data is stored in PostgreSQL and exposed by a **separate** data MCP server. Analysis MCP stays no-network.
+
+1. Start Postgres:
+
+```bash
+docker compose up -d postgres
+```
+
+2. Migrate and seed:
+
+```bash
+cp .env.example .env   # set DATABASE_URL if needed
+npm run db:migrate
+npm run db:seed
+npm run ingest -- --ticker LHB --job all --days 365
+```
+
+3. Add **both** servers to Cursor / Claude — see [`stock-buddy-data.json`](stock-buddy-data.json):
+
+- `stock-buddy-data` — `get_ticker_contract_for_analysis`, portfolio write tools
+- `stock-buddy` — `analyze_ticker`, analysis skills
+
+Workflow: fetch contract from data MCP → pass JSON to `analyze_ticker`.
+
+Portfolio is **manual only**: `upsert_position`, `set_account` on data MCP.
+
+### Web dashboard
+
+Visual explorer for all Postgres tables (tickers, OHLCV charts, portfolio, news, ingest logs):
+
+```bash
+docker compose up -d postgres
+npm run dashboard
+# → http://localhost:3000
+```
+
+Or via Docker: `docker compose up -d dashboard` (port 3000).
+
+Full LHB example: [`docs/LHB-walkthrough.md`](../docs/LHB-walkthrough.md).
+
 ## Claude Desktop (recommended: local Node)
 
 **Prerequisites:** Node 20+, built server (`npm ci && npm run build` in repo root).

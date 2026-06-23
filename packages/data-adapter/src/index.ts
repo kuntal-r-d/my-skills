@@ -10,3 +10,4 @@ export {
 export { FileProvider } from './providers/file-provider.js';
 export { MockProvider } from './providers/mock-provider.js';
 export { DSEProvider } from './providers/dse-provider.js';
+export { DbProvider } from './providers/db-provider.js';

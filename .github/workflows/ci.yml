@@ -40,6 +40,50 @@ jobs:
       - name: Skill CLI smoke test
         run: npm run smoke
 
+  data-platform:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: stockbuddy
+          POSTGRES_USER: stockbuddy
+          POSTGRES_PASSWORD: stockbuddy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stockbuddy -d stockbuddy"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Migrate and seed database
+        env:
+          DATABASE_URL: postgresql://stockbuddy:stockbuddy@localhost:5432/stockbuddy
+        run: |
+          npm run db:migrate
+          npm run db:seed
+
+      - name: Contract builder and E2E tests
+        env:
+          DATABASE_URL: postgresql://stockbuddy:stockbuddy@localhost:5432/stockbuddy
+        run: npm test -- tests/data-platform.test.ts tests/data-platform-e2e.test.ts
+
   docker-build:
     runs-on: ubuntu-latest
     steps:

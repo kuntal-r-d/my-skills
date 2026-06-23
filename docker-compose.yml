@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16
+    container_name: stock-buddy-postgres
+    environment:
+      POSTGRES_DB: stockbuddy
+      POSTGRES_USER: stockbuddy
+      POSTGRES_PASSWORD: stockbuddy
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U stockbuddy -d stockbuddy']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - stock-buddy-net
+
   stock-buddy-mcp:
     build:
       context: .
@@ -8,7 +27,7 @@ services:
     image: stock-buddy-mcp:latest
     container_name: stock-buddy-mcp
     ports:
-      - "8080:8080"
+      - '8080:8080'
     environment:
       - STOCK_BUDDY_HTTP=1
       - STOCK_BUDDY_PORT=8080
@@ -16,12 +35,72 @@ services:
       - ./skills/_fixtures:/app/skills/_fixtures:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
+      test: ['CMD', 'node', '-e', 'process.exit(0)']
       interval: 30s
       timeout: 3s
       retries: 3
     networks:
       - stock-buddy-net
+
+  stock-buddy-data-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stock-buddy-mcp:latest
+    container_name: stock-buddy-data-mcp
+    command: ['node', 'packages/data-mcp-server/dist/server.js']
+    ports:
+      - '8081:8081'
+    environment:
+      - DATABASE_URL=postgresql://stockbuddy:stockbuddy@postgres:5432/stockbuddy
+      - STOCK_BUDDY_DATA_HTTP=1
+      - STOCK_BUDDY_DATA_PORT=8081
+      - STOCK_BUDDY_DATA_ADMIN=1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - stock-buddy-net
+
+  ingest-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stock-buddy-mcp:latest
+    container_name: stock-buddy-ingest
+    command: ['node', 'packages/ingest/dist/scheduler.js']
+    environment:
+      - DATABASE_URL=postgresql://stockbuddy:stockbuddy@postgres:5432/stockbuddy
+      - INGEST_CRON_OHLCV=0 11 * * 0-4
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - stock-buddy-net
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stock-buddy-mcp:latest
+    container_name: stock-buddy-dashboard
+    command: ['node', 'packages/dashboard/dist/server.js']
+    ports:
+      - '3000:3000'
+    environment:
+      - DATABASE_URL=postgresql://stockbuddy:stockbuddy@postgres:5432/stockbuddy
+      - STOCK_BUDDY_DASHBOARD_PORT=3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - stock-buddy-net
+
+volumes:
+  pgdata:
 
 networks:
   stock-buddy-net:

@@ -1,0 +1,27 @@
+{
+  "account": {
+    "capital_bdt": 463813,
+    "risk_per_trade_pct": 1.0,
+    "label": "default"
+  },
+  "positions": [
+    { "ticker": "BSCPLC", "qty": 155, "avg_cost": 156.3, "sector": "Industrial" },
+    { "ticker": "BATBC", "qty": 178, "avg_cost": 370.7, "sector": "Consumer" },
+    { "ticker": "BXPHARMA", "qty": 1, "avg_cost": 124.0, "sector": "Pharma" },
+    { "ticker": "BRACBANK", "qty": 300, "avg_cost": 64.1, "sector": "Bank" },
+    { "ticker": "BSC", "qty": 1, "avg_cost": 102.4, "sector": "Industrial" },
+    { "ticker": "BSRMSTEEL", "qty": 151, "avg_cost": 78.1, "sector": "Industrial" },
+    { "ticker": "CITYBANK", "qty": 1, "avg_cost": 28.5, "sector": "Bank" },
+    { "ticker": "EBL", "qty": 649, "avg_cost": 25.5, "sector": "Bank" },
+    { "ticker": "GIB", "qty": 4000, "avg_cost": 5.2, "sector": "Bank" },
+    { "ticker": "GP", "qty": 1, "avg_cost": 239.7, "sector": "Telecom" },
+    { "ticker": "LHB", "qty": 875, "avg_cost": 52.7, "sector": "Cement" },
+    { "ticker": "MIDLANDBNK", "qty": 600, "avg_cost": 17.3, "sector": "Bank" },
+    { "ticker": "PRIMEBANK", "qty": 1, "avg_cost": 29.5, "sector": "Bank" },
+    { "ticker": "PUBALIBANK", "qty": 10, "avg_cost": 33.9, "sector": "Bank" },
+    { "ticker": "ROBI", "qty": 375, "avg_cost": 28.8, "sector": "Telecom" },
+    { "ticker": "SQURPHARMA", "qty": 632, "avg_cost": 212.8, "sector": "Pharma" },
+    { "ticker": "UPGDCL", "qty": 100, "avg_cost": 118.0, "sector": "Power" },
+    { "ticker": "WALTONHIL", "qty": 128, "avg_cost": 386.9, "sector": "Industrial" }
+  ]
+}
