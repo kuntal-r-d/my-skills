@@ -425,6 +425,24 @@
         "encryption",
         "authentication"
       ]
+    },
+    {
+      "id": "REQ-026",
+      "title": "No-Fetch MCP Instruction Layer & Client Data Acquisition Guidance",
+      "description": "The MCP server performs no network fetching or data management; it exposes the analysis skills and instructions only. Every tool's inputSchema MUST declare, as named properties (with additionalProperties:true), the shared-contract fields that skill reads (ohlcv, fundamentals, news, shareholding, macro, microstructure, account, agents, ...), so spec-compliant clients can pass data in the tool call. When a tool or the analyze_ticker composite is called with insufficient data, it returns a structured 'instructions' block (needs, contract JSON shape, suggested public DSE sources, missing_core_fields, call order) instead of silently skipping. A dedicated 'dse-data-acquisition' Agent Skill documents how any client sources DSE OHLCV/fundamentals/news/shareholding/macro data, assembles the shared data contract, and calls the analysis tools in order.",
+      "category": "functional",
+      "domain": "MCP Integration",
+      "priority": "must",
+      "rationale": "Skills analyse but do not fetch; without contract-aware schemas and client-facing acquisition instructions, MCP clients cannot analyse a ticker (e.g. LHB) end-to-end."
+    },
+    {
+      "id": "REQ-027",
+      "title": "Prompt-First Reusable Analysis Skills Standard",
+      "description": "Each analysis skill is a reusable, self-sufficient prompt in Agent Skills format. The SKILL.md body is the source of truth and contains: role/objective, when-to-use triggers, required inputs (referencing dse-data-acquisition), a numbered step-by-step method, an explicit scoring rubric, the output Thinking-Card JSON schema, DSE pitfalls, and a worked example. A skill must be fully usable with its script absent. references/ holds deep methodology; scripts/ holds OPTIONAL deterministic, no-network helpers the model may execute for exact math. The skill description frontmatter must be trigger-rich for reliable activation.",
+      "category": "functional",
+      "domain": "Core Skills",
+      "priority": "must",
+      "rationale": "The product is reusable, efficient analysis prompts anyone can run in any MCP client; the method must live in the prompt, not hidden in code."
     }
   ],
   "glossary": {

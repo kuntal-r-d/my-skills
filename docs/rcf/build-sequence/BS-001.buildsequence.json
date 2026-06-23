@@ -14,7 +14,11 @@
       "storyScope": [
         {
           "usId": "US-001",
-          "acIds": ["AC-001", "AC-002", "AC-003"]
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003"
+          ]
         }
       ],
       "dependencies": [],
@@ -38,10 +42,16 @@
       "storyScope": [
         {
           "usId": "US-002",
-          "acIds": ["AC-004", "AC-005", "AC-006"]
+          "acIds": [
+            "AC-004",
+            "AC-005",
+            "AC-006"
+          ]
         }
       ],
-      "dependencies": ["FBS-001"],
+      "dependencies": [
+        "FBS-001"
+      ],
       "testableOutcomes": [
         "RSI, MACD, ROC, MFI calculate correctly",
         "Minervini SEPA criteria validated",
@@ -62,10 +72,16 @@
       "storyScope": [
         {
           "usId": "US-003",
-          "acIds": ["AC-007", "AC-008", "AC-009"]
+          "acIds": [
+            "AC-007",
+            "AC-008",
+            "AC-009"
+          ]
         }
       ],
-      "dependencies": ["FBS-001"],
+      "dependencies": [
+        "FBS-001"
+      ],
       "testableOutcomes": [
         "Economic moat assessment functional",
         "Financial ratios calculated accurately",
@@ -86,10 +102,18 @@
       "storyScope": [
         {
           "usId": "US-004",
-          "acIds": ["AC-010", "AC-011", "AC-012"]
+          "acIds": [
+            "AC-010",
+            "AC-011",
+            "AC-012"
+          ]
         }
       ],
-      "dependencies": ["FBS-001", "FBS-002", "FBS-003"],
+      "dependencies": [
+        "FBS-001",
+        "FBS-002",
+        "FBS-003"
+      ],
       "testableOutcomes": [
         "gh skill publish validates all skills",
         "Skills installable via gh skill install",
@@ -110,10 +134,15 @@
       "storyScope": [
         {
           "usId": "US-005",
-          "acIds": ["AC-013", "AC-014"]
+          "acIds": [
+            "AC-013",
+            "AC-014"
+          ]
         }
       ],
-      "dependencies": ["FBS-001"],
+      "dependencies": [
+        "FBS-001"
+      ],
       "testableOutcomes": [
         "MCP server lists 14 skill tools",
         "Tool calls dispatch to skills successfully",
@@ -134,10 +163,14 @@
       "storyScope": [
         {
           "usId": "US-005",
-          "acIds": ["AC-015"]
+          "acIds": [
+            "AC-015"
+          ]
         }
       ],
-      "dependencies": ["FBS-005"],
+      "dependencies": [
+        "FBS-005"
+      ],
       "testableOutcomes": [
         "analyze_ticker runs full pipeline",
         "screen_market filters and ranks stocks",
@@ -158,7 +191,11 @@
       "storyScope": [
         {
           "usId": "US-006",
-          "acIds": ["AC-016", "AC-017", "AC-018"]
+          "acIds": [
+            "AC-016",
+            "AC-017",
+            "AC-018"
+          ]
         }
       ],
       "dependencies": [],
@@ -183,10 +220,16 @@
       "storyScope": [
         {
           "usId": "US-007",
-          "acIds": ["AC-019", "AC-020", "AC-021"]
+          "acIds": [
+            "AC-019",
+            "AC-020",
+            "AC-021"
+          ]
         }
       ],
-      "dependencies": ["FBS-005"],
+      "dependencies": [
+        "FBS-005"
+      ],
       "testableOutcomes": [
         "stdio transport works with desktop clients",
         "HTTP transport accessible remotely",
@@ -207,10 +250,17 @@
       "storyScope": [
         {
           "usId": "US-008",
-          "acIds": ["AC-022", "AC-023", "AC-024"]
+          "acIds": [
+            "AC-022",
+            "AC-023",
+            "AC-024"
+          ]
         }
       ],
-      "dependencies": ["FBS-005", "FBS-008"],
+      "dependencies": [
+        "FBS-005",
+        "FBS-008"
+      ],
       "testableOutcomes": [
         "npx/uvx runner starts server",
         "Docker container runs successfully",
@@ -231,10 +281,16 @@
       "storyScope": [
         {
           "usId": "US-009",
-          "acIds": ["AC-025", "AC-026", "AC-027"]
+          "acIds": [
+            "AC-025",
+            "AC-026",
+            "AC-027"
+          ]
         }
       ],
-      "dependencies": ["FBS-004"],
+      "dependencies": [
+        "FBS-004"
+      ],
       "testableOutcomes": [
         "PR validation workflow runs",
         "Release automation works on tags",
@@ -255,10 +311,16 @@
       "storyScope": [
         {
           "usId": "US-010",
-          "acIds": ["AC-028", "AC-029", "AC-030"]
+          "acIds": [
+            "AC-028",
+            "AC-029",
+            "AC-030"
+          ]
         }
       ],
-      "dependencies": ["FBS-010"],
+      "dependencies": [
+        "FBS-010"
+      ],
       "testableOutcomes": [
         "Secret and code scanning enabled",
         "Immutable releases with tag protection",
@@ -279,10 +341,18 @@
       "storyScope": [
         {
           "usId": "US-011",
-          "acIds": ["AC-031", "AC-032", "AC-033"]
+          "acIds": [
+            "AC-031",
+            "AC-032",
+            "AC-033"
+          ]
         }
       ],
-      "dependencies": ["FBS-001", "FBS-005", "FBS-007"],
+      "dependencies": [
+        "FBS-001",
+        "FBS-005",
+        "FBS-007"
+      ],
       "testableOutcomes": [
         "Unit test coverage > 80%",
         "Integration tests for all tools",
@@ -303,10 +373,17 @@
       "storyScope": [
         {
           "usId": "US-012",
-          "acIds": ["AC-034", "AC-035", "AC-036"]
+          "acIds": [
+            "AC-034",
+            "AC-035",
+            "AC-036"
+          ]
         }
       ],
-      "dependencies": ["FBS-004", "FBS-009"],
+      "dependencies": [
+        "FBS-004",
+        "FBS-009"
+      ],
       "testableOutcomes": [
         "README with clear installation guide",
         "Each skill has examples and quickstart",
@@ -327,10 +404,17 @@
       "storyScope": [
         {
           "usId": "US-013",
-          "acIds": ["AC-037", "AC-038", "AC-039"]
+          "acIds": [
+            "AC-037",
+            "AC-038",
+            "AC-039"
+          ]
         }
       ],
-      "dependencies": ["FBS-002", "FBS-003"],
+      "dependencies": [
+        "FBS-002",
+        "FBS-003"
+      ],
       "testableOutcomes": [
         "Momentum agent analyzes technical indicators",
         "Investment agent evaluates fundamentals",
@@ -351,10 +435,17 @@
       "storyScope": [
         {
           "usId": "US-014",
-          "acIds": ["AC-040", "AC-041", "AC-042"]
+          "acIds": [
+            "AC-040",
+            "AC-041",
+            "AC-042"
+          ]
         }
       ],
-      "dependencies": ["FBS-002", "FBS-003"],
+      "dependencies": [
+        "FBS-002",
+        "FBS-003"
+      ],
       "testableOutcomes": [
         "25-point momentum checklist displays",
         "30-point investment checklist works",
@@ -375,10 +466,16 @@
       "storyScope": [
         {
           "usId": "US-015",
-          "acIds": ["AC-043", "AC-044", "AC-045"]
+          "acIds": [
+            "AC-043",
+            "AC-044",
+            "AC-045"
+          ]
         }
       ],
-      "dependencies": ["FBS-002"],
+      "dependencies": [
+        "FBS-002"
+      ],
       "testableOutcomes": [
         "Specific buy prices in BDT calculated",
         "Sell targets and stop-loss computed",
@@ -399,10 +496,18 @@
       "storyScope": [
         {
           "usId": "US-016",
-          "acIds": ["AC-046", "AC-047", "AC-048"]
+          "acIds": [
+            "AC-046",
+            "AC-047",
+            "AC-048"
+          ]
         }
       ],
-      "dependencies": ["FBS-001", "FBS-002", "FBS-003"],
+      "dependencies": [
+        "FBS-001",
+        "FBS-002",
+        "FBS-003"
+      ],
       "testableOutcomes": [
         "DSE P/E benchmarks applied",
         "Bangladesh sector weightings used",
@@ -423,10 +528,16 @@
       "storyScope": [
         {
           "usId": "US-017",
-          "acIds": ["AC-049", "AC-050", "AC-051"]
+          "acIds": [
+            "AC-049",
+            "AC-050",
+            "AC-051"
+          ]
         }
       ],
-      "dependencies": ["FBS-015"],
+      "dependencies": [
+        "FBS-015"
+      ],
       "testableOutcomes": [
         "Financial terms have explanations",
         "Visual representations aid understanding",
@@ -447,10 +558,18 @@
       "storyScope": [
         {
           "usId": "US-018",
-          "acIds": ["AC-052", "AC-053", "AC-054"]
+          "acIds": [
+            "AC-052",
+            "AC-053",
+            "AC-054"
+          ]
         }
       ],
-      "dependencies": ["FBS-005", "FBS-006", "FBS-012"],
+      "dependencies": [
+        "FBS-005",
+        "FBS-006",
+        "FBS-012"
+      ],
       "testableOutcomes": [
         "Single skill < 2 second response",
         "Composite pipeline < 10 seconds",
@@ -471,10 +590,16 @@
       "storyScope": [
         {
           "usId": "US-019",
-          "acIds": ["AC-055", "AC-056", "AC-057"]
+          "acIds": [
+            "AC-055",
+            "AC-056",
+            "AC-057"
+          ]
         }
       ],
-      "dependencies": ["FBS-010"],
+      "dependencies": [
+        "FBS-010"
+      ],
       "testableOutcomes": [
         "Semver followed consistently",
         "Changelog maintained",
@@ -495,10 +620,17 @@
       "storyScope": [
         {
           "usId": "US-020",
-          "acIds": ["AC-058", "AC-059", "AC-060"]
+          "acIds": [
+            "AC-058",
+            "AC-059",
+            "AC-060"
+          ]
         }
       ],
-      "dependencies": ["FBS-001", "FBS-007"],
+      "dependencies": [
+        "FBS-001",
+        "FBS-007"
+      ],
       "testableOutcomes": [
         "Educational disclaimers on all outputs",
         "Only public data sources used",
@@ -511,13 +643,127 @@
       },
       "riskLevel": "high",
       "domain": "Compliance"
+    },
+    {
+      "id": "FBS-022",
+      "title": "Contract-aware MCP tool input schemas",
+      "summary": "Declare shared-contract fields as inputSchema properties on every tool and composite so client data passes through.",
+      "storyScope": [
+        {
+          "usId": "US-021",
+          "acIds": [
+            "AC-063"
+          ]
+        }
+      ],
+      "dependencies": [],
+      "testableOutcomes": [
+        "Each tool inputSchema lists its read fields as properties",
+        "Client-supplied fundamentals round-trip to the skill"
+      ],
+      "status": "complete",
+      "riskLevel": "low",
+      "domain": "MCP Integration"
+    },
+    {
+      "id": "FBS-023",
+      "title": "Missing-data acquisition instructions",
+      "summary": "analyze_ticker returns a structured instructions block (needs, example payload, sources, missing_core_fields) when core data is absent.",
+      "storyScope": [
+        {
+          "usId": "US-021",
+          "acIds": [
+            "AC-062"
+          ]
+        }
+      ],
+      "dependencies": [
+        "FBS-022"
+      ],
+      "testableOutcomes": [
+        "Bare analyze_ticker returns instructions with missing_core_fields=[ohlcv,fundamentals]",
+        "No network call made"
+      ],
+      "status": "complete",
+      "riskLevel": "low",
+      "domain": "MCP Integration"
+    },
+    {
+      "id": "FBS-024",
+      "title": "dse-data-acquisition instruction skill",
+      "summary": "Add the client-facing skill documenting data sourcing, contract assembly and call order; validate end-to-end on LHB.",
+      "storyScope": [
+        {
+          "usId": "US-021",
+          "acIds": [
+            "AC-061",
+            "AC-064"
+          ]
+        }
+      ],
+      "dependencies": [
+        "FBS-022",
+        "FBS-023"
+      ],
+      "testableOutcomes": [
+        "dse-data-acquisition/SKILL.md present with valid frontmatter",
+        "LHB pipeline runs to completion from gathered data"
+      ],
+      "status": "complete",
+      "riskLevel": "low",
+      "domain": "Core Skills"
+    },
+    {
+      "id": "FBS-025",
+      "title": "Prompt-first skill template + migration",
+      "summary": "Author the prompt-first SKILL template and methodology standard; migrate technical-analysis as pilot; roll out to remaining skills.",
+      "storyScope": [
+        {
+          "usId": "US-022",
+          "acIds": [
+            "AC-065",
+            "AC-066",
+            "AC-067",
+            "AC-068"
+          ]
+        }
+      ],
+      "dependencies": [
+        "FBS-024"
+      ],
+      "testableOutcomes": [
+        "_TEMPLATE/SKILL.md + METHODOLOGY.md present",
+        "technical-analysis SKILL.md conforms and is script-independent",
+        "Prompt rubric matches script output"
+      ],
+      "status": "in-progress",
+      "riskLevel": "medium",
+      "domain": "Core Skills"
     }
   ],
-  "criticalPath": ["FBS-001", "FBS-002", "FBS-003", "FBS-005", "FBS-007", "FBS-010"],
+  "criticalPath": [
+    "FBS-001",
+    "FBS-002",
+    "FBS-003",
+    "FBS-005",
+    "FBS-007",
+    "FBS-010"
+  ],
   "parallelOpportunities": [
-    ["FBS-002", "FBS-003"],
-    ["FBS-005", "FBS-007"],
-    ["FBS-015", "FBS-016", "FBS-017", "FBS-018"]
+    [
+      "FBS-002",
+      "FBS-003"
+    ],
+    [
+      "FBS-005",
+      "FBS-007"
+    ],
+    [
+      "FBS-015",
+      "FBS-016",
+      "FBS-017",
+      "FBS-018"
+    ]
   ],
   "riskMitigation": {
     "high": [

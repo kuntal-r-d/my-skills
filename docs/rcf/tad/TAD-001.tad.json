@@ -912,6 +912,93 @@
         "REQ-013"
       ],
       "relatedDecisions": []
+    },
+    {
+      "id": "ADR-007",
+      "title": "MCP server is a stateless, no-fetch instruction + analysis layer",
+      "status": "accepted",
+      "context": "Clients calling analyze_ticker for a ticker (e.g. LHB) got empty results: tool schemas exposed no data fields and the server fetched nothing, so skills received no data.",
+      "optionsConsidered": [
+        {
+          "option": "Server fetches DSE data itself",
+          "pros": [
+            "One call for clients"
+          ],
+          "cons": [
+            "Network, scraping ToS/reliability risk",
+            "Violates pure-skill design",
+            "State + secrets in server"
+          ]
+        },
+        {
+          "option": "No-fetch: client supplies data; server exposes contract + instructs",
+          "pros": [
+            "Stateless, deterministic",
+            "Portable across clients",
+            "No network in server"
+          ],
+          "cons": [
+            "Client must gather data"
+          ]
+        }
+      ],
+      "decision": "The MCP server never fetches. Tool inputSchemas declare the shared data contract; missing-data calls return an instructions block; a dse-data-acquisition skill guides the client.",
+      "rationale": "Keeps skills pure and portable, fixes the end-to-end analysis gap, and matches the Agent Skills philosophy.",
+      "consequences": [
+        "Clients gather data per dse-data-acquisition",
+        "Server stays no-network",
+        "Data-adapter/DSE-provider server fetching is deprecated"
+      ],
+      "relatedReqs": [
+        "REQ-026",
+        "REQ-002"
+      ],
+      "relatedDecisions": [
+        "ADR-008"
+      ]
+    },
+    {
+      "id": "ADR-008",
+      "title": "Prompt-first skills: SKILL.md is source of truth, scripts optional",
+      "status": "accepted",
+      "context": "Skills hid their method inside Python scripts; SKILL.md mostly said 'run analyze.py', so the analytical method was neither reusable nor model-runnable without code.",
+      "optionsConsidered": [
+        {
+          "option": "Script-driven skills",
+          "pros": [
+            "Exact math"
+          ],
+          "cons": [
+            "Method hidden",
+            "Not usable without code execution",
+            "Hard to reuse as prompts"
+          ]
+        },
+        {
+          "option": "Prompt-first: method in SKILL.md, script optional helper",
+          "pros": [
+            "Reusable in any client",
+            "Usable by reasoning alone",
+            "Script still available for precision"
+          ],
+          "cons": [
+            "Prompt and script must be kept in sync"
+          ]
+        }
+      ],
+      "decision": "Each skill's SKILL.md carries the full method, rubric and output schema and is usable without its script; scripts/ are optional deterministic no-network helpers; Agent Skills is the primary distribution, MCP tools secondary.",
+      "rationale": "Realises the product vision of reusable, efficient analysis prompts anyone can run.",
+      "consequences": [
+        "All skills migrate to the prompt-first template",
+        "Prompt rubric must match any script",
+        "Tests cover prompt conformance + script agreement"
+      ],
+      "relatedReqs": [
+        "REQ-027"
+      ],
+      "relatedDecisions": [
+        "ADR-007"
+      ]
     }
   ],
   "createdAt": "2026-06-19T00:00:00Z",

@@ -522,6 +522,68 @@
           "testable": true
         }
       ]
+    },
+    {
+      "id": "US-021",
+      "reqId": "REQ-026",
+      "title": "Client Data Acquisition & No-Fetch Instruction Layer",
+      "description": "Enable any MCP client to analyse a DSE ticker by supplying data, with the server instructing rather than fetching.",
+      "asA": "MCP client / agent",
+      "iWant": "the skills' tool schemas to accept the data contract and the server to tell me what to gather when data is missing",
+      "soThat": "I can analyse any DSE ticker end-to-end without the server fetching anything",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-061",
+          "description": "Given the skills directory, when listed, then a dse-data-acquisition SKILL.md is present with valid frontmatter documenting sources, the contract JSON shape, and the analysis call order.",
+          "testable": true
+        },
+        {
+          "id": "AC-062",
+          "description": "Given analyze_ticker is called with missing ohlcv/fundamentals, when executed, then the response includes an instructions block (needs, minimal_payload_example, suggested_public_sources, missing_core_fields) and no network call is made.",
+          "testable": true
+        },
+        {
+          "id": "AC-063",
+          "description": "Given any skill or composite tool, when a client inspects its inputSchema, then every shared-contract field that skill reads is declared as a property with additionalProperties:true, and client-supplied data round-trips to the skill.",
+          "testable": true
+        },
+        {
+          "id": "AC-064",
+          "description": "Given a request to analyse a DSE ticker (e.g. LHB), when an agent follows the dse-data-acquisition skill to gather data and assemble the contract, then the analysis tools run to completion and emit valid Thinking Cards.",
+          "testable": true
+        }
+      ]
+    },
+    {
+      "id": "US-022",
+      "reqId": "REQ-027",
+      "title": "Prompt-First Skill Conformance",
+      "description": "Make every analysis skill a reusable prompt usable without its script.",
+      "asA": "analyst using any MCP client",
+      "iWant": "each skill's SKILL.md to contain the full step-by-step method, rubric and output schema",
+      "soThat": "I can produce a consistent, high-quality analysis by reasoning, with the script only as an optional precision helper",
+      "acceptanceCriteria": [
+        {
+          "id": "AC-065",
+          "description": "Given any analysis skill, when its SKILL.md is inspected, then it contains all required sections: role/objective, when-to-use, inputs, numbered method, scoring rubric, output Thinking-Card schema, DSE pitfalls, and a worked example.",
+          "testable": true
+        },
+        {
+          "id": "AC-066",
+          "description": "Given a skill is followed WITHOUT running its script, when applied to supplied data, then a model can produce a valid Thinking Card (script-independent).",
+          "testable": true
+        },
+        {
+          "id": "AC-067",
+          "description": "Given a scripts/ helper exists, when present, then the SKILL.md documents when to run it and how to interpret its output, and the script makes no network calls.",
+          "testable": true
+        },
+        {
+          "id": "AC-068",
+          "description": "Given a skill's description frontmatter, when indexed by a host, then it is trigger-rich (verbs and synonyms) so the correct skill activates.",
+          "testable": true
+        }
+      ]
     }
   ],
   "createdAt": "2026-06-19T00:00:00Z",
