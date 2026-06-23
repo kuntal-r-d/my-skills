@@ -1,6 +1,6 @@
 # Build from the REPO ROOT so both skills/ and mcp-server/ are in context:
 #   docker build -f mcp-server/Dockerfile -t stock-buddy-mcp .
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
