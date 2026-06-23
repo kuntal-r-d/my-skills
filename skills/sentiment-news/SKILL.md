@@ -2,69 +2,76 @@
 name: sentiment-news
 description: Computes ticker/sector news sentiment for DSE stocks and separates rumour-driven items from fundamentals-driven news, since the Dhaka Stock Exchange is rumour-heavy. Use when the user asks about news sentiment, "what's the news saying about GP", headline tone, rumour vs real news, or wants a sentiment score to feed signal-synthesizer.
 license: Apache-2.0
-compatibility: Python 3.8+, standard library only. No network. No third-party packages.
+compatibility: Prompt-first Agent Skill. Usable with the script absent. Script is Python 3.8+ stdlib-only, no network.
 metadata:
   author: stock-buddy
-  version: "0.1.0"
-  prd_refs: ["PRD-002:REQ-019", "PRD-001:REQ-023"]
+  version: "0.2.0"
+  prd_refs: ["PRD-001:REQ-027"]
   mode: ["momentum", "investment"]
 ---
 
 # Sentiment & News
 
+> **Prompt-first skill.** Score the headlines by the rules below. `scripts/sentiment.py`
+> is OPTIONAL (lexicon scorer). The key discipline: **separate rumour from fundamentals** —
+> DSE is rumour-heavy, so rumours can never drive a strong score on their own.
+
+## Role & objective
+You produce an aggregate news sentiment score (−1..+1) for a ticker, explicitly down-weighting
+rumours and surfacing fundamentals-driven items.
+
 ## When to use
+"What's the news saying about GP?", "headline tone", "rumour vs real news", "sentiment score".
+Feed the score into `signal-synthesizer`.
 
-Activate when a user wants the news read on a DSE stock or sector: "what's the
-sentiment on GP?", "is the news good or bad?", "is this just a rumour?", "score the
-headlines". This is the Sentiment Agent (PRD-002 REQ-019). Its score is designed to
-feed `signal-synthesizer` alongside the technical and fundamental legs.
+## Inputs you need
+**`news`** — array of `{headline, source, category}`. Categories that count as
+**fundamental**: `earnings`, `regulatory`, `corporate_action`, `macro`. Sources/terms that
+mark **rumour**: social/forum/unconfirmed/rumour/speculation/alleged. If `news` missing →
+error; if empty → error.
 
-## What it does
+## Method (follow in order)
+1. **Per-headline tone** — count positive vs negative keywords; tone = (pos−neg)/(pos+neg),
+   clamp −1..+1 (0 if no keywords).
+2. **Classify & weight** each item: **rumour → ×0.3**; **fundamental → ×1.0**; **general → ×0.7**.
+3. **Aggregate** = weighted average of tones.
+4. **Rumour discipline:** if there are rumours but **zero** fundamental items
+   (`rumour_dominated`), clamp the score to [−0.4, +0.4] and flag it.
+5. Flag `thin_coverage` if fewer than 2 items.
 
-Reads the shared contract's `news` array and produces an aggregate sentiment score in
-`[-1, +1]`. Because the DSE is rumour-heavy (PRD-001 REQ-023), it explicitly
-**separates rumour-driven from fundamentals-driven items**:
+## Scoring rubric
+Rating: score ≥ 0.2 → **positive** · ≤ −0.2 → **negative** · else **neutral**.
 
-- **Lexicon scoring** — each headline is scored from positive vs negative keyword
-  counts (stdlib only; no NLP libraries).
-- **Rumour detection** — an item is a `RUMOUR` if its `source` is social/forum/
-  unconfirmed/rumour, its category is rumour-like, or its headline mentions
-  rumour/unconfirmed/speculation. Rumours are down-weighted to **x0.3** and, when
-  they are the *only* material signal, the score is capped to `[-0.4, +0.4]` so a
-  rumour alone can never drive a strong signal.
-- **Fundamental classification** — items in `earnings`, `regulatory`,
-  `corporate_action`, or `macro` carry full weight.
+**Confidence** = clamp(0.4 + 0.1·min(fundamental_count,4) + 0.05·min(item_count,4)
+− 0.2 (if rumour_dominated) − 0.15 (if thin_coverage), 0.15, 0.9).
 
-Output is a Thinking Card (see suite README).
+## Output (emit this Thinking Card)
+```json
+{ "skill": "sentiment-news", "ticker": "..", "mode": "both", "as_of": "..",
+  "score": 0.0, "confidence": 0.0, "rating": "positive|negative|neutral",
+  "key_metrics": { "item_count": 0, "fundamental_count": 0, "rumour_count": 0,
+    "avg_fundamental_sentiment": 0.0 },
+  "reasoning": ["[FUNDAMENTAL|RUMOUR|general] headline -> tone"], "flags": ["..."],
+  "disclaimer": "Educational analysis only. Not financial advice." }
+```
 
-## How to run
+## DSE pitfalls
+- **Rumour-heavy market:** a wave of social/forum buzz must never produce a strong signal —
+  enforce the ±0.4 clamp when no fundamental item is present.
+- **Thin coverage:** one headline is not sentiment — flag and lower confidence.
+- Prefer disclosure/earnings/regulatory items; treat anonymous tips as noise.
 
+## Optional precision helper
 ```bash
 python3 scripts/sentiment.py --input data.json --pretty
-cat data.json | python3 scripts/sentiment.py
 ```
+Returns the per-item classification and the weighted aggregate.
 
-Reads `news` (required) and optional `mode`/`ticker`/`as_of`. Returns `score`
-(-1..+1, fundamental-weighted), `confidence`, `rating` (positive/neutral/negative),
-`key_metrics` (item/fundamental/rumour counts, average fundamental sentiment),
-per-item `reasoning`, and `flags`.
+## Worked example
+3 items: earnings "record profit, dividend" (+1.0, fundamental ×1.0), regulatory "approval"
+(+1.0, ×1.0), forum "rumour of merger" (+0.5, ×0.3) → aggregate ≈ +0.93 → **positive**,
+confidence ≈ 0.75 (2 fundamental items).
 
-Try it now with the shared fixture:
-
-```bash
-python3 scripts/sentiment.py --input ../_fixtures/sample_input.json --pretty
-```
-
-## Interpreting output
-
-- `rating`: `positive` (score >=0.2), `negative` (<=-0.2), else `neutral`.
-- `flags`: `rumour_dominated` (no fundamental items, score capped) and
-  `thin_coverage` (<2 items) both lower confidence — never silent drops.
-- Compare `avg_fundamental_sentiment` against the headline `score` to see how much of
-  the read is fundamentals vs noise.
-
-## Notes
-
-The lexicon, rumour-vs-news separation rationale, and DSE rumour context are
-documented in [references/SENTIMENT.md](references/SENTIMENT.md). Output is
-educational analysis only, never financial advice.
+## References
+Lexicon & rules: [references/SENTIMENT.md](references/SENTIMENT.md).
+Output is educational analysis only, never financial advice.

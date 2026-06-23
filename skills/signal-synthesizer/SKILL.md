@@ -2,89 +2,88 @@
 name: signal-synthesizer
 description: Combines per-agent DSE sub-scores (technical, fundamental, smart-money, sentiment, macro, volume-flow) into two synthesized signals — a long-term Investment signal and a short-term Momentum signal — each with a 1-10 DSE Composite Score, rating, confluence/conflict logic, and microstructure suppression. Use when the user wants to fuse multiple analyses into a final call, asks "what's the overall signal", "combine the agent scores", "should I invest or trade this", or needs the Mode Router / composite score for a Dhaka Stock Exchange ticker.
 license: Apache-2.0
-compatibility: Python 3.8+, standard library only. No network. No third-party packages.
+compatibility: Prompt-first Agent Skill. Usable with the script absent. Script is Python 3.8+ stdlib-only, no network.
 metadata:
   author: stock-buddy
-  version: "0.1.0"
-  prd_refs: ["PRD-002:REQ-022", "PRD-002:REQ-111", "PRD-002:REQ-097"]
-  mode: ["investment", "momentum"]
+  version: "0.2.0"
+  prd_refs: ["PRD-001:REQ-027", "PRD-002:REQ-022"]
+  mode: ["momentum", "investment"]
 ---
 
 # Signal Synthesizer
 
+> **Prompt-first skill.** Fuse the agent scores by following the rules below.
+> `scripts/synthesize.py` is OPTIONAL — run it for exact weighting; the synthesis is valid
+> without it. Produce ONE card holding two signals (investment + momentum).
+
+## Role & objective
+You are the Mode Router. Goal: blend per-agent sub-scores into a long-term **Investment**
+signal and a short-term **Momentum** signal, each with a rating, confidence, a 1–10
+Composite Score, and confluence/conflict governance.
+
 ## When to use
+"What's the overall signal?", "combine the agent scores", "should I invest or trade this?".
+Run after the leaf skills; feed the chosen signal into `risk-manager`.
 
-Activate when individual committee skills (`technical-analysis`, `fundamental-analysis`,
-`smart-money-flow`, `sentiment-news`, `macro-regime`, …) have each produced a score and the
-user wants the *final fused call*: "combine these into one signal", "what's the overall
-rating for GP", "is this an investment or a trade", "give me the composite score". This skill
-is the Mode Router + Synthesizer (PRD-002 REQ-022) and emits the DSE Composite Score
-(REQ-111) for **both** modes at once.
+## Inputs you need
+**`agents`** — a map of `{score −1..+1, confidence 0..1}` for any of: `technical`,
+`fundamental`, `smart_money`, `sentiment`, `macro`, `volume_flow`. Need at least `technical`
+**or** `fundamental`. Optional `microstructure`. If `volume_flow` is absent, derive it as
+0.8× technical (flag `volume_flow_derived_from_technical`).
 
-## What it does
+## Method (follow in order)
+**1. Weighted score per lens** (renormalise weights over agents actually present):
+- **Investment:** fundamental .40, smart_money .20, macro .15, sentiment .15, technical .10.
+- **Momentum:** technical .45, volume_flow .20, smart_money .15, sentiment .12, fundamental .08 (veto-only).
 
-Takes an `agents` map of sub-scores and produces two independent signals:
+**2. Base rating** from weighted w: ≥0.50 strong_buy · ≥0.15 buy · −0.15..0.15 hold ·
+≤−0.15 sell.
 
-1. **Investment** — weighted toward fundamentals/smart-money/macro. Emits a rating,
-   fair-value/entry-zone note, a thesis, and exit conditions.
-2. **Momentum** — weighted toward technical/volume-flow. Fundamentals act as a **veto**
-   (a strongly broken business caps a momentum trade at `stand_aside`).
+**3. Governance**
+- **Strong conflict:** any agent ≥0.50 AND any ≤−0.50 → **stand_aside** (don't average); −0.2 confidence.
+- **Confluence:** if |w| ≥ 0.50, need ≥2 agents agreeing in sign at |score| ≥ 0.30; else
+  downgrade (strong_buy→buy, sell→hold) and −0.1 confidence.
+- **Momentum fundamental veto:** if fundamental < −0.50 → momentum capped at **stand_aside**.
+- **Microstructure:** circuit limit / floor / halt → momentum **suppressed**; investment keeps
+  thesis but defer execution.
 
-It applies three governance rules on top of the weighted averages:
+**4. Composite 1–10** = round(clamp(5.5 + 4.5·w, 1, 10)).
 
-- **Confluence** — a high-conviction call (|weighted| ≥ 0.5) is only kept if **≥ 2
-  independent agents agree in sign** with |score| ≥ 0.3; otherwise it is downgraded to a
-  moderate rating.
-- **Strong conflict** — if a strongly bullish agent (≥ 0.5) and a strongly bearish agent
-  (≤ -0.5) coexist, the signal is **`stand_aside`** (not a diluted average), and the
-  conflict is explained.
-- **Microstructure suppression (REQ-097)** — if the stock is at a circuit limit
-  (`limit_up`/`limit_down`), on a floor price, or halted, the **Momentum** signal is
-  `suppressed` (price discovery is interrupted); the Investment signal is still emitted with
-  a microstructure flag.
+**Confidence** per lens = weight-blended agent confidence (after the governance penalties above).
 
-Each weighted score (-1..+1) maps to a **DSE Composite Score 1-10** (rounded), and per-agent
-contributions (weight × score) are returned so the composite is fully decomposable.
+## Scoring rubric
+Per lens: weighted score w (renormalised weights) → rating (≥0.50 strong_buy · ≥0.15 buy ·
+−0.15..0.15 hold · ≤−0.15 sell), then apply governance (strong-conflict → stand_aside;
+confluence shortfall → downgrade + −0.1 conf; momentum fundamental veto; microstructure
+suppression). Composite 1–10 = round(clamp(5.5 + 4.5·w, 1, 10)). Report both Investment and
+Momentum signals even when they disagree.
 
-## How to run
+## Output (emit this Thinking Card)
+```json
+{ "skill": "signal-synthesizer", "ticker": "..", "as_of": "..",
+  "investment": { "score": 0.0, "composite_1_10": 5, "rating": "..", "confidence": 0.0,
+    "contributions": {}, "fair_value_note": "..", "thesis": "..", "exit_conditions": [], "reasoning": [] },
+  "momentum": { "score": 0.0, "composite_1_10": 5, "rating": "..", "confidence": 0.0,
+    "contributions": {}, "entry_trigger": "..", "stop_note": "..", "reasoning": [] },
+  "flags": ["..."], "disclaimer": "Educational analysis only. Not financial advice." }
+```
 
+## DSE pitfalls
+- **Circuit/floor/halt** suppress momentum entirely — technicals are unreliable without price discovery.
+- A high average that lacks confluence is a false-confidence trap — downgrade it.
+- Investment and momentum can legitimately disagree (e.g. cheap but no momentum) — report both honestly.
+
+## Optional precision helper
 ```bash
 python3 scripts/synthesize.py --input data.json --pretty
-cat data.json | python3 scripts/synthesize.py
 ```
+Input shape: `{"ticker":"..","agents":{"technical":{"score":..,"confidence":..}, ...}}`.
+Returns both signals with exact contributions and composite scores.
 
-Input shape:
+## Worked example
+agents technical +0.55/0.77, fundamental +0.44/0.62, smart_money +0.2, macro 0, sentiment +0.1
+→ investment w ≈ +0.32 → **buy**, composite ≈ 7; momentum w ≈ +0.45, ≥2 agents agree → **buy**, composite ≈ 8.
 
-```json
-{
-  "ticker": "GP",
-  "as_of": "2026-06-19",
-  "agents": {
-    "technical":   {"score": 0.40, "confidence": 0.70},
-    "fundamental": {"score": 0.60, "confidence": 0.80},
-    "smart_money": {"score": 0.30, "confidence": 0.60},
-    "sentiment":   {"score": 0.20, "confidence": 0.50},
-    "macro":       {"score": -0.10, "confidence": 0.60},
-    "volume_flow": {"score": 0.35, "confidence": 0.65}
-  },
-  "microstructure": {"circuit_state": "normal", "floor_price": null, "halted": false}
-}
-```
-
-`volume_flow` is optional — if absent it is derived from the `technical` score.
-Scores are clamped to [-1, +1] and confidences to [0, 1].
-
-## Interpreting output
-
-- `investment` and `momentum` blocks each carry `score` (-1..+1), `composite_1_10`,
-  `rating`, `confidence`, and decomposable `contributions`.
-- Ratings: `strong_buy`, `buy`, `hold`, `sell`, `stand_aside`, `suppressed`.
-- `stand_aside` means the synthesizer found a genuine conflict — do **not** read it as a weak
-  buy. `suppressed` means price discovery is interrupted (circuit/floor/halt).
-- `flags` carry penalties and microstructure notes; they are never silently dropped.
-
-## Notes
-
-Weights, the confluence/conflict logic, the composite-score mapping, and microstructure
-suppression are documented in [references/SYNTHESIS.md](references/SYNTHESIS.md).
+## References
+Synthesis & governance detail: [references/SYNTHESIS.md](references/SYNTHESIS.md).
 Output is educational analysis only, never financial advice.
