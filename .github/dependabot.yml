@@ -1,39 +1,26 @@
 version: 2
 updates:
-  # Python dependencies
-  - package-ecosystem: "pip"
-    directory: "/mcp-server"
+  - package-ecosystem: npm
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
     open-pull-requests-limit: 5
     labels:
-      - "dependencies"
-      - "python"
+      - dependencies
+      - javascript
 
-  # npm dependencies
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: weekly
     labels:
-      - "dependencies"
-      - "javascript"
+      - dependencies
+      - github-actions
 
-  # GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: docker
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
     labels:
-      - "dependencies"
-      - "github-actions"
-
-  # Docker
-  - package-ecosystem: "docker"
-    directory: "/mcp-server"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "docker"
+      - dependencies
+      - docker

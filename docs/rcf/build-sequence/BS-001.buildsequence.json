@@ -739,6 +739,34 @@
       "status": "in-progress",
       "riskLevel": "medium",
       "domain": "Core Skills"
+    },
+    {
+      "id": "FBS-026",
+      "title": "TypeScript monorepo migration (v2.0.0)",
+      "summary": "Parallel rewrite of skills, MCP server, data adapter, agents, scraper, prediction, and UI into packages/ TypeScript monorepo; cut over CI/Docker to Node 20.",
+      "storyScope": [
+        {
+          "usId": "US-001",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003"
+          ]
+        }
+      ],
+      "dependencies": [
+        "FBS-001",
+        "FBS-005"
+      ],
+      "testableOutcomes": [
+        "packages/ monorepo builds with npm workspaces",
+        "All 14 skills + 2 composites pass Vitest integration tests",
+        "Docker image runs HTTP MCP on port 8080",
+        "Python runtime removed; ADR-009 accepted"
+      ],
+      "status": "complete",
+      "riskLevel": "high",
+      "domain": "Platform"
     }
   ],
   "criticalPath": [
@@ -781,5 +809,5 @@
     ]
   },
   "createdAt": "2026-06-19T00:00:00Z",
-  "updatedAt": "2026-06-19T00:00:00Z"
+  "updatedAt": "2026-06-24T00:00:00Z"
 }

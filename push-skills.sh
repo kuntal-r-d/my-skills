@@ -27,7 +27,7 @@ git status -s
 git commit -m "Add Stock Buddy DSE analysis skill suite (14 agent skills)
 
 Adds 14 Agent Skills for Dhaka Stock Exchange analysis (investment + momentum),
-each with SKILL.md + stdlib-only Python scripts + references. Derived from
+each with SKILL.md + TypeScript CLI scripts + references. Derived from
 PRD-001/prd-002. Skills: technical-analysis, momentum-screen, fundamental-analysis,
 value-investment-checklist, smart-money-flow, sentiment-news, macro-regime,
 signal-synthesizer, risk-manager, stock-screener, pattern-miner, daily-briefing,

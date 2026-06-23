@@ -1,56 +1,29 @@
 #!/usr/bin/env node
 /**
- * Stock Buddy MCP Server Runner
- *
- * Starts the Python-based MCP server for Stock Buddy skills.
- * Can be run via: npx @stock-buddy/mcp-server
+ * Stock Buddy MCP server launcher (TypeScript native).
  */
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
-const { spawn } = require('child_process');
-const path = require('path');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const serverPath = join(__dirname, '..', 'packages', 'mcp-server', 'dist', 'server.js');
 
-// Parse arguments
-const args = process.argv.slice(2);
-const httpMode = args.includes('--http') || process.env.STOCK_BUDDY_HTTP === '1';
-const port = process.env.STOCK_BUDDY_PORT || '8080';
-
-console.log('Starting Stock Buddy MCP Server...');
-if (httpMode) {
-  console.log(`HTTP mode enabled on port ${port}`);
-  process.env.STOCK_BUDDY_HTTP = '1';
-  process.env.STOCK_BUDDY_PORT = port;
-}
-
-// Find the Python server
-const serverPath = path.join(__dirname, '..', 'mcp-server');
-
-// Start Python server
-const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-const server = spawn(pythonCmd, ['-m', 'stock_buddy_mcp.server'], {
-  cwd: serverPath,
+const child = spawn(process.execPath, [serverPath], {
   stdio: 'inherit',
-  env: process.env
+  env: {
+    ...process.env,
+    // Claude Desktop and other MCP clients require stdio transport.
+    STOCK_BUDDY_HTTP: '0',
+    STOCK_BUDDY_SKILLS_DIR:
+      process.env.STOCK_BUDDY_SKILLS_DIR ?? join(__dirname, '..', 'skills'),
+  },
 });
 
-server.on('error', (err) => {
-  console.error('Failed to start server:', err);
-  console.error('Make sure Python 3.8+ is installed and dependencies are met.');
-  console.error('Run: pip install -e mcp-server/');
-  process.exit(1);
-});
-
-server.on('exit', (code) => {
-  if (code !== 0) {
-    console.error(`Server exited with code ${code}`);
+child.on('exit', (code, signal) => {
+  if (signal) {
+    process.kill(process.pid, signal);
+  } else {
+    process.exit(code ?? 0);
   }
-  process.exit(code);
-});
-
-// Handle signals
-process.on('SIGINT', () => {
-  server.kill('SIGINT');
-});
-
-process.on('SIGTERM', () => {
-  server.kill('SIGTERM');
 });

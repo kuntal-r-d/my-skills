@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.github
+.claude
+.agents
+docs
+tests
+*.md
+!skills/**/SKILL.md
+!skills/**/references/**
+!skills/README.md

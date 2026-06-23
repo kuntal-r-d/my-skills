@@ -1,0 +1,41 @@
+{
+  "name": "@stock-buddy/skills",
+  "version": "2.0.0",
+  "description": "TypeScript ports of Stock Buddy DSE analysis skills",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "sb-lookup": "./dist/cli/financial-terms-educator.js",
+    "sb-regime": "./dist/cli/macro-regime.js",
+    "sb-sentiment": "./dist/cli/sentiment-news.js",
+    "sb-smart-money": "./dist/cli/smart-money-flow.js",
+    "sb-fundamental": "./dist/cli/fundamental-analysis.js",
+    "sb-value-checklist": "./dist/cli/value-investment-checklist.js",
+    "sb-technical": "./dist/cli/technical-analysis.js",
+    "sb-momentum": "./dist/cli/momentum-screen.js",
+    "sb-risk": "./dist/cli/risk-manager.js",
+    "sb-screener": "./dist/cli/stock-screener.js",
+    "sb-pattern-miner": "./dist/cli/pattern-miner.js",
+    "sb-synthesize": "./dist/cli/signal-synthesizer.js",
+    "sb-brief": "./dist/cli/daily-briefing.js",
+    "sb-dossier": "./dist/cli/ticker-dossier.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stock-buddy/core": "file:../core"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2"
+  }
+}

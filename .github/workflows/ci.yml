@@ -7,97 +7,72 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
+  build-and-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        node-version: ['20', '22']
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
 
-    - name: Cache pip packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install ruff pytest pytest-cov pytest-asyncio
-        pip install -e mcp-server/
+      - name: Build all packages
+        run: npm run build
 
-    - name: Lint with ruff
-      run: |
-        ruff check . --output-format=github
-        ruff format --check .
+      - name: Build skill CLIs into skills/
+        run: npm run build:skills-cli
 
-    - name: Test skill execution
-      run: |
-        # Test each skill with fixtures
-        for skill in skills/*/; do
-          if [ -d "$skill/scripts" ]; then
-            echo "Testing $skill"
-            python3 "$skill/scripts/"*.py --input skills/_fixtures/sample_input.json || true
-          fi
-        done
+      - name: Typecheck
+        run: npm run typecheck
 
-    - name: Test data adapter
-      run: |
-        python test_data_adapter.py
+      - name: Run tests
+        run: npm test
 
-    - name: Test MCP server
-      run: |
-        python -m pytest tests/ -v --cov=mcp-server --cov-report=xml
-      continue-on-error: true
-
-    - name: Upload coverage
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-      continue-on-error: true
+      - name: Skill CLI smoke test
+        run: npm run smoke
 
   docker-build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Build Docker image
-      run: |
-        docker build -f mcp-server/Dockerfile -t stock-buddy-mcp:test .
+      - name: Build Docker image
+        run: docker build -f Dockerfile -t stock-buddy-mcp:test .
 
-    - name: Test Docker image
-      run: |
-        docker run --rm stock-buddy-mcp:test python -c "import stock_buddy_mcp"
+      - name: Test Docker container
+        run: |
+          docker run -d --name stock-buddy-test -p 8080:8080 \
+            -e STOCK_BUDDY_HTTP=1 -e STOCK_BUDDY_PORT=8080 \
+            stock-buddy-mcp:test
+          sleep 3
+          node scripts/docker-smoke.mjs
+          docker stop stock-buddy-test && docker rm stock-buddy-test
 
   validate-skills:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Validate skill metadata
-      run: |
-        for skill in skills/*/SKILL.md; do
-          echo "Validating $skill"
-          # Check SKILL.md has required fields
-          grep -q "name:" "$skill" || exit 1
-          grep -q "description:" "$skill" || exit 1
-          grep -q "license:" "$skill" || exit 1
-        done
+      - name: Validate skill metadata
+        run: |
+          for skill in skills/*/SKILL.md; do
+            echo "Validating $skill"
+            grep -q "name:" "$skill" || exit 1
+            grep -q "description:" "$skill" || exit 1
+            grep -q "license:" "$skill" || exit 1
+          done
 
-    - name: Check fixture files
-      run: |
-        test -f skills/_fixtures/sample_input.json || exit 1
+      - name: Check fixture files
+        run: test -f skills/_fixtures/sample_input.json

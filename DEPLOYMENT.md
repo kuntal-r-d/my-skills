@@ -12,8 +12,11 @@ cd my-skills
 # Start with Docker Compose
 docker-compose up -d
 
-# Verify deployment
-curl http://localhost:8080/health
+# Verify deployment (MCP HTTP endpoint)
+curl -s -X POST http://localhost:8080/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' | head -c 200
 ```
 
 ### Option 2: NPM Package
@@ -29,47 +32,58 @@ stock-buddy-mcp
 npx @stock-buddy/mcp-server
 ```
 
-### Option 3: Python Installation
+### Option 3: From Source (Node.js)
 
 ```bash
-# Clone and install
+# Clone and build
 git clone https://github.com/kuntal-r-d/my-skills.git
 cd my-skills
 
-# Install dependencies
-pip install -e mcp-server/
+npm ci
+npm run build
+npm run build:skills-cli
 
-# Run the server
-python -m stock_buddy_mcp.server
+# Run the server (stdio)
+npm start
 ```
 
 ## 🔧 Configuration
 
 ### Claude Desktop Integration
 
-1. Locate your Claude Desktop config:
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-   - Linux: `~/.config/Claude/claude_desktop_config.json`
+Stock Buddy v2 uses **Node.js stdio** — not Python, not `docker exec` into the HTTP container.
 
-2. Add the Stock Buddy server:
+1. Build from source (once):
+
+```bash
+cd /path/to/stock-buddy
+npm ci && npm run build
+```
+
+2. Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
   "mcpServers": {
     "stock-buddy": {
-      "command": "python3",
-      "args": ["-m", "stock_buddy_mcp.server"],
-      "cwd": "/absolute/path/to/my-skills/mcp-server",
+      "command": "node",
+      "args": ["/absolute/path/to/stock-buddy/packages/mcp-server/dist/server.js"],
       "env": {
-        "STOCK_BUDDY_SKILLS_DIR": "../skills"
+        "STOCK_BUDDY_HTTP": "0",
+        "STOCK_BUDDY_SKILLS_DIR": "/absolute/path/to/stock-buddy/skills"
       }
     }
   }
 }
 ```
 
-3. Restart Claude Desktop
+See [`client-config/README.md`](client-config/README.md) for Docker stdio and troubleshooting.
+
+3. Restart Claude Desktop (full quit + reopen).
+
+**Do not use:**
+- `python3 -m stock_buddy_mcp.server` (removed in v2)
+- `docker exec -i stock-buddy-mcp python ...` (wrong runtime; conflicts with HTTP service on :8080)
 
 ### Environment Variables
 
@@ -190,8 +204,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
 ### Health Check
 
 ```bash
-# HTTP transport
-curl http://localhost:8080/health
+# HTTP transport — list MCP tools
+curl -s -X POST http://localhost:8080/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
 
 # Via MCP tool
 echo '{"method":"tool.list"}' | python -m stock_buddy_mcp.server

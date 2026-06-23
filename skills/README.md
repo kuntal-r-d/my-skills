@@ -30,15 +30,15 @@ These skills are derived from the Stock Buddy PRDs (`PRD-001.json`, `prd-002.jso
 
 ## Shared data contract
 
-To stay portable across MCP clients, every executable script is a **stdlib-only Python 3 CLI**
-that reads one JSON document and writes one JSON document. No third-party packages (no pandas,
-no numpy) so a script runs anywhere Python 3.8+ exists.
+To stay portable across MCP clients, every executable script is a **Node.js CLI**
+(TypeScript compiled) that reads one JSON document and writes one JSON document.
+No third-party packages in skill runtime beyond the compiled bundle.
 
 ### Invocation
 
 ```bash
-python3 scripts/<script>.py --input data.json        # read from a file
-cat data.json | python3 scripts/<script>.py           # or read from stdin
+node scripts/<script>.js --input data.json        # read from a file
+cat data.json | node scripts/<script>.js           # or read from stdin
 ```
 
 Add `--pretty` for indented output. Every script exits non-zero and prints
@@ -105,7 +105,7 @@ auditable (glass-box):
 
 - **Frontmatter**: `name`, `description` (third-person, trigger-rich), `license: Apache-2.0`,
   `compatibility`, and `metadata` (author, version).
-- **`scripts/`**: stdlib-only Python CLIs implementing the math. Pure functions, no network.
+- **`scripts/`**: TypeScript CLIs (compiled to `.js`) implementing the math. Pure functions, no network.
 - **`references/`**: deeper docs (formulas, criteria tables, methodology) loaded on demand.
 - **Determinism**: same input → same output. No randomness except where a skill explicitly
   documents a seeded simulation.

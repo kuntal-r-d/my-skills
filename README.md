@@ -20,11 +20,14 @@ docker-compose up -d
 git clone https://github.com/kuntal-r-d/my-skills.git
 cd my-skills
 
-# Install Python dependencies
-pip install -e mcp-server/
+# Install Node.js dependencies and build
+npm ci
+npm run build
+npm run build:skills-cli
 
-# Run the server
-python -m stock_buddy_mcp.server
+# Run the server (stdio)
+npm start
+# or: npx stock-buddy-mcp
 ```
 
 ## 📦 Features
@@ -54,21 +57,25 @@ python -m stock_buddy_mcp.server
 ## 🛠️ Architecture
 
 ### Technology Stack
-- **Skills**: Python 3.8+ (stdlib only, no dependencies)
-- **MCP Server**: Python with `mcp` package
+- **Skills**: TypeScript (compiled Node.js CLIs)
+- **MCP Server**: TypeScript with `@modelcontextprotocol/sdk`
 - **Transports**: stdio (default) and HTTP
-- **Data**: Pluggable data adapter with caching
+- **Data**: Pluggable data adapter with caching (`@stock-buddy/data-adapter`)
 
 ### Project Structure
 ```
 stock-buddy/
-├── skills/                 # Individual analysis skills
-│   ├── daily-briefing/
-│   ├── momentum-screen/
-│   └── ...
-├── mcp-server/            # MCP server implementation
-├── data_adapter/          # Data provider abstraction
-├── tests/                 # Test suite
+├── packages/              # TypeScript monorepo
+│   ├── core/              # Shared types, indicators, DSE config
+│   ├── skills/            # All 14 skill implementations
+│   ├── mcp-server/        # MCP server
+│   ├── data-adapter/      # Data provider abstraction
+│   ├── agents/            # Multi-agent orchestration
+│   ├── prediction/        # Price target engine
+│   ├── ui/                # HTML checklist generator
+│   └── scraper/           # DSE data fetchers
+├── skills/                # SKILL.md + compiled CLI scripts
+├── tests/                 # Vitest integration tests
 └── docs/                  # Documentation
 ```
 

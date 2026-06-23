@@ -6,7 +6,7 @@
   "systemOverview": {
     "executiveSummary": "Stock Buddy Skills Suite is a comprehensive DSE stock analysis system combining 14 specialized AI-powered skills with multiple distribution channels (Agent Skills, MCP server, CLI) and robust data integration.",
     "systemPurpose": "Provide Bangladesh stock market investors with AI-powered analysis tools for momentum trading, investment analysis, and business intelligence through modern agent interfaces and MCP clients.",
-    "architecturalApproach": "Microservice-style architecture with pure Python analysis skills as the core, thin distribution layers (gh skill, MCP server), pluggable data adapters, and comprehensive CI/CD infrastructure.",
+    "architecturalApproach": "Microservice-style architecture with TypeScript analysis skills as the core (packages/ monorepo), thin distribution layers (gh skill, MCP server), pluggable data adapters, and comprehensive CI/CD infrastructure.",
     "keyCapabilities": [
       "14 specialized DSE analysis skills",
       "Multi-channel distribution (Agent Skills, MCP, CLI)",
@@ -42,7 +42,7 @@
       }
     ],
     "assumptionsAndConstraints": [
-      "Skills remain stdlib-only Python with no network calls",
+      "Skills remain network-free TypeScript functions with JSON in/out",
       "Public data sources only for compliance",
       "Educational-only outputs with disclaimers",
       "Must conform to agentskills.io spec",
@@ -55,7 +55,7 @@
       "description": "Skill folders are canonical; all distribution channels dispatch to the same core skills",
       "rationale": "Prevents logic drift and ensures consistency across all access methods",
       "implications": [
-        "MCP server uses subprocess dispatch",
+        "MCP server uses in-process skill dispatch",
         "No analysis logic in distribution layers",
         "All improvements go to core skills"
       ],
@@ -151,7 +151,7 @@
     {
       "name": "MCP Server",
       "purpose": "Expose skills as MCP tools",
-      "location": "mcp-server/",
+      "location": "packages/mcp-server/",
       "dependencies": [
         "Skills Library"
       ],
@@ -567,10 +567,10 @@
     ],
     "containerization": {
       "enabled": true,
-      "baseImage": "python:3.11-slim",
+      "baseImage": "node:20-slim",
       "buildStrategy": "Multi-stage build with minimal runtime"
     },
-    "cicdPipeline": "GitHub Actions with matrix testing across Python versions, automated releases on tags, security scanning on every push"
+    "cicdPipeline": "GitHub Actions with Node.js matrix testing, automated npm/Docker releases on tags, security scanning on every push"
   },
   "operationalConcerns": {
     "configurationManagement": {
@@ -662,7 +662,7 @@
     {
       "id": "ADR-001",
       "title": "Python for all components",
-      "status": "accepted",
+      "status": "superseded",
       "context": "Need to choose implementation language for skills and server",
       "optionsConsidered": [
         {
@@ -702,7 +702,7 @@
     {
       "id": "ADR-002",
       "title": "Subprocess dispatch for skills",
-      "status": "accepted",
+      "status": "superseded",
       "context": "MCP server needs to execute skill logic",
       "optionsConsidered": [
         {
@@ -999,10 +999,57 @@
       "relatedDecisions": [
         "ADR-007"
       ]
+    },
+    {
+      "id": "ADR-009",
+      "title": "TypeScript monorepo migration",
+      "status": "accepted",
+      "context": "Python skills and MCP server required dual-runtime maintenance (Node launcher spawning Python). Consolidating to TypeScript improves type safety, npm-native distribution, and eliminates duplicated indicator code.",
+      "optionsConsidered": [
+        {
+          "option": "Incremental hybrid (TS MCP + Python skills)",
+          "pros": [
+            "Lower initial risk",
+            "Gradual port"
+          ],
+          "cons": [
+            "Two runtimes during transition",
+            "Subprocess IPC overhead remains"
+          ]
+        },
+        {
+          "option": "Parallel rewrite in packages/ monorepo",
+          "pros": [
+            "Clean cutover",
+            "Shared types",
+            "In-process dispatch"
+          ],
+          "cons": [
+            "Large upfront effort"
+          ]
+        }
+      ],
+      "decision": "Parallel rewrite into npm workspaces under packages/ with v2.0.0 cutover",
+      "rationale": "Single runtime, deduplicated @stock-buddy/core indicators, native MCP SDK support, and simpler CI/Docker",
+      "consequences": [
+        "Python runtime removed in v2.0.0",
+        "Skills compiled to Node.js CLIs in skills/*/scripts/*.js",
+        "ADR-001 and ADR-002 superseded",
+        "Vitest replaces pytest"
+      ],
+      "relatedReqs": [
+        "REQ-001",
+        "REQ-005"
+      ],
+      "relatedDecisions": [
+        "ADR-001",
+        "ADR-002",
+        "ADR-008"
+      ]
     }
   ],
   "createdAt": "2026-06-19T00:00:00Z",
-  "updatedAt": "2026-06-19T00:00:00Z",
+  "updatedAt": "2026-06-24T00:00:00Z",
   "generationMetadata": {
     "comprehensiveness": "standard",
     "sectionsGenerated": [

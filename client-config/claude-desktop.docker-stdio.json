@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "stock-buddy": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "STOCK_BUDDY_HTTP=0",
+        "-e",
+        "STOCK_BUDDY_SKILLS_DIR=/app/skills",
+        "stock-buddy-mcp:latest"
+      ]
+    }
+  }
+}

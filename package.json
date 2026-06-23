@@ -1,13 +1,27 @@
 {
   "name": "@stock-buddy/mcp-server",
-  "version": "1.0.0",
-  "description": "MCP server for Stock Buddy DSE analysis skills",
+  "version": "2.0.0",
+  "private": false,
+  "type": "module",
+  "description": "Stock Buddy DSE analysis — TypeScript monorepo",
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
     "stock-buddy-mcp": "./bin/stock-buddy-mcp.js"
   },
   "scripts": {
-    "start": "node bin/stock-buddy-mcp.js",
-    "test": "echo \"Run python tests: python -m pytest tests/\""
+    "build": "npm run build -w @stock-buddy/core && npm run build -w @stock-buddy/skills && npm run build -w @stock-buddy/mcp-server && npm run build -w @stock-buddy/data-adapter && npm run build -w @stock-buddy/agents && npm run build -w @stock-buddy/prediction && npm run build -w @stock-buddy/ui && npm run build -w @stock-buddy/scraper",
+    "build:docker": "npm run build -w @stock-buddy/core && npm run build -w @stock-buddy/skills && npm run build -w @stock-buddy/mcp-server",
+    "build:skills-cli": "node scripts/build-skills-cli.mjs",
+    "smoke": "node scripts/skill-smoke.mjs",
+    "docker:smoke": "node scripts/docker-smoke.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "parity": "tsx scripts/parity-check.ts",
+    "start": "node packages/mcp-server/dist/server.js",
+    "lint": "eslint packages --ext .ts"
   },
   "keywords": [
     "mcp",
@@ -23,7 +37,12 @@
     "url": "https://github.com/kuntal-r-d/my-skills.git"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=20.0.0"
   },
-  "preferGlobal": true
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
 }

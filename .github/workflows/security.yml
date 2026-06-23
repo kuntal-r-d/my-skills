@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 0 * * 0'  # Weekly scan
+    - cron: '0 0 * * 0'
 
 permissions:
   contents: read
@@ -16,66 +16,64 @@ jobs:
   code-scanning:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: python, javascript
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
 
   dependency-scanning:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Run Dependabot scan
-      uses: github/dependabot-action@v2
-      continue-on-error: true
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
 
-    - name: Safety check Python dependencies
-      run: |
-        pip install safety
-        safety check --json || true
+      - name: npm audit
+        run: npm audit --audit-level=moderate || true
 
   secret-scanning:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Scan for secrets with Trufflehog
-      uses: trufflesecurity/trufflehog@v3
-      with:
-        path: ./
-        base: main
-        head: HEAD
+      - name: Scan for secrets with Trufflehog
+        uses: trufflesecurity/trufflehog@v3
+        with:
+          path: ./
+          base: main
+          head: HEAD
 
-    - name: Check for hardcoded secrets
-      run: |
-        # Check for common patterns
-        ! grep -r "api[_-]key.*=.*['\"]" . --include="*.py" --include="*.js"
-        ! grep -r "password.*=.*['\"]" . --include="*.py" --include="*.js"
-        ! grep -r "token.*=.*['\"]" . --include="*.py" --include="*.js"
+      - name: Check for hardcoded secrets
+        run: |
+          ! grep -r "api[_-]key.*=.*['\"]" . --include="*.ts" --include="*.js"
+          ! grep -r "password.*=.*['\"]" . --include="*.ts" --include="*.js"
+          ! grep -r "token.*=.*['\"]" . --include="*.ts" --include="*.js"
 
   container-scanning:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: |
-        docker build -f mcp-server/Dockerfile -t stock-buddy-mcp:scan .
+      - name: Build Docker image
+        run: docker build -f Dockerfile -t stock-buddy-mcp:scan .
 
-    - name: Run Trivy scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: stock-buddy-mcp:scan
-        format: 'sarif'
-        output: 'trivy-results.sarif'
+      - name: Run Trivy scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: stock-buddy-mcp:scan
+          format: sarif
+          output: trivy-results.sarif
 
-    - name: Upload Trivy results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: 'trivy-results.sarif'
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif

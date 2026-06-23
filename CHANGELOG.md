@@ -5,6 +5,21 @@ All notable changes to the Stock Buddy Skills Suite will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-06-24
+
+### Changed
+- **BREAKING:** Migrated entire codebase from Python to TypeScript (Node.js 20+)
+- MCP server now runs natively via `@modelcontextprotocol/sdk` (no Python subprocess)
+- Skills compiled to Node.js CLIs in `skills/*/scripts/*.js`
+- Monorepo layout under `packages/` (`core`, `skills`, `mcp-server`, `data-adapter`, `agents`, `prediction`, `ui`, `scraper`)
+- CI/CD updated to Node.js matrix; Docker base image is `node:20-slim`
+- In-process skill dispatch replaces subprocess dispatch (supersedes ADR-002)
+
+### Removed
+- Python runtime requirement
+- Duplicated `indicators.py` copies across skills (consolidated in `@stock-buddy/core`)
+- Legacy Python modules (`mcp-server/`, `data_adapter/`, `agents/`, `scraper/`, `prediction/`, `ui/`)
+
 ## [1.1.0] - 2024-06-21
 
 ### Added
