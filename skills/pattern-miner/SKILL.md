@@ -2,57 +2,76 @@
 name: pattern-miner
 description: Discovers and out-of-sample validates recurring price patterns for one DSE ticker with anti-overfitting safeguards (train/holdout split, minimum occurrences, Bonferroni multiple-testing correction, auto-retirement of degraded patterns, manipulation-footprint warnings). Use when the user asks to mine, backtest, or validate chart patterns/setups, "which patterns actually work on this stock", "is this breakout signal reliable", or wants historical edge and forward-return statistics for a Dhaka Stock Exchange ticker.
 license: Apache-2.0
-compatibility: Python 3.8+, standard library only. No network. No third-party packages.
+compatibility: Prompt-first Agent Skill. Usable with the script absent. Script is Python 3.8+ stdlib-only, no network.
 metadata:
   author: stock-buddy
-  version: "0.1.0"
-  prd_refs: ["PRD-002:REQ-107", "PRD-001:REQ-052"]
+  version: "0.2.0"
+  prd_refs: ["PRD-001:REQ-027"]
   mode: ["momentum"]
 ---
 
 # Pattern Miner
 
+> **Prompt-first skill.** Test the pattern library by the safeguards below. `scripts/mine.py`
+> is OPTIONAL but recommended here — the train/holdout arithmetic is fiddly; use it for exact
+> forward-return stats. The discipline matters more than any single number: never report an
+> in-sample edge without an out-of-sample check.
+
+## Role & objective
+You mine a fixed library of rule-based price patterns on one ticker's history and report each
+pattern's occurrence count, train/holdout success and forward return, with anti-overfitting
+safeguards — so the user trusts only patterns that survive out-of-sample.
+
 ## When to use
+"Which patterns actually work on GP?", "is this breakout signal reliable?", "backtest this
+setup", "historical edge / forward returns". Pair with `technical-analysis` for the live read.
 
-Activate when a user wants to know which rule-based price patterns have a *validated* edge
-on a specific DSE stock: "mine patterns for GP", "backtest the 20-day breakout on BEXIMCO",
-"does the oversold RSI bounce work here?", "which of my setups survive out-of-sample?".
-This is the **Pattern Miner with anti-overfitting** (PRD-002 REQ-107; PRD-001 REQ-052).
+## Inputs you need
+**`ohlcv`** — daily bars, **≥60** (≥120 recommended; flag `limited_history_<120_bars` below).
+Optional **`params`**: `min_occurrences` (8), `forward_days` (5), `success_threshold` (0.6).
 
-## What it does
+## Method (follow in order)
+1. **Split** history: train = first 70%, holdout = last 30% (out-of-sample).
+2. **Detect** four candidate patterns: 20-day high breakout; RSI(14) cross up through 30
+   (oversold bounce); golden cross (MA50 crosses above MA200); close above upper Bollinger band.
+3. For each occurrence with a full forward window, record the `forward_days` return; success =
+   return > 0.
+4. **Flag manipulation footprints** (don't drop): volume > 5× trailing avg, or a daily move ≥ 9.5%
+   (circuit-sized).
 
-Tests a fixed library of rule-based candidate patterns and reports only those that survive
-the safeguards in [references/PATTERNS.md](references/PATTERNS.md):
+## Scoring rubric (validation, not a single score)
+Raise the success bar by a Bonferroni bump for 4 tests: `adj_threshold = min(0.95,
+success_threshold + 0.0375)`. Per pattern:
+- **validated** if occurrences ≥ min_occurrences AND train_success ≥ adj AND holdout_success ≥ adj;
+- **retired** if it passes in-sample but fails the holdout (or fails outright);
+- **insufficient_data** if too few occurrences or an empty window.
 
-- **20-day high breakout** — close makes a new 20-bar high.
-- **RSI oversold bounce** — RSI(14) crosses up through 30.
-- **Golden cross** — MA50 crosses above MA200.
-- **Upper-Bollinger close** — close above the upper 20/2 Bollinger band.
-
-For each pattern it finds every historical occurrence, splits the series into a **train**
-window (first 70%) and an out-of-sample **holdout** window (last 30%), and computes the
-forward return over `forward_days` and the success rate (P(forward return > 0)) on each
-window. A pattern is `validated` only if total occurrences ≥ `min_occurrences` **and** the
-success rate clears `success_threshold` on **both** train and holdout. Degradation on the
-holdout triggers `retired` (auto-retirement). A **Bonferroni** correction tightens the
-threshold by the number of patterns tested. Occurrences with volume > 5× average or a
-circuit-limit-sized move raise a `manipulation_footprint` warning.
-
-## How to run
-
-```bash
-python3 scripts/mine.py --input data.json --pretty
-cat data.json | python3 scripts/mine.py
+## Output
+```json
+{ "skill": "pattern-miner", "ticker": "..", "as_of": "..",
+  "patterns": [ { "name": "..", "occurrences": 0, "train_occurrences": 0, "holdout_occurrences": 0,
+    "train_success": 0.0, "holdout_success": 0.0, "avg_forward_return_pct": 0.0,
+    "status": "validated|retired|insufficient_data", "warnings": [] } ],
+  "validated_count": 0, "methodology_note": "..", "flags": ["..."],
+  "disclaimer": "Educational analysis only. Not financial advice." }
 ```
 
-Reads `ohlcv` (required, ≥120 bars recommended) and optional `params`
-(`min_occurrences` default 8, `forward_days` default 5, `success_threshold` default 0.6).
-Indicator math lives in `scripts/indicators.py`.
+## DSE pitfalls
+- **Overfitting is the enemy** — a great train success means nothing without the holdout; report both.
+- **Manipulation footprints** (volume spikes, circuit-sized moves) inflate apparent edges on DSE —
+  always surface the warning.
+- Short histories (<120 bars) give too few occurrences to trust — flag and lower conviction.
 
-## Interpreting output
+## Optional precision helper
+```bash
+python3 scripts/mine.py --input data.json --pretty
+```
+Returns each pattern's exact train/holdout success, forward returns, status and warnings.
 
-Returns `patterns[]` each with `occurrences`, `train_success`, `holdout_success`,
-`avg_forward_return_pct`, `status` (`validated` / `retired` / `insufficient_data`), and
-`warnings[]`; plus `validated_count`, a `methodology_note`, and `flags[]`. If nothing
-survives, `validated_count` is 0 — the skill is deliberately honest about a null result.
-Educational analysis only, never financial advice.
+## Worked example
+240 bars: "20-day high breakout" 14 occ, train 0.71 / holdout 0.64 (both ≥ 0.6375) → **validated**,
+avg forward +2.1%. "Golden cross" 3 occ → **insufficient_data**.
+
+## References
+Pattern library & safeguards: [references/PATTERNS.md](references/PATTERNS.md).
+Output is educational analysis only, never financial advice.
