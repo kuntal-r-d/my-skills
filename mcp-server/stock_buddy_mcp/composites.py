@@ -29,6 +29,49 @@ def _score_conf(card: Dict[str, Any]) -> Dict[str, float]:
     }
 
 
+# What each leaf needs from the payload. Drives the instructions returned to the
+# client when data is absent — the server never fetches, it tells the client what
+# to gather (see the dse-data-acquisition skill).
+_LEAF_NEEDS = {
+    "technical_analysis": "ohlcv (>=30 daily bars, oldest-first)",
+    "fundamental_analysis": "fundamentals (eps_ttm, eps_history, book_value_per_share, "
+                            "debt_to_equity, roe, pe, price, ...)",
+    "smart_money_flow": "shareholding (public shareholding-pattern snapshots)",
+    "sentiment_news": "news (recent headlines/disclosures)",
+    "macro_regime": "macro (Bangladesh inflation, policy_rate, fx, ...)",
+}
+
+
+def _missing_fields(payload: Dict[str, Any]) -> list:
+    needed = {"ohlcv": "technical + risk", "fundamentals": "fundamental"}
+    return [f for f in needed if not payload.get(f)]
+
+
+def _acquisition_instructions(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Tell the client how to gather the data this pipeline needs. The MCP server
+    does not fetch — the client assembles the contract and calls again."""
+    return {
+        "message": "No analysable data was supplied. This server does not fetch market "
+                   "data; assemble the shared data contract for the ticker and call again.",
+        "how_to": "Follow the `dse-data-acquisition` skill: gather public DSE data, shape it "
+                  "into the contract JSON, then re-call analyze_ticker with it.",
+        "needs": _LEAF_NEEDS,
+        "minimal_payload_example": {
+            "ticker": payload.get("ticker") or "LHB",
+            "as_of": payload.get("as_of") or "YYYY-MM-DD",
+            "mode": payload.get("mode") or "investment",
+            "ohlcv": [{"date": "YYYY-MM-DD", "open": 0, "high": 0, "low": 0,
+                       "close": 0, "volume": 0}, "... >=30 daily bars, oldest-first ..."],
+            "fundamentals": {"eps_ttm": 0, "eps_history": [], "book_value_per_share": 0,
+                             "debt_to_equity": 0, "roe": 0, "pe": 0, "price": 0},
+        },
+        "suggested_public_sources": [
+            "dsebd.org / dse.com.bd (official prices, disclosures)",
+            "company financial statements / annual report (fundamentals)",
+        ],
+    }
+
+
 def analyze_ticker(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Run the full pipeline for one ticker.
 
@@ -54,7 +97,9 @@ def analyze_ticker(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     if not agents:
         return {"skill": "analyze_ticker", "ticker": ticker,
-                "error": "no leaf analyses succeeded", "stages": stages}
+                "error": "no leaf analyses succeeded — no usable data was supplied",
+                "stages": stages,
+                "instructions": _acquisition_instructions(payload)}
 
     # Synthesize dual-mode signal.
     syn_payload = {"ticker": ticker, "as_of": payload.get("as_of"),
@@ -74,7 +119,7 @@ def analyze_ticker(payload: Dict[str, Any]) -> Dict[str, Any]:
         risk = {"error": str(e)}
         stages["risk_manager"] = f"error: {e}"
 
-    return {
+    result = {
         "skill": "analyze_ticker",
         "ticker": ticker,
         "as_of": payload.get("as_of"),
@@ -84,6 +129,14 @@ def analyze_ticker(payload: Dict[str, Any]) -> Dict[str, Any]:
         "stages": stages,
         "disclaimer": "Educational analysis only. Not financial advice.",
     }
+    # If core data is missing, the result is thin — tell the client what to gather
+    # rather than leaving it to guess from skipped stages.
+    missing = _missing_fields(payload)
+    if missing:
+        instr = _acquisition_instructions(payload)
+        instr["missing_core_fields"] = missing
+        result["instructions"] = instr
+    return result
 
 
 def screen_market(payload: Dict[str, Any]) -> Dict[str, Any]:

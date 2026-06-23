@@ -37,12 +37,18 @@ def _tool_list() -> list[Tool]:
         ))
     # composite tools
     for name, spec in COMPOSITES.items():
+        reads = spec["reads"]
+        properties = {f: registry._FIELD_SCHEMAS[f]
+                      for f in reads if f in registry._FIELD_SCHEMAS}
         tools.append(Tool(
             name=name,
             description=spec["description"] + f"  [{DISCLAIMER}]",
             inputSchema={
                 "type": "object",
-                "description": "Shared data-contract object. Reads: " + ", ".join(spec["reads"]),
+                "description": "Shared data-contract object the client assembles (server does "
+                               "not fetch — see the dse-data-acquisition skill). Reads: "
+                               + ", ".join(reads),
+                "properties": properties,
                 "additionalProperties": True,
             },
         ))

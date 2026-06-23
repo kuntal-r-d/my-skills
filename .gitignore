@@ -1,3 +1,11 @@
 __pycache__/
 *.py[cod]
 .DS_Store
+
+# Personal local data
+data/
+scraper/
+
+# Local tool configs
+.claude/settings.local.json
+claude_desktop_config.json

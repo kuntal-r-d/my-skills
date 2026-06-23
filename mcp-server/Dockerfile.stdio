@@ -1,0 +1,17 @@
+# Build from the REPO ROOT so both skills/ and mcp-server/ are in context:
+#   docker build -f mcp-server/Dockerfile.stdio -t stock-buddy-mcp-stdio .
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Skills (stdlib-only) + the server package.
+COPY skills/ /app/skills/
+COPY mcp-server/ /app/mcp-server/
+
+RUN pip install --no-cache-dir "/app/mcp-server"
+
+# Tell the server where the skills live inside the image.
+ENV STOCK_BUDDY_SKILLS_DIR=/app/skills
+
+# Keep container running, Claude Desktop will exec in to run the server
+CMD ["tail", "-f", "/dev/null"]

@@ -7,6 +7,7 @@
       "id": "PRD-001",
       "name": "Stock Buddy Financial Analysis Platform - Unified System",
       "path": "docs/rcf/prds/PRD-001.json",
+      "description": "Comprehensive unified PRD for financial-grade stock analysis platform with 25 requirements covering skills, data, storage, dashboard, risk management, and compliance",
       "stories": [
         {
           "id": "US-PRD-001",
