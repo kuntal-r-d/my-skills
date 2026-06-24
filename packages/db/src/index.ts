@@ -5,3 +5,4 @@ export * from './schema.js';
 export * from './repos.js';
 export { findUniqueNearMatch, levenshtein } from './symbols.js';
 export { SEED_TICKERS } from './seed-data.js';
+export { listImportantNews, type ImportantNewsRow, type NewsImportance } from './important-news.js';

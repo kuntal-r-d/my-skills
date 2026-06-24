@@ -19,6 +19,7 @@ let currentSnapshotMeta = null;
 let viewMode = 'both';
 let valueBucket = 'buffett';
 let glossaryTerms = [];
+let glossarySections = [];
 let rawOhlcv = [];
 let activeJsonKey = null;
 
@@ -179,6 +180,10 @@ function renderFullAnalysis() {
     const jsonNav = $('#json-key-nav');
     if (jsonNav) jsonNav.innerHTML = '';
     activeJsonKey = null;
+    if (currentTickerData?.news) {
+      $('#sub-summary').innerHTML = UI.renderTickerNewsTeaser(currentTickerData.news, 3);
+      bindSubPanelLinks('#sub-summary');
+    }
     return;
   }
 
@@ -188,7 +193,8 @@ function renderFullAnalysis() {
   const vc = a.value_investment_checklist;
   const rot = a.momentum_rotation;
 
-  $('#sub-summary').innerHTML = UI.renderComparison(syn, ms, vc);
+  $('#sub-summary').innerHTML =
+    UI.renderComparison(syn, ms, vc) + UI.renderTickerNewsTeaser(currentTickerData?.news, 3);
   $('#sub-investment').innerHTML =
     UI.renderThinkingCard('Investment Agent', cards.fundamental, 'Fundamentals, value criteria, long-term thesis (REQ-006)') +
     (viewMode !== 'momentum' ? `<div class="checklist-block"><h4>Value checklist</h4>${UI.renderValueChecklist(vc, valueBucket)}</div>` : '');
@@ -333,6 +339,15 @@ function renderDataWarnings(warnings) {
   return `<div class="data-warnings">${warnings.map((w) => `<p>⚠ ${esc(w)}</p>`).join('')}</div>`;
 }
 
+function bindSubPanelLinks(root = 'body') {
+  $$(`${root} [data-sub].linkish, ${root} button[data-sub].linkish`).forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const sub = btn.dataset.sub;
+      if (sub) showSubPanel(sub);
+    });
+  });
+}
+
 async function loadTickerDetail(symbol) {
   const sym = symbol || $('#ticker-select').value;
   const data = await api(`/api/tickers/${sym}?limit=260`);
@@ -368,41 +383,52 @@ async function loadTickerDetail(symbol) {
     <button type="button" class="btn-sm watch-add" data-symbol="${t.symbol}" data-purpose="trading">+ Trading watchlist</button>`;
   bindWatchlistButtons('#ticker-watchlist-actions');
 
+  const newsEl = $('#sub-news');
+  if (newsEl) {
+    newsEl.innerHTML = UI.renderTickerNews(data.news, data.ticker);
+  }
+  bindSubPanelLinks('#panel-ticker-detail');
+
   renderTickerCommands(t.symbol);
   await loadTickerAnalysis(sym);
+  bindSubPanelLinks('#sub-summary');
+}
+
+function bindHomeClicks(root) {
+  $$(`${root} [data-symbol].clickable`).forEach((el) => {
+    el.addEventListener('click', () => openTicker(el.dataset.symbol));
+  });
+}
+
+function bindPanelLinks(root = 'body') {
+  $$(`${root} [data-panel].linkish, ${root} button[data-panel]`).forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const panel = btn.dataset.panel;
+      if (panel) showPanel(panel);
+      if (panel === 'briefing') loadBriefing();
+      if (panel === 'portfolio') loadPortfolio();
+      if (panel === 'news') loadNews();
+      if (panel === 'watchlist') {
+        loadWatchlists();
+        populateWatchSelects('investment', $(`.watch-filter[data-purpose="investment"]`)?.value ?? '');
+        populateWatchSelects('trading', $(`.watch-filter[data-purpose="trading"]`)?.value ?? '');
+      }
+    });
+  });
 }
 
 async function loadOverview() {
+  $('#home-briefing-content').innerHTML = '<p class="muted">Loading…</p>';
   const data = await api('/api/overview');
-  const c = data.counts;
-  $('#stat-cards').innerHTML = Object.entries(c)
-    .map(([k, v]) => `<div class="card"><div class="label">${k.replace(/_/g, ' ')}</div><div class="value">${UI.fmtNum(v, 0)}</div></div>`)
-    .join('');
+  const home = UI.renderHome(data);
 
-  $('#overview-analyses').innerHTML = table(
-    ['Symbol', 'Investment', 'Momentum', 'Risk', 'When'],
-    (data.recentAnalyses ?? []).map((a) => [
-      `<span class="clickable" data-symbol="${a.symbol}">${a.symbol}</span>`,
-      a.investmentScore ?? '—',
-      a.momentumScore ?? '—',
-      a.riskRating ?? '—',
-      UI.fmtDate(a.createdAt),
-    ]),
-  );
-  $$('#overview-analyses [data-symbol]').forEach((el) => {
-    el.addEventListener('click', () => openTicker(el.dataset.symbol));
-  });
+  $('#home-briefing-content').innerHTML = home.briefing;
+  $('#home-important-news').innerHTML = home.importantNews;
+  $('#home-portfolio-summary').innerHTML = home.portfolioSummary;
+  $('#home-portfolio-table').innerHTML = home.portfolioTable;
 
-  $('#overview-runs').innerHTML = table(
-    ['Job', 'Ticker', 'Status', 'Rows', 'Started'],
-    data.recentRuns.map((r) => [
-      r.jobName,
-      r.symbol ?? '—',
-      `<span class="badge ${r.status === 'ok' ? 'ok' : 'fail'}">${r.status}</span>`,
-      r.rowsUpserted,
-      UI.fmtDate(r.startedAt),
-    ]),
-  );
+  bindHomeClicks('#panel-overview');
+  bindPanelLinks('#panel-overview');
 }
 
 async function loadTickers() {
@@ -492,22 +518,7 @@ async function loadPortfolio() {
     },
   });
 
-  $('#portfolio-table').innerHTML = table(
-    ['Ticker', 'Qty', 'Avg', 'Last', 'P&L', 'Inv', 'Mom', 'Risk', ''],
-    data.positions
-      .sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0))
-      .map((p) => [
-        `<span class="clickable" data-symbol="${p.ticker}">${p.ticker}</span>`,
-        UI.fmtNum(p.qty, 0),
-        UI.fmtNum(p.avg_cost),
-        UI.fmtNum(p.last_close),
-        p.pnl != null ? `৳${UI.fmtNum(p.pnl, 0)} (${UI.fmtPct(p.pnl_pct)})` : '—',
-        p.investment_score ?? '—',
-        p.momentum_score ?? '—',
-        p.risk_rating ?? '—',
-        `<button type="button" class="btn-sm del-pos" data-symbol="${p.ticker}">×</button>`,
-      ]),
-  );
+  $('#portfolio-table').innerHTML = UI.renderPortfolioTable(data.positions);
   $$('#portfolio-table [data-symbol]').forEach((el) => {
     el.addEventListener('click', () => openTicker(el.dataset.symbol));
   });
@@ -615,10 +626,68 @@ async function loadBriefing() {
   $('#briefing-content').innerHTML = UI.renderBriefing(briefing);
 }
 
+const GLOSSARY_SECTION_ORDER = [
+  'fundamental',
+  'technical',
+  'dashboard_overview',
+  'dashboard_risk',
+  'dashboard_tools',
+];
+
+const FUNDAMENTAL_IDS = new Set(['roe', 'pe', 'peg', 'debt_equity', 'margin_of_safety', 'pb_ratio', 'eps_ttm', 'dividend_yield', 'market_cap']);
+const TECHNICAL_IDS = new Set(['adx', 'atr', 'rsi', 'macd', 'mfi']);
+const PORTFOLIO_IDS = new Set(['inv', 'mom', 'risk']);
+
+function orderGlossarySections(sections) {
+  const byId = new Map((sections ?? []).map((s) => [s.id, s]));
+  const ordered = GLOSSARY_SECTION_ORDER.map((id) => byId.get(id)).filter(Boolean);
+  for (const s of sections ?? []) {
+    if (!GLOSSARY_SECTION_ORDER.includes(s.id)) ordered.push(s);
+  }
+  return ordered;
+}
+
+function defaultTermSection(term) {
+  if (term.section) return term.section;
+  if (PORTFOLIO_IDS.has(term.id)) return 'dashboard_risk';
+  if (TECHNICAL_IDS.has(term.id)) return 'technical';
+  if (FUNDAMENTAL_IDS.has(term.id)) return 'fundamental';
+  return 'fundamental';
+}
+
+function mergeGlossaryPayload(apiData, guide) {
+  const rawTerms = Array.isArray(apiData) ? apiData : (apiData.terms ?? []);
+  const metricTerms = rawTerms.map((t) => ({
+    ...t,
+    section: defaultTermSection(t),
+  }));
+  const byId = new Map(metricTerms.map((t) => [t.id, t]));
+  for (const t of guide.terms ?? []) byId.set(t.id, t);
+
+  const sectionById = new Map();
+  for (const s of guide.sections ?? []) sectionById.set(s.id, s);
+  for (const s of apiData.sections ?? []) sectionById.set(s.id, s);
+
+  return {
+    terms: [...byId.values()],
+    sections: orderGlossarySections([...sectionById.values()]),
+  };
+}
+
 async function loadGlossary() {
-  const data = await api('/api/glossary');
-  glossaryTerms = data.terms ?? data;
+  const [apiData, guide] = await Promise.all([
+    api('/api/glossary'),
+    fetch('/analysis-glossary.json')
+      .then((r) => (r.ok ? r.json() : { sections: [], terms: [] }))
+      .catch(() => ({ sections: [], terms: [] })),
+  ]);
+
+  const merged = mergeGlossaryPayload(apiData, guide);
+
+  glossaryTerms = merged.terms;
+  glossarySections = merged.sections;
   renderGlossary();
+  bindGlossaryToolbar();
   $('#learn-panel').innerHTML = UI.renderLearnPanel();
   const roe = $('#learn-roe');
   if (roe) {
@@ -634,7 +703,21 @@ async function loadGlossary() {
 }
 
 function renderGlossary() {
-  $('#glossary-list').innerHTML = UI.renderGlossary(glossaryTerms, $('#glossary-search')?.value);
+  $('#glossary-list').innerHTML = UI.renderGlossary(
+    glossaryTerms,
+    $('#glossary-search')?.value,
+    glossarySections,
+  );
+}
+
+function bindGlossaryToolbar() {
+  const setAll = (open) => {
+    $$('#glossary-list details.glossary-section').forEach((el) => { el.open = open; });
+  };
+  const expandBtn = $('#glossary-expand-all');
+  const collapseBtn = $('#glossary-collapse-all');
+  if (expandBtn) expandBtn.onclick = () => setAll(true);
+  if (collapseBtn) collapseBtn.onclick = () => setAll(false);
 }
 
 async function loadAnalytics() {
@@ -643,11 +726,65 @@ async function loadAnalytics() {
 }
 
 async function loadNews() {
-  const { news } = await api('/api/news');
+  const { news } = await api('/api/news?days=30');
+  const tagged = news.filter((n) => n.symbol).length;
+  const meta = $('#news-meta');
+  if (meta) {
+    meta.textContent = `${news.length} items · ${tagged} with ticker · run: npm run ingest -- --job retag-news`;
+  }
+
+  const SOURCE_LABELS = {
+    tbs_stocks: 'TBS Stocks',
+    tbs_economy: 'TBS Economy',
+    tbs_economy_bn: 'TBS অর্থনীতি',
+    dhaka_tribune_stock: 'Dhaka Tribune',
+    daily_star_business: 'Daily Star',
+    financial_express: 'Financial Express',
+    financial_express_bn: 'FE বাংলা',
+    prothomalo: 'Prothom Alo',
+    google_news_dse: 'Google News',
+    google_news_bn: 'Google News BN',
+    dse: 'DSE',
+  };
+
+  const TICKER_BN = {
+    BXPHARMA: 'বেক্সিমকো',
+    GP: 'গ্রামীণফোন',
+    SQURPHARMA: 'স্কয়ার ফার্মা',
+    LHB: 'লাফার্জ',
+    BRACBANK: 'ব্র্যাক',
+    ROBI: 'রবি',
+    ACI: 'এসিআই',
+    WALTONHIL: 'ওয়ালটন',
+    NHFIL: 'ন্যাশনাল হাউজিং',
+    PEOPLESINS: 'পিপলস',
+    ISLAMIINS: 'ইসলামী ইন্স্যুরেন্স',
+    IPDC: 'আইপিডিসি',
+  };
+
+  const bnHeadline = (text) => /[\u0980-\u09FF]/.test(text ?? '');
+
+  const fmtTicker = (n) => {
+    if (!n.symbol) return '<span class="muted">—</span>';
+    const bn = bnHeadline(n.headline) && TICKER_BN[n.symbol]
+      ? `<span class="ticker-bn" lang="bn">${UI.esc(TICKER_BN[n.symbol])}</span>`
+      : '';
+    return `<span class="news-ticker"><span class="clickable" data-symbol="${n.symbol}">${UI.esc(n.symbol)}</span>${bn}</span>`;
+  };
+
   $('#all-news').innerHTML = table(
-    ['Date', 'Ticker', 'Headline', 'Source'],
-    news.map((n) => [UI.fmtDate(n.publishedDate), n.symbol ?? '—', n.headline, n.source ?? '—']),
+    ['Date', 'Ticker', 'Headline', 'Source', 'Category'],
+    news.map((n) => [
+      UI.fmtDate(n.publishedDate),
+      fmtTicker(n),
+      n.url ? `<a href="${n.url}" target="_blank" rel="noopener">${UI.esc(n.headline)}</a>` : UI.esc(n.headline),
+      UI.esc(SOURCE_LABELS[n.source] ?? n.source ?? '—'),
+      UI.esc(n.category ?? '—'),
+    ]),
   );
+  $$('#all-news [data-symbol]').forEach((el) => {
+    el.addEventListener('click', () => openTicker(el.dataset.symbol));
+  });
 }
 
 async function loadMacro() {
@@ -662,7 +799,15 @@ async function loadMacro() {
 }
 
 async function loadOps() {
-  const [fresh, runs] = await Promise.all([api('/api/freshness'), api('/api/ingest-runs?limit=100')]);
+  const [fresh, runs, stats] = await Promise.all([
+    api('/api/freshness'),
+    api('/api/ingest-runs?limit=100'),
+    api('/api/stats').catch(() => ({ counts: {} })),
+  ]);
+  const c = stats.counts ?? {};
+  $('#ops-stat-cards').innerHTML = Object.entries(c)
+    .map(([k, v]) => `<div class="card"><div class="label">${k.replace(/_/g, ' ')}</div><div class="value">${UI.fmtNum(v, 0)}</div></div>`)
+    .join('');
   $('#freshness-table').innerHTML = table(
     ['Entity', 'Ticker', 'Last success', 'Stale (h)'],
     fresh.freshness.map((f) => [f.entityType, f.symbol ?? 'global', UI.fmtDate(f.lastSuccessAt), f.staleAfterHours]),
@@ -682,6 +827,7 @@ async function loadOps() {
 $$('.tab').forEach((btn) => {
   btn.addEventListener('click', () => {
     showPanel(btn.dataset.panel);
+    if (btn.dataset.panel === 'overview') loadOverview();
     if (btn.dataset.panel === 'watchlist') {
       loadWatchlists();
       populateWatchSelects('investment', $(`.watch-filter[data-purpose="investment"]`)?.value ?? '');
@@ -769,7 +915,9 @@ $('#panel-ticker-detail')?.addEventListener('click', async (e) => {
 
 bindClick('#run-discover', runDiscover);
 bindClick('#load-briefing', loadBriefing);
+bindClick('#refresh-home', loadOverview);
 bindClick('#load-analytics', loadAnalytics);
+bindClick('#refresh-news', loadNews);
 $('#glossary-search')?.addEventListener('input', renderGlossary);
 
 $('#chart-tf').addEventListener('change', () => {

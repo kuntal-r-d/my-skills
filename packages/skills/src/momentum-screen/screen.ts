@@ -1,5 +1,5 @@
 import * as ind from '@stock-buddy/core';
-import { educationLevels } from '@stock-buddy/core';
+import { buildCriterionEducation } from '@stock-buddy/core';
 
 export const DISCLAIMER = 'Educational analysis only. Not financial advice.';
 
@@ -26,7 +26,7 @@ interface Criterion {
   passed: boolean | null;
   explanation: string;
   value?: unknown;
-  levels?: { beginner: string; intermediate: string; advanced: string };
+  levels?: ReturnType<typeof buildCriterionEducation>;
 }
 
 function slopeRising(series: (number | null)[], lookback = 21): boolean | null {
@@ -109,7 +109,7 @@ export function screen(data: Record<string, unknown>): Record<string, unknown> {
       passed,
       explanation: expl,
       value,
-      levels: educationLevels(label, expl, value),
+      levels: buildCriterionEducation(label, expl, value, 'momentum'),
     });
   }
 

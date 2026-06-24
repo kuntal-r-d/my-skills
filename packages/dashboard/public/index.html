@@ -20,7 +20,7 @@
       <button type="button" class="mode-btn" data-mode="momentum">Trading</button>
     </div>
     <nav class="tabs" id="tabs">
-      <button type="button" class="tab active" data-panel="overview">Overview</button>
+      <button type="button" class="tab active" data-panel="overview">Home</button>
       <button type="button" class="tab" data-panel="tickers">Tickers</button>
       <button type="button" class="tab" data-panel="ticker-detail">Analysis</button>
       <button type="button" class="tab" data-panel="discover">Discover</button>
@@ -37,11 +37,36 @@
 
   <main class="main">
     <section id="panel-overview" class="panel active">
-      <div class="cards" id="stat-cards"></div>
-      <h2>Recent analyses</h2>
-      <div class="table-wrap" id="overview-analyses"></div>
-      <h2>Recent ingest runs</h2>
-      <div class="table-wrap" id="overview-runs"></div>
+      <div class="home-toolbar toolbar wrap">
+        <h2 class="home-title">Home</h2>
+        <button type="button" id="refresh-home" class="btn-sm">Refresh</button>
+      </div>
+
+      <section class="home-section" aria-labelledby="home-briefing-heading">
+        <div class="home-section-head">
+          <h3 id="home-briefing-heading">Daily briefing</h3>
+          <button type="button" class="btn-sm linkish" data-panel="briefing">Full briefing →</button>
+        </div>
+        <div id="home-briefing-content"><p class="muted">Loading briefing…</p></div>
+      </section>
+
+      <section class="home-section" aria-labelledby="home-news-heading">
+        <div class="home-section-head">
+          <h3 id="home-news-heading">News to watch</h3>
+          <button type="button" class="btn-sm linkish" data-panel="news">All news →</button>
+        </div>
+        <p class="home-news-intro muted">Disclosures, dividends, and headlines tied to your holdings, watchlist, and the wider DSE market.</p>
+        <div id="home-important-news"><p class="muted">Loading news…</p></div>
+      </section>
+
+      <section class="home-section" aria-labelledby="home-portfolio-heading">
+        <div class="home-section-head">
+          <h3 id="home-portfolio-heading">Portfolio</h3>
+          <button type="button" class="btn-sm linkish" data-panel="portfolio">Manage →</button>
+        </div>
+        <div id="home-portfolio-summary" class="meta-bar"></div>
+        <div class="table-wrap" id="home-portfolio-table"></div>
+      </section>
     </section>
 
     <section id="panel-tickers" class="panel">
@@ -68,7 +93,8 @@
         <button type="button" class="sub-tab active" data-sub="summary">Summary</button>
         <button type="button" class="sub-tab" data-sub="investment">Investment</button>
         <button type="button" class="sub-tab" data-sub="momentum">Momentum</button>
-        <button type="button" class="sub-tab" data-sub="business">Business &amp; News</button>
+        <button type="button" class="sub-tab" data-sub="business">Business</button>
+        <button type="button" class="sub-tab" data-sub="news">News</button>
         <button type="button" class="sub-tab" data-sub="risk">Risk &amp; Prices</button>
         <button type="button" class="sub-tab" data-sub="history">History</button>
         <button type="button" class="sub-tab" data-sub="commands">Commands</button>
@@ -78,6 +104,7 @@
       <div id="sub-investment" class="sub-panel"></div>
       <div id="sub-momentum" class="sub-panel"></div>
       <div id="sub-business" class="sub-panel"></div>
+      <div id="sub-news" class="sub-panel"></div>
       <div id="sub-risk" class="sub-panel"></div>
       <div id="sub-history" class="sub-panel"></div>
       <div id="sub-commands" class="sub-panel"></div>
@@ -171,7 +198,12 @@
     </section>
 
     <section id="panel-glossary" class="panel">
-      <div class="toolbar"><input type="search" id="glossary-search" placeholder="Search terms…" /></div>
+      <p class="glossary-page-intro muted">Plain-language guide in <strong>English</strong> and <strong>বাংলা</strong>. Fundamental and technical terms are separated. Click a section or term to expand.</p>
+      <div class="toolbar glossary-toolbar wrap">
+        <input type="search" id="glossary-search" placeholder="Search… (e.g. RSI, ROE, stop, checklist)" />
+        <button type="button" class="btn-sm" id="glossary-expand-all">Expand all</button>
+        <button type="button" class="btn-sm" id="glossary-collapse-all">Collapse all</button>
+      </div>
       <div id="glossary-list"></div>
       <div id="learn-panel"></div>
     </section>
@@ -182,6 +214,10 @@
     </section>
 
     <section id="panel-news" class="panel">
+      <div class="toolbar">
+        <button type="button" id="refresh-news">Refresh news</button>
+        <span class="muted" id="news-meta"></span>
+      </div>
       <div class="table-wrap" id="all-news"></div>
     </section>
 
@@ -191,6 +227,7 @@
     </section>
 
     <section id="panel-ops" class="panel">
+      <div class="cards" id="ops-stat-cards"></div>
       <h2>Data freshness</h2>
       <div class="table-wrap" id="freshness-table"></div>
       <h2>Ingest runs</h2>

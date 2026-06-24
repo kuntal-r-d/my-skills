@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import type { Db } from './client.js';
 import {
   analysisSnapshots,
@@ -305,10 +305,39 @@ export async function upsertNews(
     category?: string;
     url?: string;
   }>,
-) {
-  if (items.length === 0) return;
+): Promise<{ inserted: number; skipped: number }> {
+  if (items.length === 0) return { inserted: 0, skipped: 0 };
+
+  const urls = [...new Set(items.map((i) => i.url).filter(Boolean))] as string[];
+  const existingUrls = new Set<string>();
+  if (urls.length) {
+    const rows = await db
+      .select({ url: newsItems.url })
+      .from(newsItems)
+      .where(inArray(newsItems.url, urls));
+    for (const r of rows) {
+      if (r.url) existingUrls.add(r.url);
+    }
+  }
+
+  const fresh = items.filter((i) => !i.url || !existingUrls.has(i.url));
+  let retagged = 0;
+  for (const item of items) {
+    if (!item.url || !item.tickerId || !existingUrls.has(item.url)) continue;
+    const updated = await db
+      .update(newsItems)
+      .set({ tickerId: item.tickerId })
+      .where(and(eq(newsItems.url, item.url), isNull(newsItems.tickerId)))
+      .returning({ id: newsItems.id });
+    retagged += updated.length;
+  }
+
+  if (fresh.length === 0) {
+    return { inserted: retagged, skipped: items.length - retagged };
+  }
+
   await db.insert(newsItems).values(
-    items.map((i) => ({
+    fresh.map((i) => ({
       tickerId: i.tickerId ?? null,
       publishedDate: i.publishedDate,
       headline: i.headline,
@@ -317,9 +346,36 @@ export async function upsertNews(
       url: i.url,
     })),
   );
+  return { inserted: fresh.length + retagged, skipped: items.length - fresh.length - retagged };
 }
 
-export async function getNews(db: Db, tickerId?: number, days = 7) {
+export async function retagUntaggedNews(
+  db: Db,
+  tagger: (headline: string, url?: string | null) => number | null,
+  limit = 1000,
+): Promise<number> {
+  const rows = await db
+    .select({ id: newsItems.id, headline: newsItems.headline, url: newsItems.url })
+    .from(newsItems)
+    .where(isNull(newsItems.tickerId))
+    .orderBy(desc(newsItems.publishedDate))
+    .limit(limit);
+
+  let updated = 0;
+  for (const row of rows) {
+    const tickerId = tagger(row.headline, row.url);
+    if (!tickerId) continue;
+    const hit = await db
+      .update(newsItems)
+      .set({ tickerId })
+      .where(eq(newsItems.id, row.id))
+      .returning({ id: newsItems.id });
+    updated += hit.length;
+  }
+  return updated;
+}
+
+export async function getNews(db: Db, tickerId?: number, days = 7, limit = 20) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
@@ -330,14 +386,14 @@ export async function getNews(db: Db, tickerId?: number, days = 7) {
       .from(newsItems)
       .where(and(eq(newsItems.tickerId, tickerId), gte(newsItems.publishedDate, cutoffStr)))
       .orderBy(desc(newsItems.publishedDate))
-      .limit(20);
+      .limit(limit);
   }
   return db
     .select()
     .from(newsItems)
     .where(gte(newsItems.publishedDate, cutoffStr))
     .orderBy(desc(newsItems.publishedDate))
-    .limit(20);
+    .limit(limit);
 }
 
 export async function getDefaultAccount(db: Db) {
@@ -687,4 +743,59 @@ export async function recordPredictionOutcome(
 ) {
   const [row] = await db.insert(predictionOutcomes).values(data).returning();
   return row!;
+}
+
+export function extractAnalysisScores(payload: Record<string, unknown> | undefined) {
+  const syn = payload?.synthesis as Record<string, unknown> | undefined;
+  const inv = syn?.investment as Record<string, unknown> | undefined;
+  const mom = syn?.momentum as Record<string, unknown> | undefined;
+  const risk = payload?.risk as Record<string, unknown> | undefined;
+  return {
+    investment_score: inv?.composite_1_10 as number | undefined,
+    momentum_score: mom?.composite_1_10 as number | undefined,
+    risk_rating: risk?.rating as string | undefined,
+  };
+}
+
+export function roc1mPctFromOhlcv(bars: { close: number }[], lookback = 21): number | null {
+  if (bars.length < lookback + 1) return null;
+  const last = bars[bars.length - 1]?.close;
+  const past = bars[bars.length - 1 - lookback]?.close;
+  if (last == null || past == null || past <= 0) return null;
+  return Math.round(((last - past) / past) * 10000) / 100;
+}
+
+export interface TopPerformerRow {
+  symbol: string;
+  name: string | null;
+  sector: string | null;
+  roc_1m_pct: number;
+  last_close: number;
+  last_trade_date: string;
+}
+
+export async function listTopPerformers(db: Db, limit = 10, lookbackBars = 21): Promise<TopPerformerRow[]> {
+  const rows = await db.execute(sql`
+    SELECT t.symbol, t.name, t.sector,
+      ROUND(((last.close - past.close) / past.close * 100)::numeric, 2) AS roc_1m_pct,
+      last.close AS last_close,
+      last.trade_date AS last_trade_date
+    FROM tickers t
+    JOIN LATERAL (
+      SELECT close, trade_date FROM ohlcv_daily
+      WHERE ticker_id = t.id
+      ORDER BY trade_date DESC
+      LIMIT 1
+    ) last ON true
+    JOIN LATERAL (
+      SELECT close FROM ohlcv_daily
+      WHERE ticker_id = t.id
+      ORDER BY trade_date DESC
+      OFFSET ${lookbackBars} LIMIT 1
+    ) past ON true
+    WHERE past.close > 0 AND last.close > 0 AND t.is_active = true
+    ORDER BY roc_1m_pct DESC
+    LIMIT ${limit}
+  `);
+  return rows as unknown as TopPerformerRow[];
 }

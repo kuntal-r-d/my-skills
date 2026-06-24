@@ -11,6 +11,7 @@ export {
   ingestShareholding,
   ingestMacro,
   ingestNews,
+  ingestNewsMarket,
   ingestAll,
   ingestWatchlist,
   ingestFundamentalsUniverse,

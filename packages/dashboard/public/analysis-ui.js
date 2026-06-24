@@ -205,6 +205,34 @@ window.AnalysisUI = (function () {
       .join('');
   }
 
+  function formatCriterionSummaryValue(c) {
+    if (c.levels?.formattedValue) return c.levels.formattedValue;
+    if (c.value != null && typeof c.value !== 'object') return fmtNum(c.value, 4);
+    return '';
+  }
+
+  function renderCriterionBody(c) {
+    const levels = c.levels;
+    const simple = levels?.simple ?? c.explanation;
+    const example = levels?.example ?? '';
+    const bangla = levels?.bangla ?? '';
+    const stock = levels?.formattedValue ?? formatCriterionSummaryValue(c);
+    const verdict =
+      c.passed === true
+        ? 'Passes this check.'
+        : c.passed === false
+          ? 'Does not pass yet.'
+          : 'Waiting on data for this check.';
+
+    return `
+      <div class="criterion-edu">
+        <p class="criterion-verdict ${criterionClass(c.passed)}">${esc(verdict)}${stock ? ` <span class="criterion-stock">(${esc(stock)})</span>` : ''}</p>
+        <p class="criterion-simple">${esc(simple)}</p>
+        ${example ? `<p class="criterion-example">${esc(example)}</p>` : ''}
+        ${bangla ? `<p class="criterion-bn" lang="bn">${esc(bangla)}</p>` : ''}
+      </div>`;
+  }
+
   function renderCriteriaList(criteria, bucketKey) {
     if (!Array.isArray(criteria) || !criteria.length) return '<p class="muted">No criteria data</p>';
     let current = null;
@@ -216,12 +244,12 @@ window.AnalysisUI = (function () {
         html += `<div class="criteria-group"><h5>${esc(String(bucket))}</h5>`;
         current = bucket;
       }
-      const val = c.value != null && typeof c.value !== 'object' ? ` · ${fmtNum(c.value, 4)}` : '';
+      const summaryVal = formatCriterionSummaryValue(c);
+      const val = summaryVal ? ` · ${esc(summaryVal)}` : '';
       html += `
         <details class="criterion ${criterionClass(c.passed)}">
           <summary><span class="c-icon">${criterionIcon(c.passed)}</span> ${esc(c.label)}${val}</summary>
-          <p>${esc(c.explanation)}</p>
-          ${c.levels ? `<div class="edu-levels"><p><strong>Beginner:</strong> ${esc(c.levels.beginner)}</p><p><strong>Advanced:</strong> ${esc(c.levels.advanced)}</p></div>` : ''}
+          ${renderCriterionBody(c)}
         </details>`;
     }
     if (current) html += '</div>';
@@ -253,6 +281,10 @@ window.AnalysisUI = (function () {
     }
 
     return `
+      <div class="checklist-intro">
+        <p><strong>Momentum checklist</strong> — Short-term trading: is price, volume, and relative strength aligned for a trend trade? Not a buy signal on its own — pair with risk rules.</p>
+        <p class="checklist-intro-bn" lang="bn">স্বল্পমেয়াদি ট্রেডিং: দাম, ভলিউম ও আপেক্ষিক শক্তি একসাথে ঊর্ধ্বমুখী কিনা। একা কেনার সংকেত নয় — ঝুঁকি নিয়মের সাথে দেখুন।</p>
+      </div>
       <div class="checklist-header">
         <div><span class="grade-badge lg">${esc(ms.rating)}</span> ${esc(ms.key_metrics?.overall_count ?? '')} ${confidenceBadge(ms.confidence)}</div>
         <div class="action-rec ${scoreColor(ms.score)}"><strong>${esc(rec.label)}:</strong> ${esc(rec.text)}</div>
@@ -276,6 +308,10 @@ window.AnalysisUI = (function () {
         : (vc.criteria ?? []).filter((c) => c.bucket === activeBucket);
 
     return `
+      <div class="checklist-intro">
+        <p><strong>Investment checklist</strong> — Long-term quality: can this business compound your money for years? Each row is pass ✓, fail ✗, or needs data ⏳.</p>
+        <p class="checklist-intro-bn" lang="bn">দীর্ঘমেয়াদি বিনিয়োগ: ব্যবসাটি বছরের পর বছর টাকা বাড়াতে পারে কিনা। প্রতিটি সারি পাস, ফেল বা ডেটা অপেক্ষা।</p>
+      </div>
       <div class="checklist-header">
         <div><span class="grade-badge lg">${esc(vc.rating)}</span> GPA ${fmtNum(vc.key_metrics?.gpa)} · ${esc(vc.key_metrics?.overall_count ?? '')} ${confidenceBadge(vc.confidence)}</div>
         <div class="action-rec ${scoreColor(vc.score)}"><strong>${esc(rec.label)}:</strong> ${esc(rec.text)}</div>
@@ -295,6 +331,120 @@ window.AnalysisUI = (function () {
     ].filter(([, v]) => v != null);
     if (!items.length) return '';
     return `<div class="indicator-strip">${items.map(([l, v]) => `<span class="ind-chip">${l} ${fmtNum(v)}</span>`).join('')}</div>`;
+  }
+
+  const NEWS_SOURCE_LABELS = {
+    tbs_stocks: 'TBS Stocks',
+    tbs_economy: 'TBS Economy',
+    tbs_economy_bn: 'TBS অর্থনীতি',
+    dhaka_tribune_stock: 'Dhaka Tribune',
+    daily_star_business: 'Daily Star',
+    financial_express: 'Financial Express',
+    financial_express_bn: 'FE বাংলা',
+    prothomalo: 'Prothom Alo',
+    google_news_dse: 'Google News',
+    google_news_bn: 'Google News BN',
+    dse: 'DSE',
+  };
+
+  const TICKER_BN_LABELS = {
+    BXPHARMA: 'বেক্সিমকো',
+    GP: 'গ্রামীণফোন',
+    SQURPHARMA: 'স্কয়ার ফার্মা',
+    LHB: 'লাফার্জ',
+    BRACBANK: 'ব্র্যাক ব্যাংক',
+    ROBI: 'রবি',
+    ACI: 'এসিআই',
+    WALTONHIL: 'ওয়ালটন',
+    NHFIL: 'ন্যাশনাল হাউজিং',
+    PEOPLESINS: 'পিপলস ইন্স্যুরেন্স',
+    ISLAMIINS: 'ইসলামী ইন্স্যুরেন্স',
+    IPDC: 'আইপিডিসি',
+  };
+
+  function formatNewsHeadline(n) {
+    const h = (n.headline ?? '').trim();
+    if (/^https?:\/\//i.test(h)) {
+      if (n.category === 'price_sensitive') return 'Price sensitive information (DSE disclosure)';
+      return 'Company disclosure — open link for details';
+    }
+    return h;
+  }
+
+  function newsCategoryLabel(cat) {
+    const labels = {
+      price_sensitive: 'Disclosure',
+      earnings: 'Earnings',
+      macro: 'Macro',
+      rumour: 'Rumour',
+      general: 'General',
+    };
+    return labels[cat] ?? cat ?? 'News';
+  }
+
+  function renderTickerNews(news, ticker, { compact = false } = {}) {
+    const sym = ticker?.symbol ?? '';
+    const items = news ?? [];
+
+    if (!items.length) {
+      return `<div class="ticker-news-empty">
+        <p class="muted">No news tagged to <strong>${esc(sym)}</strong> yet.</p>
+        <p class="muted">Run market news ingest, then DSE company news:</p>
+        <pre class="cmd-snippet">npm run ingest -- --job news-market
+npm run ingest -- --ticker ${esc(sym)} --job news
+npm run ingest -- --job retag-news</pre>
+      </div>`;
+    }
+
+    const list = items
+      .map((n) => {
+        const src = NEWS_SOURCE_LABELS[n.source] ?? n.source ?? '—';
+        const cat = newsCategoryLabel(n.category);
+        const pillKind =
+          n.category === 'price_sensitive' ? 'disclosure' : n.category === 'earnings' ? 'market' : 'market';
+        const catClass = `news-pill news-pill-${pillKind}`;
+        const headlineText = formatNewsHeadline(n);
+        const headline = n.url
+          ? `<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(headlineText)}</a>`
+          : esc(headlineText);
+        const bn =
+          /[\u0980-\u09FF]/.test(headlineText) && TICKER_BN_LABELS[sym]
+            ? `<span class="ticker-bn" lang="bn">${esc(TICKER_BN_LABELS[sym])}</span>`
+            : '';
+        return `<li class="home-news-item ticker-news-item">
+          <div class="home-news-meta">
+            <span class="${catClass}">${esc(cat)}</span>
+            ${bn}
+            <span class="muted home-news-src">${esc(src)} · ${fmtDate(n.publishedDate ?? n.date)}</span>
+          </div>
+          <div class="home-news-headline">${headline}</div>
+        </li>`;
+      })
+      .join('');
+
+    if (compact) {
+      return `<ul class="home-news-list ticker-news-teaser">${list}</ul>`;
+    }
+
+    return `
+      <div class="ticker-news-panel">
+        <p class="agent-scope">${esc(sym)} — DSE disclosures, newspapers, and web headlines tagged to this symbol (last 90 days).</p>
+        <p class="muted ticker-news-count">${items.length} item${items.length === 1 ? '' : 's'}</p>
+        <ul class="home-news-list">${list}</ul>
+      </div>`;
+  }
+
+  function renderTickerNewsTeaser(news, limit = 3) {
+    const items = (news ?? []).slice(0, limit);
+    if (!items.length) return '';
+    return `
+      <div class="ticker-news-teaser-block">
+        <div class="home-section-head">
+          <h4>Recent news</h4>
+          <button type="button" class="btn-sm linkish" data-sub="news">All news →</button>
+        </div>
+        ${renderTickerNews(items, null, { compact: true })}
+      </div>`;
   }
 
   function renderBusiness(fundamentals, news, ticker, warnings) {
@@ -355,10 +505,9 @@ window.AnalysisUI = (function () {
         return `<tr><td>${k}${foot}</td><td>${esc(v ?? '—')}</td></tr>`;
       })
       .join('');
-    const newsHtml = (news ?? [])
-      .slice(0, 10)
-      .map((n) => `<li><span class="muted">${fmtDate(n.publishedDate ?? n.date)}</span> ${esc(n.headline)}</li>`)
-      .join('');
+    const newsNote = (news ?? []).length
+      ? `<p class="muted">Latest headlines are on the <button type="button" class="btn-sm linkish" data-sub="news">News</button> tab (${(news ?? []).length} items).</p>`
+      : `<p class="muted">No news yet — see the <button type="button" class="btn-sm linkish" data-sub="news">News</button> tab for ingest commands.</p>`;
 
     const fundNote = hasFund
       ? ''
@@ -376,33 +525,103 @@ window.AnalysisUI = (function () {
     return `
       ${fundNote}${warnHtml}
       <p class="agent-scope">Business Analysis Agent — model, growth, competitive position from fundamentals.</p>
-      <div class="grid-2">
-        <div><h4>${esc(ticker?.name ?? ticker?.symbol)}</h4><p class="muted">Sector: ${esc(ticker?.sector ?? '—')} · Commodity: ${esc(ticker?.commodityType ?? '—')}</p>
+      ${newsNote}
+      <div>
+        <h4>${esc(ticker?.name ?? ticker?.symbol)}</h4>
+        <p class="muted">Sector: ${esc(ticker?.sector ?? '—')} · Commodity: ${esc(ticker?.commodityType ?? '—')}</p>
         <div class="table-wrap"><table>${table}</table></div>
         ${provenanceNote}
-        <p class="muted dse-note">DSE context: compare P/E vs market average ~18. Circuit breaker rules apply.</p></div>
-        <div><h4>News</h4><ul class="news-list">${newsHtml || '<li class="muted">No recent news</li>'}</ul></div>
+        <p class="muted dse-note">DSE context: compare P/E vs market average ~18. Circuit breaker rules apply.</p>
       </div>`;
   }
 
-  function renderGlossary(terms, query) {
+  function renderGlossary(terms, query, sections) {
     const q = (query ?? '').toLowerCase();
-    const filtered = (terms ?? []).filter(
-      (t) => !q || t.term.toLowerCase().includes(q) || t.id.includes(q),
-    );
-    return filtered
-      .map(
-        (t) => `
+    const filtered = (terms ?? []).filter((t) => {
+      if (!q) return true;
+      const hay = [
+        t.term,
+        t.id,
+        t.section,
+        t.simple,
+        t.bangla,
+        t.investor,
+        t.trader,
+        t.detail,
+        t.where,
+        t.good,
+        t.bad,
+        t.action,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+
+    if (!filtered.length) {
+      return '<p class="muted">No matching terms — try another keyword (e.g. RSI, stop, checklist).</p>';
+    }
+
+    const metaById = new Map((sections ?? []).map((s) => [s.id, s]));
+    const bySection = new Map();
+    for (const t of filtered) {
+      const sec = t.section ?? 'other';
+      if (!bySection.has(sec)) bySection.set(sec, []);
+      bySection.get(sec).push(t);
+    }
+
+    const sectionOrder = (sections ?? []).map((s) => s.id);
+    const ordered = sectionOrder.filter((id) => bySection.has(id));
+    for (const id of bySection.keys()) {
+      if (!ordered.includes(id)) ordered.push(id);
+    }
+
+    let html = '';
+    for (const secId of ordered) {
+      const meta = metaById.get(secId);
+      const title = meta?.title ?? String(secId).replace(/_/g, ' ');
+      const titleBn = meta?.title_bn;
+      const count = bySection.get(secId).length;
+      const openAttr = q || meta?.defaultOpen === true || secId === 'fundamental' || secId === 'technical' ? ' open' : '';
+
+      html += `<details class="glossary-section" id="glossary-${esc(secId)}"${openAttr}>`;
+      html += `<summary class="glossary-section-summary">`;
+      html += `<span class="glossary-section-head">`;
+      html += `<span class="glossary-section-title">${esc(title)}</span>`;
+      if (titleBn) html += `<span class="glossary-section-title-bn bangla">${esc(titleBn)}</span>`;
+      html += `</span>`;
+      html += `<span class="glossary-section-count muted">${count} term${count === 1 ? '' : 's'}</span>`;
+      html += `</summary>`;
+      html += `<div class="glossary-section-body">`;
+      if (meta?.intro) {
+        html += `<p class="glossary-section-intro">${esc(meta.intro)}</p>`;
+      }
+      if (meta?.intro_bn) {
+        html += `<p class="glossary-section-intro bangla">${esc(meta.intro_bn)}</p>`;
+      }
+      for (const t of bySection.get(secId)) {
+        html += `
         <details class="glossary-term">
-          <summary>${esc(t.term)}</summary>
-          <p>${esc(t.simple)}</p>
-          <p class="bangla">${esc(t.bangla)}</p>
-          <p><strong>Investor:</strong> ${esc(t.investor)}</p>
-          <p><strong>Trader:</strong> ${esc(t.trader)}</p>
-          <p class="muted">Good: ${esc(t.good)} · Bad: ${esc(t.bad)}</p>
-        </details>`,
-      )
-      .join('');
+          <summary class="glossary-term-summary">${esc(t.term)}</summary>
+          <div class="glossary-term-body">
+            <div class="glossary-bilingual">
+              <p class="glossary-en"><span class="glossary-lang-label">English</span>${esc(t.simple)}</p>
+              <p class="glossary-bn bangla"><span class="glossary-lang-label">বাংলা</span>${esc(t.bangla)}</p>
+            </div>
+            ${t.detail ? `<p class="glossary-detail"><span class="glossary-lang-label">More detail</span>${esc(t.detail)}</p>` : ''}
+            <div class="glossary-extra">
+              <p><span class="glossary-extra-label">Long-term investor</span> ${esc(t.investor)}</p>
+              <p><span class="glossary-extra-label">Short-term trader</span> ${esc(t.trader)}</p>
+              <p class="glossary-thresholds muted"><span class="glossary-extra-label">Good sign</span> ${esc(t.good)} · <span class="glossary-extra-label">Caution</span> ${esc(t.bad)}</p>
+              <p><span class="glossary-extra-label">What to do</span> ${esc(t.action)}</p>
+            </div>
+          </div>
+        </details>`;
+      }
+      html += '</div></details>';
+    }
+    return html;
   }
 
   function renderLearnPanel() {
@@ -420,6 +639,131 @@ window.AnalysisUI = (function () {
   function renderBriefing(briefing) {
     if (!briefing?.markdown) return '<p class="muted">Briefing unavailable</p>';
     return `<div class="briefing-md"><pre class="briefing-pre">${esc(briefing.markdown)}</pre></div>`;
+  }
+
+  function roc1mCell(pct) {
+    if (pct == null || Number.isNaN(pct)) return '—';
+    const n = Number(pct);
+    return `<span class="${n >= 0 ? 'pos' : 'neg'}">${fmtPct(n)}</span>`;
+  }
+
+  function renderPortfolioTable(positions, { compact = false } = {}) {
+    if (!positions?.length) return '<p class="muted">No open positions.</p>';
+
+    const sorted = [...positions].sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0));
+    const headers = compact
+      ? ['Symbol', 'Qty', '1M %', 'Last', 'Sector', 'P&amp;L %', 'Inv', 'Mom', 'Risk']
+      : ['Ticker', 'Qty', 'Avg', '1M %', 'Last', 'Sector', 'P&amp;L', 'Inv', 'Mom', 'Risk', ''];
+
+    let html = `<table><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>`;
+    for (const p of sorted) {
+      const sym = `<span class="clickable" data-symbol="${esc(p.ticker)}">${esc(p.ticker)}</span>`;
+      const pnlCell = compact
+        ? (p.pnl_pct != null ? `<span class="${p.pnl_pct >= 0 ? 'pos' : 'neg'}">${fmtPct(p.pnl_pct)}</span>` : '—')
+        : (p.pnl != null ? `৳${fmtNum(p.pnl, 0)} (${fmtPct(p.pnl_pct)})` : '—');
+      const cells = compact
+        ? [sym, fmtNum(p.qty, 0), roc1mCell(p.roc_1m_pct), fmtNum(p.last_close), esc(p.sector ?? '—'), pnlCell, p.investment_score ?? '—', p.momentum_score ?? '—', esc(p.risk_rating ?? '—')]
+        : [sym, fmtNum(p.qty, 0), fmtNum(p.avg_cost), roc1mCell(p.roc_1m_pct), fmtNum(p.last_close), esc(p.sector ?? '—'), pnlCell, p.investment_score ?? '—', p.momentum_score ?? '—', esc(p.risk_rating ?? '—'), `<button type="button" class="btn-sm del-pos" data-symbol="${esc(p.ticker)}">×</button>`];
+      html += `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
+    }
+    return html + '</table>';
+  }
+
+  function renderHomePortfolio(portfolio) {
+    if (!portfolio?.account) {
+      return {
+        summary: '<p class="muted">No portfolio yet — add positions on the Portfolio tab or run <code>npm run db:seed</code>.</p>',
+        table: '',
+      };
+    }
+    const totalPnl = (portfolio.positions ?? []).reduce((s, p) => s + (p.pnl ?? 0), 0);
+    const summary =
+      `Account <strong>${esc(portfolio.account.label)}</strong> · Capital ৳${fmtNum(portfolio.account.capital_bdt, 0)} · `
+      + `Cost ৳${fmtNum(portfolio.total_cost_basis, 0)} · Unrealized P&amp;L ৳${fmtNum(totalPnl, 0)}`;
+
+    return {
+      summary,
+      table: renderPortfolioTable(portfolio.positions, { compact: true }),
+    };
+  }
+
+  function renderHomeImportantNews(items) {
+    const SOURCE_LABELS = {
+      tbs_stocks: 'TBS',
+      tbs_economy: 'TBS Economy',
+      tbs_economy_bn: 'TBS BN',
+      dhaka_tribune_stock: 'Tribune',
+      daily_star_business: 'Daily Star',
+      financial_express: 'FE',
+      financial_express_bn: 'FE BN',
+      prothomalo: 'Prothom Alo',
+      google_news_dse: 'Google',
+      google_news_bn: 'Google BN',
+      dse: 'DSE',
+    };
+
+    const TICKER_BN = {
+      BXPHARMA: 'বেক্সিমকো',
+      GP: 'গ্রামীণফোন',
+      SQURPHARMA: 'স্কয়ার',
+      LHB: 'লাফার্জ',
+      BRACBANK: 'ব্র্যাক',
+      ROBI: 'রবি',
+      ACI: 'এসিআই',
+      WALTONHIL: 'ওয়ালটন',
+      NHFIL: 'ন্যাশনাল হাউজিং',
+      PEOPLESINS: 'পিপলস',
+      ISLAMIINS: 'ইসলামী ইন্স্যুরেন্স',
+      IPDC: 'আইপিডিসি',
+    };
+
+    const IMPORTANCE_LABEL = {
+      holding: 'Your holding',
+      watchlist: 'Watchlist',
+      disclosure: 'Disclosure',
+      market: 'Market',
+    };
+
+    if (!items?.length) {
+      return '<p class="muted">No ranked news yet — run <code>npm run ingest -- --job news-market</code> then refresh.</p>';
+    }
+
+    const bnHeadline = (text) => /[\u0980-\u09FF]/.test(text ?? '');
+
+    return `<ul class="home-news-list">${items
+      .map((n) => {
+        const imp = IMPORTANCE_LABEL[n.importance] ?? 'Market';
+        const impClass = `news-pill news-pill-${esc(n.importance ?? 'market')}`;
+        const src = SOURCE_LABELS[n.source] ?? n.source ?? '—';
+        const tickerBn = n.symbol && bnHeadline(n.headline) && TICKER_BN[n.symbol]
+          ? `<span class="ticker-bn" lang="bn">${esc(TICKER_BN[n.symbol])}</span>`
+          : '';
+        const ticker = n.symbol
+          ? `<span class="clickable home-news-ticker" data-symbol="${esc(n.symbol)}">${esc(n.symbol)}</span>${tickerBn}`
+          : '';
+        const headline = n.url
+          ? `<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.headline)}</a>`
+          : esc(n.headline);
+        return `<li class="home-news-item">
+          <div class="home-news-meta">
+            <span class="${impClass}">${esc(imp)}</span>
+            ${ticker ? `<span class="home-news-symbol">${ticker}</span>` : ''}
+            <span class="muted home-news-src">${esc(src)} · ${fmtDate(n.publishedDate)}</span>
+          </div>
+          <div class="home-news-headline">${headline}</div>
+        </li>`;
+      })
+      .join('')}</ul>`;
+  }
+
+  function renderHome(data) {
+    const port = renderHomePortfolio(data.portfolio);
+    return {
+      briefing: renderBriefing(data.briefing),
+      importantNews: renderHomeImportantNews(data.importantNews),
+      portfolioSummary: port.summary,
+      portfolioTable: port.table,
+    };
   }
 
   function renderDiscoverResults(results) {
@@ -645,57 +989,103 @@ window.AnalysisUI = (function () {
     return `curl -s -X POST http://localhost:3000/api/tickers/${sym}/analyze -H "Content-Type: application/json" -d '${body}'`;
   }
 
+  const WORKFLOW_COMMANDS = [
+    {
+      id: 'wf-postgres',
+      label: '1. Start Postgres',
+      description: 'Docker Compose database (required before any ingest).',
+      command: () => 'docker compose up -d postgres',
+    },
+    {
+      id: 'wf-migrate',
+      label: '2. Apply schema',
+      description: 'Create/update tables in PostgreSQL.',
+      command: () => 'npm run db:migrate',
+    },
+    {
+      id: 'wf-seed',
+      label: '3. Seed tickers & watchlist',
+      description: 'Default DSE symbols, watchlist rows, portfolio account.',
+      command: () => 'npm run db:seed',
+    },
+    {
+      id: 'wf-news-market',
+      label: '4. Market news (newspapers + web)',
+      description: 'TBS, Tribune, Daily Star, Prothom Alo, FE, Google News EN/BN — tags headlines to tickers.',
+      command: () => 'npm run ingest -- --job news-market',
+    },
+    {
+      id: 'wf-watchlist',
+      label: '5. Watchlist full ingest',
+      description: 'For each watchlist symbol: OHLCV, fundamentals, shareholding, DSE news, analysis snapshot.',
+      command: () => 'npm run ingest -- --watchlist --days 365',
+    },
+    {
+      id: 'wf-retag',
+      label: '6. Retag Bengali / untagged news',
+      description: 'Re-apply ticker matching on news already in DB (no new fetch).',
+      command: () => 'npm run ingest -- --job retag-news',
+    },
+    {
+      id: 'wf-dashboard',
+      label: '7. Start dashboard',
+      description: 'Web UI on port 3000 — reads Postgres only, does not scrape.',
+      command: () => 'npm run dashboard',
+    },
+  ];
+
   const TICKER_COMMANDS = [
     {
       id: 'ingest-all',
-      group: 'Pipeline',
+      group: 'Per-ticker pipeline',
       label: 'Full ingest + analyze',
-      description: 'OHLCV, fundamentals, shareholding, news, then analysis snapshot.',
+      description: 'Runs: OHLCV → fundamentals → shareholding → DSE company news → analysis snapshot. Does not include market news (run news-market separately).',
       command: (sym) => ingestCmd(sym, 'all', 365),
       quick: true,
     },
     {
       id: 'ingest-ohlcv-365',
-      group: 'Ingest',
+      group: 'Per-ticker ingest',
       label: 'OHLCV (1 year)',
-      description: 'Fetch and store daily price/volume bars.',
+      description: 'Fetch daily bars from DSE, Yahoo, StockAnalysis — picks longest clean series → ohlcv_daily.',
       command: (sym) => ingestCmd(sym, 'ohlcv', 365),
     },
     {
       id: 'ingest-ohlcv-30',
-      group: 'Ingest',
+      group: 'Per-ticker ingest',
       label: 'OHLCV (30-day refresh)',
-      description: 'Light daily delta — good after market close.',
+      description: 'Light refresh after market close — same sources, fewer days.',
       command: (sym) => ingestCmd(sym, 'ohlcv', 30),
       quick: true,
     },
     {
       id: 'ingest-fundamentals',
-      group: 'Ingest',
+      group: 'Per-ticker ingest',
       label: 'Fundamentals',
-      description: 'Multi-source fundamentals merge (DSE, Lankabd, etc.).',
+      description: 'Merge DSE, StockAnalysis, LankaBangla, AmarStock → fundamentals_snapshots.',
       command: (sym) => ingestCmd(sym, 'fundamentals'),
       quick: true,
     },
     {
       id: 'ingest-shareholding',
-      group: 'Ingest',
+      group: 'Per-ticker ingest',
       label: 'Shareholding',
-      description: 'Sponsor, institution, foreign, public breakdown.',
+      description: 'Sponsor, institution, foreign, public from DSE company page → shareholding_monthly.',
       command: (sym) => ingestCmd(sym, 'shareholding'),
     },
     {
       id: 'ingest-news',
-      group: 'Ingest',
-      label: 'News',
-      description: 'Recent DSE headlines for sentiment.',
+      group: 'Per-ticker ingest',
+      label: 'News (DSE company page)',
+      description: 'Price-sensitive disclosures from dsebd.org for this symbol → news_items.',
       command: (sym) => ingestCmd(sym, 'news'),
+      quick: true,
     },
     {
       id: 'ingest-analysis',
-      group: 'Analysis',
-      label: 'CLI analysis snapshot',
-      description: 'Run analyze_ticker pipeline from Postgres (same as Analyze Full).',
+      group: 'Per-ticker analysis',
+      label: 'Analysis snapshot (CLI)',
+      description: 'Read Postgres → run skills → save analysis_snapshots (same data as Analyze Full button).',
       command: (sym) => ingestCmd(sym, 'analysis'),
       quick: true,
     },
@@ -703,75 +1093,120 @@ window.AnalysisUI = (function () {
       id: 'verify-fundamentals',
       group: 'Verify',
       label: 'Fundamentals sources',
-      description: 'Compare enabled scraper sources for this ticker.',
+      description: 'Compare raw output from each enabled scraper source for this ticker.',
       command: (sym) => `npm run verify:fundamentals -- --ticker ${String(sym ?? 'LHB').toUpperCase()}`,
       quick: true,
     },
     {
       id: 'api-analyze-full',
-      group: 'API',
+      group: 'Dashboard API',
       label: 'Analyze Full (curl)',
-      description: 'Dashboard API — full pipeline + checklists.',
+      description: 'POST /api/tickers/:symbol/analyze — full pipeline + checklists.',
       command: (sym) => analyzeCurl(sym, 'full'),
     },
     {
       id: 'api-analyze-investment',
-      group: 'API',
+      group: 'Dashboard API',
       label: 'Analyze Investment (curl)',
-      description: 'Dashboard API — value checklist mode.',
+      description: 'POST — value checklist mode.',
       command: (sym) => analyzeCurl(sym, 'investment'),
     },
     {
       id: 'api-analyze-momentum',
-      group: 'API',
+      group: 'Dashboard API',
       label: 'Analyze Trading (curl)',
-      description: 'Dashboard API — momentum checklist mode.',
+      description: 'POST — momentum checklist mode.',
       command: (sym) => analyzeCurl(sym, 'momentum'),
     },
   ];
 
   const GLOBAL_COMMANDS = [
     {
+      id: 'ingest-news-market',
+      group: 'Market-wide ingest',
+      label: 'Market news (newspapers + web)',
+      description: 'Fetch RSS/HTML from TBS, Tribune, Daily Star, Prothom Alo, FE, Google News — tag tickers → news_items.',
+      command: () => 'npm run ingest -- --job news-market',
+      quick: true,
+    },
+    {
+      id: 'ingest-retag-news',
+      group: 'Market-wide ingest',
+      label: 'Retag untagged news',
+      description: 'Re-run Bengali/English ticker matching on existing news_items rows.',
+      command: () => 'npm run ingest -- --job retag-news',
+      quick: true,
+    },
+    {
       id: 'ingest-macro',
-      group: 'Global',
+      group: 'Market-wide ingest',
       label: 'Macro snapshot',
-      description: 'Policy rate, FX, inflation (not ticker-specific).',
+      description: 'Policy rate, FX, inflation seed data → macro_snapshots.',
       command: () => 'npm run ingest -- --job macro',
     },
     {
-      id: 'ingest-watchlist',
-      group: 'Global',
-      label: 'Watchlist full ingest',
-      description: 'All watchlist tickers — OHLCV, fundamentals, analysis.',
-      command: () => 'npm run ingest -- --watchlist --days 365',
-    },
-    {
       id: 'ingest-universe',
-      group: 'Global',
-      label: 'Fundamentals universe',
-      description: 'Bulk Lankabd DataMatrix (~400 ticker names).',
+      group: 'Market-wide ingest',
+      label: 'Fundamentals universe (LankaBangla grid)',
+      description: 'One fetch, ~400 tickers — bulk fundamentals_snapshots from Lankabd DataMatrix.',
       command: () => 'npm run ingest -- --job fundamentals-universe',
     },
     {
-      id: 'dashboard',
-      group: 'Global',
-      label: 'Start dashboard',
-      description: 'Local dev server on port 3000.',
-      command: () => 'npm run dashboard',
+      id: 'ingest-watchlist',
+      group: 'Market-wide ingest',
+      label: 'Watchlist batch (macro + news + all tickers)',
+      description: 'macro → news-market → ingest all for every watchlist symbol.',
+      command: () => 'npm run ingest -- --watchlist --days 365',
+      quick: true,
     },
     {
-      id: 'db-setup',
-      group: 'Global',
-      label: 'Postgres + migrate',
-      description: 'Start database and apply schema.',
-      command: () => 'docker compose up -d postgres && npm run db:migrate',
+      id: 'db-postgres',
+      group: 'Database & setup',
+      label: 'Start Postgres (Docker)',
+      description: 'Required before migrate, seed, or ingest.',
+      command: () => 'docker compose up -d postgres',
+    },
+    {
+      id: 'db-migrate',
+      group: 'Database & setup',
+      label: 'Apply DB schema',
+      description: 'Drizzle migrations → tables (tickers, ohlcv_daily, news_items, …).',
+      command: () => 'npm run db:migrate',
     },
     {
       id: 'db-seed',
-      group: 'Global',
-      label: 'Seed tickers + portfolio',
-      description: 'Default watchlist and portfolio account.',
+      group: 'Database & setup',
+      label: 'Seed tickers + watchlist + portfolio account',
+      description: 'Default DSE symbols and empty portfolio shell.',
       command: () => 'npm run db:seed',
+    },
+    {
+      id: 'db-setup',
+      group: 'Database & setup',
+      label: 'Postgres + migrate (combined)',
+      description: 'Start database and apply schema in one step.',
+      command: () => 'docker compose up -d postgres && npm run db:migrate',
+    },
+    {
+      id: 'portfolio-import',
+      group: 'Database & setup',
+      label: 'Import portfolio JSON',
+      description: 'Load positions from a JSON file into Postgres (edit path as needed).',
+      command: () => 'npm run portfolio:import -- scripts/portfolio-kuntal.json',
+    },
+    {
+      id: 'dashboard',
+      group: 'Dashboard',
+      label: 'Start dashboard dev server',
+      description: 'Express + static UI on STOCK_BUDDY_DASHBOARD_PORT (default 3000). Reads DB only.',
+      command: () => 'npm run dashboard',
+    },
+    {
+      id: 'build-all',
+      group: 'Dashboard',
+      label: 'Build all packages',
+      description: 'Compile TypeScript workspaces (optional for tsx-based ingest).',
+      command: () => 'npm run build',
     },
   ];
 
@@ -783,6 +1218,10 @@ window.AnalysisUI = (function () {
     if (!symbol) return '<p class="muted">Select a ticker to see commands.</p>';
     const sym = String(symbol).toUpperCase();
     const quick = TICKER_COMMANDS.filter((c) => c.quick);
+    const globalQuick = GLOBAL_COMMANDS.filter((c) => c.quick);
+    const wfQuick = WORKFLOW_COMMANDS.filter((c) =>
+      ['wf-news-market', 'wf-watchlist', 'wf-retag'].includes(c.id),
+    );
     return `
       <div class="cmd-quick-head">
         <span class="cmd-quick-title">Quick copy</span>
@@ -792,6 +1231,14 @@ window.AnalysisUI = (function () {
         ${quick.map((c) => {
           const cmd = c.command(sym);
           return `<button type="button" class="cmd-quick-chip" data-copy-cmd="${cmdAttr(cmd)}" title="${cmdAttr(cmd)}">${esc(c.label)}</button>`;
+        }).join('')}
+        ${globalQuick.map((c) => {
+          const cmd = c.command();
+          return `<button type="button" class="cmd-quick-chip cmd-quick-global" data-copy-cmd="${cmdAttr(cmd)}" title="${cmdAttr(cmd)}">${esc(c.label)}</button>`;
+        }).join('')}
+        ${wfQuick.map((c) => {
+          const cmd = c.command();
+          return `<button type="button" class="cmd-quick-chip cmd-quick-global" data-copy-cmd="${cmdAttr(cmd)}" title="${cmdAttr(cmd)}">${esc(c.label.replace(/^\d+\.\s*/, ''))}</button>`;
         }).join('')}
         <button type="button" class="cmd-quick-chip cmd-quick-more" data-sub-jump="commands">All commands →</button>
       </div>`;
@@ -813,22 +1260,49 @@ window.AnalysisUI = (function () {
   function renderTickerCommandsFull(symbol) {
     if (!symbol) return '<p class="muted">Select a ticker to see commands.</p>';
     const sym = String(symbol).toUpperCase();
-    const groups = [...new Set(TICKER_COMMANDS.map((c) => c.group))];
-    const tickerSections = groups.map((g) => {
+    const tickerGroups = [...new Set(TICKER_COMMANDS.map((c) => c.group))];
+    const globalGroups = [...new Set(GLOBAL_COMMANDS.map((c) => c.group))];
+
+    const workflowSection = `
+      <section class="cmd-group cmd-group-workflow">
+        <h4>Recommended workflow (first time / daily)</h4>
+        <p class="muted cmd-group-note">Run from repo root. Ingest writes to PostgreSQL; dashboard and Analyze only read from DB.</p>
+        ${WORKFLOW_COMMANDS.map((c) => renderCommandRow(c, null)).join('')}
+      </section>`;
+
+    const tickerSections = tickerGroups.map((g) => {
       const items = TICKER_COMMANDS.filter((c) => c.group === g);
+      const note =
+        g === 'Per-ticker pipeline'
+          ? '<p class="muted cmd-group-note">Replace SYMBOL with the ticker above. <code>--job all</code> does not fetch market news — run news-market first.</p>'
+          : g === 'Per-ticker ingest'
+            ? `<p class="muted cmd-group-note">Individual jobs for <strong>${esc(sym)}</strong> — each maps to <code>packages/ingest/src/jobs.ts</code>.</p>`
+            : '';
       return `
         <section class="cmd-group">
-          <h4>${esc(g)}</h4>
+          <h4>${esc(g)} — ${esc(sym)}</h4>
+          ${note}
           ${items.map((c) => renderCommandRow(c, sym)).join('')}
         </section>`;
     }).join('');
-    const globalSections = `
-      <section class="cmd-group">
-        <h4>Global</h4>
-        <p class="muted cmd-group-note">Not tied to a single ticker — run from repo root.</p>
-        ${GLOBAL_COMMANDS.map((c) => renderCommandRow(c, null)).join('')}
-      </section>`;
-    return `<div class="cmd-full-wrap">${tickerSections}${globalSections}</div>`;
+
+    const globalSections = globalGroups.map((g) => {
+      const items = GLOBAL_COMMANDS.filter((c) => c.group === g);
+      const note =
+        g === 'Market-wide ingest'
+          ? '<p class="muted cmd-group-note">No <code>--ticker</code> needed. Controlled by INGEST_NEWS_SOURCES / INGEST_FUNDAMENTALS_SOURCES in .env.</p>'
+          : g === 'Database & setup'
+            ? '<p class="muted cmd-group-note">One-time or after schema changes. Requires DATABASE_URL in .env.</p>'
+            : '';
+      return `
+        <section class="cmd-group">
+          <h4>${esc(g)}</h4>
+          ${note}
+          ${items.map((c) => renderCommandRow(c, null)).join('')}
+        </section>`;
+    }).join('');
+
+    return `<div class="cmd-full-wrap">${workflowSection}${globalSections}${tickerSections}</div>`;
   }
 
   function getFullIngestCommand(symbol) {
@@ -867,9 +1341,13 @@ window.AnalysisUI = (function () {
     renderValueChecklist,
     renderIndicators,
     renderBusiness,
+    renderTickerNews,
+    renderTickerNewsTeaser,
     renderGlossary,
     renderLearnPanel,
     renderBriefing,
+    renderHome,
+    renderPortfolioTable,
     renderDiscoverResults,
     renderAnalytics,
     isStale,

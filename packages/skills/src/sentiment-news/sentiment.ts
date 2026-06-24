@@ -15,7 +15,7 @@ const NEGATIVE = new Set([
   'delisting', 'warning', 'cut', 'cuts', 'slump',
 ]);
 
-const RUMOUR_SOURCES = new Set(['social', 'unconfirmed', 'forum', 'rumour', 'rumor']);
+const RUMOUR_SOURCES = new Set(['social', 'unconfirmed', 'forum', 'rumour', 'rumor', 'telegram']);
 const RUMOUR_TERMS = new Set(['rumour', 'rumor', 'unconfirmed', 'speculation', 'speculative', 'alleged']);
 const FUNDAMENTAL_CATEGORIES = new Set(['earnings', 'regulatory', 'corporate_action', 'macro']);
 const RUMOUR_WEIGHT = 0.3;
@@ -41,7 +41,8 @@ function isRumour(item: Record<string, unknown>): boolean {
   const src = String(item.source ?? '').toLowerCase();
   const cat = String(item.category ?? '').toLowerCase();
   const head = String(item.headline ?? '').toLowerCase();
-  if (RUMOUR_SOURCES.has(src) || RUMOUR_TERMS.has(cat)) return true;
+  if (RUMOUR_SOURCES.has(src) || src.includes('telegram') || RUMOUR_TERMS.has(cat)) return true;
+  if (cat === 'rumour' || cat === 'rumor') return true;
   for (const t of RUMOUR_TERMS) {
     if (head.includes(t)) return true;
   }

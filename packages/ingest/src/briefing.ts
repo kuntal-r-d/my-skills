@@ -49,7 +49,7 @@ export async function runDailyBriefing(db: Db): Promise<Record<string, unknown>>
     });
   }
 
-  const newsRows = await getNews(db, undefined, 3);
+  const newsRows = await getNews(db, undefined, 15);
   const news = newsRows.map((n) => ({
     date: n.publishedDate,
     headline: n.headline,

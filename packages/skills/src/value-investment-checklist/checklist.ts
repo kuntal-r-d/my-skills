@@ -1,4 +1,4 @@
-import { educationLevels } from '@stock-buddy/core';
+import { buildCriterionEducation } from '@stock-buddy/core';
 
 export const DISCLAIMER = 'Educational analysis only. Not financial advice.';
 
@@ -18,7 +18,7 @@ interface Criterion {
   passed: boolean | null;
   value: unknown;
   explanation: string;
-  levels?: { beginner: string; intermediate: string; advanced: string };
+  levels?: ReturnType<typeof buildCriterionEducation>;
 }
 
 function gradeAndGpa(score: number): [string, number] {
@@ -59,7 +59,7 @@ export function checklist(data: Record<string, unknown>): Record<string, unknown
       passed,
       value,
       explanation: expl,
-      levels: educationLevels(label, expl, value),
+      levels: buildCriterionEducation(label, expl, value, 'investment'),
     });
   }
 

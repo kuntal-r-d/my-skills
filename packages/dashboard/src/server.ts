@@ -2,7 +2,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, gte, sql } from 'drizzle-orm';
 import {
   getDb,
   closeDb,
@@ -27,17 +27,18 @@ import {
   removePosition,
   getAnalyticsKpi,
   ensureTicker,
+  roc1mPctFromOhlcv,
+  extractAnalysisScores,
+  listImportantNews,
 } from '@stock-buddy/db';
 import {
   analysisSnapshots,
   dataFreshness,
   fundamentalsSnapshots,
   ingestRuns,
-  macroSnapshots,
   newsItems,
   ohlcvDaily,
   portfolioPositions,
-  shareholdingMonthly,
   tickers,
   watchlistTickers,
 } from '@stock-buddy/db';
@@ -72,59 +73,94 @@ function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
   };
 }
 
-app.get('/api/overview', asyncHandler(async (_req, res) => {
-  const data = await withDb(async (db) => {
+async function fetchPortfolio(db: ReturnType<typeof getDb>) {
+  const account = await getDefaultAccount(db);
+  if (!account) return { account: null, positions: [], sector_allocation: [], total_cost_basis: 0 };
+
+  const positions = await getPortfolioPositions(db, account.id);
+  const enriched = await Promise.all(
+    positions.map(async (p) => {
+      const cost = p.position.qty * p.position.avgCost;
+      const ohlcv = await getOhlcv(db, p.position.tickerId, { limit: 23 });
+      const lastClose = ohlcv[ohlcv.length - 1]?.close;
+      const roc1m = roc1mPctFromOhlcv(ohlcv);
+      const snap = await getLatestAnalysisSnapshot(db, p.position.tickerId);
+      const scores = extractAnalysisScores(snap?.payload as Record<string, unknown> | undefined);
+      const marketValue = lastClose != null ? p.position.qty * lastClose : null;
+      const pnl = marketValue != null ? marketValue - cost : null;
+      const pnlPct = pnl != null && cost ? (pnl / cost) * 100 : null;
+      return {
+        ticker: p.symbol,
+        qty: p.position.qty,
+        avg_cost: p.position.avgCost,
+        sector: p.position.sector ?? 'Unknown',
+        cost_basis: cost,
+        stop_level: p.position.stopLevel,
+        target_level: p.position.targetLevel,
+        last_close: lastClose,
+        roc_1m_pct: roc1m,
+        market_value: marketValue,
+        pnl,
+        pnl_pct: pnlPct,
+        ...scores,
+      };
+    }),
+  );
+
+  const totalCost = enriched.reduce((s, p) => s + p.cost_basis, 0);
+  const sectorMap = new Map<string, number>();
+  for (const p of enriched) {
+    const sec = p.sector ?? 'Unknown';
+    sectorMap.set(sec, (sectorMap.get(sec) ?? 0) + p.cost_basis);
+  }
+  const sector_allocation = [...sectorMap.entries()]
+    .map(([sector, value]) => ({
+      sector,
+      value,
+      pct: totalCost > 0 ? (value / totalCost) * 100 : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  return {
+    account: {
+      label: account.label,
+      capital_bdt: account.capitalBdt,
+      risk_per_trade_pct: account.riskPerTradePct,
+    },
+    positions: enriched,
+    total_cost_basis: totalCost,
+    sector_allocation,
+  };
+}
+
+app.get('/api/stats', asyncHandler(async (_req, res) => {
+  const counts = await withDb(async (db) => {
     const [tickerRow] = await db.select({ n: sql<number>`count(*)::int` }).from(tickers);
     const [ohlcvRow] = await db.select({ n: sql<number>`count(*)::int` }).from(ohlcvDaily);
     const [fundRow] = await db.select({ n: sql<number>`count(*)::int` }).from(fundamentalsSnapshots);
-    const [shareRow] = await db.select({ n: sql<number>`count(*)::int` }).from(shareholdingMonthly);
-    const [newsRow] = await db.select({ n: sql<number>`count(*)::int` }).from(newsItems);
-    const [macroRow] = await db.select({ n: sql<number>`count(*)::int` }).from(macroSnapshots);
-    const [posRow] = await db.select({ n: sql<number>`count(*)::int` }).from(portfolioPositions);
-    const [runRow] = await db.select({ n: sql<number>`count(*)::int` }).from(ingestRuns);
-    const [watchRow] = await db.select({ n: sql<number>`count(*)::int` }).from(watchlistTickers);
     const [analysisRow] = await db.select({ n: sql<number>`count(*)::int` }).from(analysisSnapshots);
-
-    const recentAnalyses = await listRecentAnalyses(db, 15);
-
-    const freshness = await db
-      .select()
-      .from(dataFreshness)
-      .orderBy(desc(dataFreshness.lastSuccessAt))
-      .limit(50);
-
-    const recentRuns = await db
-      .select({
-        id: ingestRuns.id,
-        jobName: ingestRuns.jobName,
-        status: ingestRuns.status,
-        rowsUpserted: ingestRuns.rowsUpserted,
-        startedAt: ingestRuns.startedAt,
-        errorMessage: ingestRuns.errorMessage,
-        symbol: tickers.symbol,
-      })
-      .from(ingestRuns)
-      .leftJoin(tickers, eq(ingestRuns.tickerId, tickers.id))
-      .orderBy(desc(ingestRuns.startedAt))
-      .limit(20);
-
+    const [posRow] = await db.select({ n: sql<number>`count(*)::int` }).from(portfolioPositions);
+    const [watchRow] = await db.select({ n: sql<number>`count(*)::int` }).from(watchlistTickers);
     return {
-      counts: {
-        tickers: tickerRow?.n ?? 0,
-        ohlcv_bars: ohlcvRow?.n ?? 0,
-        fundamentals: fundRow?.n ?? 0,
-        shareholding: shareRow?.n ?? 0,
-        news: newsRow?.n ?? 0,
-        macro: macroRow?.n ?? 0,
-        portfolio_positions: posRow?.n ?? 0,
-        ingest_runs: runRow?.n ?? 0,
-        watchlist: watchRow?.n ?? 0,
-        analysis_snapshots: analysisRow?.n ?? 0,
-      },
-      freshness,
-      recentRuns,
-      recentAnalyses,
+      tickers: tickerRow?.n ?? 0,
+      ohlcv_bars: ohlcvRow?.n ?? 0,
+      fundamentals: fundRow?.n ?? 0,
+      analysis_snapshots: analysisRow?.n ?? 0,
+      portfolio_positions: posRow?.n ?? 0,
+      watchlist: watchRow?.n ?? 0,
     };
+  });
+  res.json({ counts });
+}));
+
+app.get('/api/overview', asyncHandler(async (_req, res) => {
+  const data = await withDb(async (db) => {
+    const [briefing, portfolio, importantNews] = await Promise.all([
+      runDailyBriefing(db),
+      fetchPortfolio(db),
+      listImportantNews(db, 12, 14),
+    ]);
+    return { briefing, portfolio, importantNews };
   });
   res.json(data);
 }));
@@ -172,7 +208,7 @@ app.get('/api/tickers/:symbol', asyncHandler(async (req, res) => {
     const { bars: ohlcv, dropped } = sanitizeOhlcv(mapped);
     const fundamentals = await getLatestFundamentals(db, ticker.id);
     const shareholding = await getShareholding(db, ticker.id, 12);
-    const news = await getNews(db, ticker.id, 30);
+    const news = await getNews(db, ticker.id, 90, 50);
     const freshness = await getFreshness(db, ticker.id);
 
     const dataWarnings: string[] = [];
@@ -209,6 +245,24 @@ app.get('/api/tickers/:symbol', asyncHandler(async (req, res) => {
     return;
   }
   res.json(data);
+}));
+
+app.get('/api/tickers/:symbol/news', asyncHandler(async (req, res) => {
+  const symbol = String(req.params.symbol).toUpperCase();
+  const days = req.query.days ? Number(req.query.days) : 90;
+  const limit = req.query.limit ? Number(req.query.limit) : 50;
+
+  const rows = await withDb(async (db) => {
+    const ticker = await getTickerBySymbol(db, symbol);
+    if (!ticker) return null;
+    return getNews(db, ticker.id, days, limit);
+  });
+
+  if (rows === null) {
+    res.status(404).json({ error: `Ticker not found: ${symbol}` });
+    return;
+  }
+  res.json({ symbol, news: rows });
 }));
 
 app.get('/api/analysis/recent', asyncHandler(async (req, res) => {
@@ -362,13 +416,57 @@ app.get('/api/analytics/kpi', asyncHandler(async (_req, res) => {
 
 app.get('/api/glossary', asyncHandler(async (_req, res) => {
   const glossaryPath = join(publicDir, 'glossary.json');
+  const guidePath = join(publicDir, 'analysis-glossary.json');
+
+  let metrics: Array<Record<string, unknown>> = [];
   try {
     const raw = readFileSync(glossaryPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    res.json({ terms: Array.isArray(parsed) ? parsed : parsed.terms ?? [] });
+    const parsed = JSON.parse(raw) as unknown;
+    metrics = Array.isArray(parsed) ? parsed : ((parsed as { terms?: unknown[] }).terms ?? []) as Array<Record<string, unknown>>;
   } catch {
-    res.json({ terms: [] });
+    metrics = [];
   }
+
+  let guide: { sections?: Array<Record<string, unknown>>; terms?: Array<Record<string, unknown>> } = {};
+  try {
+    guide = JSON.parse(readFileSync(guidePath, 'utf8')) as typeof guide;
+  } catch {
+    guide = {};
+  }
+
+  const fundamentalIds = new Set(['roe', 'pe', 'peg', 'debt_equity', 'margin_of_safety', 'pb_ratio', 'eps_ttm', 'dividend_yield', 'market_cap']);
+  const technicalIds = new Set(['adx', 'atr', 'rsi', 'macd', 'mfi']);
+  const portfolioIds = new Set(['inv', 'mom', 'risk']);
+  const sectionOrder = ['fundamental', 'technical', 'dashboard_overview', 'dashboard_risk', 'dashboard_tools'];
+
+  const defaultSection = (t: Record<string, unknown>): string => {
+    if (t.section) return String(t.section);
+    const id = String(t.id);
+    if (portfolioIds.has(id)) return 'dashboard_risk';
+    if (technicalIds.has(id)) return 'technical';
+    if (fundamentalIds.has(id)) return 'fundamental';
+    return 'fundamental';
+  };
+
+  const metricTerms: Array<Record<string, unknown>> = metrics.map((t) => ({
+    ...t,
+    section: defaultSection(t),
+  }));
+  const byId = new Map<string, Record<string, unknown>>(
+    metricTerms.map((t) => [String(t.id), t]),
+  );
+  for (const t of guide.terms ?? []) {
+    const term = t as Record<string, unknown>;
+    byId.set(String(term.id), { ...term, section: defaultSection(term) });
+  }
+
+  const sectionById = new Map((guide.sections ?? []).map((s) => [String(s.id), s]));
+  const sections = sectionOrder.map((id) => sectionById.get(id)).filter(Boolean);
+
+  res.json({
+    terms: [...byId.values()],
+    sections,
+  });
 }));
 
 app.get('/api/sectors', asyncHandler(async (_req, res) => {
@@ -415,68 +513,7 @@ app.delete('/api/portfolio/positions/:symbol', asyncHandler(async (req, res) => 
 }));
 
 app.get('/api/portfolio', asyncHandler(async (_req, res) => {
-  const data = await withDb(async (db) => {
-    const account = await getDefaultAccount(db);
-    if (!account) return { account: null, positions: [], sector_allocation: [] };
-
-    const positions = await getPortfolioPositions(db, account.id);
-    const enriched = await Promise.all(
-      positions.map(async (p) => {
-        const cost = p.position.qty * p.position.avgCost;
-        const ohlcv = await getOhlcv(db, p.position.tickerId, { limit: 1 });
-        const lastClose = ohlcv[ohlcv.length - 1]?.close;
-        const snap = await getLatestAnalysisSnapshot(db, p.position.tickerId);
-        const payload = snap?.payload as Record<string, unknown> | undefined;
-        const syn = payload?.synthesis as Record<string, unknown> | undefined;
-        const inv = syn?.investment as Record<string, unknown> | undefined;
-        const mom = syn?.momentum as Record<string, unknown> | undefined;
-        const marketValue = lastClose != null ? p.position.qty * lastClose : null;
-        const pnl = marketValue != null ? marketValue - cost : null;
-        const pnlPct = pnl != null && cost ? (pnl / cost) * 100 : null;
-        return {
-          ticker: p.symbol,
-          qty: p.position.qty,
-          avg_cost: p.position.avgCost,
-          sector: p.position.sector ?? 'Unknown',
-          cost_basis: cost,
-          stop_level: p.position.stopLevel,
-          target_level: p.position.targetLevel,
-          last_close: lastClose,
-          market_value: marketValue,
-          pnl,
-          pnl_pct: pnlPct,
-          investment_score: inv?.composite_1_10,
-          momentum_score: mom?.composite_1_10,
-          risk_rating: (payload?.risk as Record<string, unknown> | undefined)?.rating,
-        };
-      }),
-    );
-
-    const totalCost = enriched.reduce((s, p) => s + p.cost_basis, 0);
-    const sectorMap = new Map<string, number>();
-    for (const p of enriched) {
-      const sec = p.sector ?? 'Unknown';
-      sectorMap.set(sec, (sectorMap.get(sec) ?? 0) + p.cost_basis);
-    }
-    const sector_allocation = [...sectorMap.entries()]
-      .map(([sector, value]) => ({
-        sector,
-        value,
-        pct: totalCost > 0 ? (value / totalCost) * 100 : 0,
-      }))
-      .sort((a, b) => b.value - a.value);
-
-    return {
-      account: {
-        label: account.label,
-        capital_bdt: account.capitalBdt,
-        risk_per_trade_pct: account.riskPerTradePct,
-      },
-      positions: enriched,
-      total_cost_basis: totalCost,
-      sector_allocation,
-    };
-  });
+  const data = await withDb((db) => fetchPortfolio(db));
   res.json(data);
 }));
 
@@ -501,6 +538,10 @@ app.get('/api/news', asyncHandler(async (req, res) => {
     const items = await getNews(db, tickerId, days);
     if (symbol) return items;
 
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+
     return db
       .select({
         id: newsItems.id,
@@ -513,8 +554,9 @@ app.get('/api/news', asyncHandler(async (req, res) => {
       })
       .from(newsItems)
       .leftJoin(tickers, eq(newsItems.tickerId, tickers.id))
+      .where(gte(newsItems.publishedDate, cutoffStr))
       .orderBy(desc(newsItems.publishedDate))
-      .limit(100);
+      .limit(150);
   });
 
   res.json({ news: rows });

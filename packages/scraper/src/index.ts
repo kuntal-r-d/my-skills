@@ -69,3 +69,15 @@ export {
 } from './lankabd.js';
 
 export { fetchAmarStockFundamentals } from './amarstock.js';
+
+export {
+  DEFAULT_NEWS_SOURCES,
+  createNewsRegistry,
+  fetchMarketNews,
+  parseRssXml,
+  parseFeStockHtml,
+  tagTickerInHeadline,
+  normalizeHeadlineForTagging,
+  TICKER_BN_LABELS,
+  type TickerRef,
+} from './news/index.js';

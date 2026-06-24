@@ -420,46 +420,7 @@ export interface NewsRow {
   url?: string;
 }
 
-export function parseDseNewsHtml(html: string): NewsRow[] {
-  const $ = cheerio.load(html);
-  const items: NewsRow[] = [];
-  const today = new Date().toISOString().slice(0, 10);
-
-  $('a').each((_, el) => {
-    const href = $(el).attr('href') ?? '';
-    const text = $(el).text().trim();
-    if (text.length < 10 || !href.includes('displayNews')) return;
-    items.push({
-      date: today,
-      headline: text,
-      source: 'dse',
-      category: 'general',
-      url: href.startsWith('http') ? href : `https://www.dsebd.org/${href}`,
-    });
-  });
-
-  if (items.length === 0) {
-    $('tr').each((_, tr) => {
-      const cells = $(tr).find('td, th');
-      if (cells.length < 2) return;
-      const label = $(cells[0]).text().trim().toLowerCase();
-      if (!label.includes('price sensitive')) return;
-      const link = $(cells[1]).find('a').first();
-      const href = link.attr('href') ?? '';
-      const headline = link.text().trim() || 'Price sensitive information';
-      if (!href) return;
-      items.push({
-        date: today,
-        headline,
-        source: 'dse',
-        category: 'price_sensitive',
-        url: href.startsWith('http') ? href : href,
-      });
-    });
-  }
-
-  return items.slice(0, 20);
-}
+export { parseDseNewsHtml } from './news/parsers.js';
 
 /** Default Bangladesh macro snapshot (override via ingest seed). */
 export const DEFAULT_MACRO: Record<string, unknown> = {

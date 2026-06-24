@@ -5,6 +5,8 @@ import {
   ingestFundamentals,
   ingestMacro,
   ingestNews,
+  ingestNewsMarket,
+  ingestRetagNews,
   ingestOhlcv,
   ingestShareholding,
   ingestWatchlist,
@@ -66,13 +68,20 @@ async function main(): Promise<void> {
         console.log('Macro ingested');
         break;
       case 'news':
-        console.log(await ingestNews(db, ticker), 'news rows');
+        console.log(await ingestNews(db, ticker), 'DSE news rows');
+        break;
+      case 'news-market':
+        console.log(await ingestNewsMarket(db), 'market news rows inserted/retagged');
+        break;
+      case 'retag-news':
+        console.log(await ingestRetagNews(db), 'news rows tagged');
         break;
       case 'analysis':
         const { ingestAnalysis } = await import('./analysis.js');
         console.log(await ingestAnalysis(db, ticker), 'analysis snapshot id');
         break;
       case 'all':
+        await ingestNewsMarket(db);
         await ingestAll(db, ticker, days);
         console.log(`All jobs complete for ${ticker}`);
         break;
