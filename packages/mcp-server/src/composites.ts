@@ -103,6 +103,8 @@ export function screenMarket(payload: Record<string, unknown>): Record<string, u
   return runSkill('stock_screener', payload);
 }
 
+export { runSkill, SkillError } from './dispatch.js';
+
 export interface CompositeSpec {
   fn: (payload: Record<string, unknown>) => Record<string, unknown>;
   description: string;

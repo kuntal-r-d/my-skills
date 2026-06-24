@@ -117,16 +117,43 @@ All jobs complete for LHB
 | Entity | Source | Typical LHB result |
 |--------|--------|-------------------|
 | OHLCV | DSE HTML archive (~240 bars) | 200+ daily bars |
-| Fundamentals | DSE company page + StockAnalysis fallback | `price`, `eps_ttm`, `pe`, `roe`, … |
+| Fundamentals | Multi-source merge (DSE + StockAnalysis + Lankabd + …) | `price`, `eps_ttm`, `pe`, `roe`, `pb`, … |
 | Shareholding | DSE nested holding blocks | 3+ monthly snapshots |
 | Macro | Seed snapshot | Policy rate, inflation, FX |
 | News | DSE price-sensitive link | 0–1 items (varies) |
+
+### Multi-source fundamentals (field priority)
+
+Configure sources in `.env`:
+
+```env
+INGEST_FUNDAMENTALS_SOURCES=dse,stockanalysis,stockanalysis_statistics,lankabd,amarstock
+INGEST_OHLCV_SOURCES=dse,yahoo,stockanalysis
+INGEST_SOURCE_RATE_MS=1000
+```
+
+| Field | Preferred source | Fallback |
+|-------|------------------|----------|
+| `eps_ttm` | StockAnalysis (TTM) | DSE quarterly basic, AmarStock |
+| `pe` | DSE trailing / AmarStock audited | Lankabd, StockAnalysis |
+| `market_cap`, `dividend_yield`, `beta` | StockAnalysis or Lankabd | DSE company page |
+| `book_value_per_share`, `pb` | StockAnalysis statistics or Lankabd NAV | derive `pb = price / nav` |
+| `roe`, `debt_to_equity` | StockAnalysis `/statistics` | Lankabd grid |
+| `sector` | DSE company page | Lankabd grid |
+
+Merged payloads include `_field_sources` (per-field provenance) and a composite `source` tag like `dse+stockanalysis+stockanalysis_statistics`. The dashboard Business tab shows `*` markers with source tooltips.
+
+**StockNow** is deferred until a licensed API exists — do not scrape without permission.
 
 ### Individual jobs (optional)
 
 ```bash
 npm run ingest -- --ticker LHB --job ohlcv --days 365
 npm run ingest -- --ticker LHB --job fundamentals
+npm run ingest -- --job fundamentals-universe   # bulk Lankabd DataMatrix (~400 tickers)
+
+# Cross-check all sources side-by-side (live fetch, no DB required)
+npm run verify:fundamentals -- --ticker ACI --ticker LHB
 npm run ingest -- --ticker LHB --job shareholding
 npm run ingest -- --ticker LHB --job macro
 npm run ingest -- --ticker LHB --job news

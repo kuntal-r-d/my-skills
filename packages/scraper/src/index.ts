@@ -39,13 +39,33 @@ export {
   fetchYahooOhlcv,
   fetchDseCompanyHtml,
   fetchStockAnalysisFundamentals,
+  fetchStockAnalysisStatistics,
   fetchStockAnalysisOhlcv,
   parseDseCompanyHtml,
   parseDseShareholdingHtml,
   parseDseArchiveHtml,
   parseDseNewsHtml,
+  parseStockAnalysisStatisticsHtml,
   DEFAULT_MACRO,
   type FundamentalsPayload,
   type ShareholdingRow,
   type NewsRow,
 } from './sources.js';
+
+export {
+  createFundamentalsRegistry,
+  createOhlcvRegistry,
+  fetchAllFundamentals,
+  parseEnabledSources,
+  ingestRateMs,
+  type FundamentalsSource,
+  type OhlcvSource,
+} from './sources/registry.js';
+
+export {
+  fetchLankabdDataMatrix,
+  fetchLankabdFundamentals,
+  parseLankabdDataMatrixHtml,
+} from './lankabd.js';
+
+export { fetchAmarStockFundamentals } from './amarstock.js';

@@ -1,3 +1,5 @@
+import { educationLevels } from '@stock-buddy/core';
+
 export const DISCLAIMER = 'Educational analysis only. Not financial advice.';
 
 const BUCKET_WEIGHTS = {
@@ -16,6 +18,7 @@ interface Criterion {
   passed: boolean | null;
   value: unknown;
   explanation: string;
+  levels?: { beginner: string; intermediate: string; advanced: string };
 }
 
 function gradeAndGpa(score: number): [string, number] {
@@ -49,7 +52,15 @@ export function checklist(data: Record<string, unknown>): Record<string, unknown
     value: unknown,
     expl: string,
   ): void {
-    crit.push({ id, bucket, label, passed, value, explanation: expl });
+    crit.push({
+      id,
+      bucket,
+      label,
+      passed,
+      value,
+      explanation: expl,
+      levels: educationLevels(label, expl, value),
+    });
   }
 
   function need(field: string): null {
@@ -241,6 +252,7 @@ export function checklist(data: Record<string, unknown>): Record<string, unknown
       criteria_evaluated: counted.length,
       buckets: bucketScores,
     },
+    criteria: crit,
     reasoning,
     flags,
     disclaimer: DISCLAIMER,

@@ -18,6 +18,7 @@ export const tickers = pgTable('tickers', {
   symbol: text('symbol').notNull().unique(),
   name: text('name'),
   sector: text('sector'),
+  commodityType: text('commodity_type'),
   exchange: text('exchange').notNull().default('DSE'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -160,10 +161,11 @@ export const watchlistTickers = pgTable(
     id: serial('id').primaryKey(),
     tickerId: integer('ticker_id')
       .notNull()
-      .references(() => tickers.id, { onDelete: 'cascade' })
-      .unique(),
+      .references(() => tickers.id, { onDelete: 'cascade' }),
+    purpose: text('purpose').notNull().default('investment'),
     addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
   },
+  (table) => [uniqueIndex('watchlist_ticker_purpose_idx').on(table.tickerId, table.purpose)],
 );
 
 /** Immutable skill/agent analysis results (REQ-005 audit trail). */
@@ -185,4 +187,25 @@ export const analysisSnapshots = pgTable(
     index('analysis_snapshots_ticker_created_idx').on(table.tickerId, table.createdAt),
     index('analysis_snapshots_skill_idx').on(table.skill),
   ],
+);
+
+export const predictionOutcomes = pgTable(
+  'prediction_outcomes',
+  {
+    id: serial('id').primaryKey(),
+    tickerId: integer('ticker_id')
+      .notNull()
+      .references(() => tickers.id, { onDelete: 'cascade' }),
+    signalDate: date('signal_date').notNull(),
+    predictedAction: text('predicted_action').notNull(),
+    predictedRating: text('predicted_rating'),
+    actualReturn1w: doublePrecision('actual_return_1w'),
+    actualReturn1m: doublePrecision('actual_return_1m'),
+    actualReturn3m: doublePrecision('actual_return_3m'),
+    criterionId: integer('criterion_id'),
+    agentName: text('agent_name'),
+    snapshotId: integer('snapshot_id').references(() => analysisSnapshots.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('prediction_outcomes_ticker_date_idx').on(table.tickerId, table.signalDate)],
 );

@@ -74,6 +74,12 @@ async function main(): Promise<void> {
     await server.connect(transport);
     console.error('stock-buddy-data-mcp stdio ready');
   }
+
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(sig, () => {
+      void closeDb().finally(() => process.exit(0));
+    });
+  }
 }
 
 main().catch((err) => {

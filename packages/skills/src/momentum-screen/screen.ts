@@ -1,4 +1,5 @@
 import * as ind from '@stock-buddy/core';
+import { educationLevels } from '@stock-buddy/core';
 
 export const DISCLAIMER = 'Educational analysis only. Not financial advice.';
 
@@ -24,6 +25,8 @@ interface Criterion {
   label: string;
   passed: boolean | null;
   explanation: string;
+  value?: unknown;
+  levels?: { beginner: string; intermediate: string; advanced: string };
 }
 
 function slopeRising(series: (number | null)[], lookback = 21): boolean | null {
@@ -98,8 +101,16 @@ export function screen(data: Record<string, unknown>): Record<string, unknown> {
   }
 
   const crit: Criterion[] = [];
-  function add(id: number, cat: string, label: string, passed: boolean | null, expl: string): void {
-    crit.push({ id, category: cat, label, passed, explanation: expl });
+  function add(id: number, cat: string, label: string, passed: boolean | null, expl: string, value?: unknown): void {
+    crit.push({
+      id,
+      category: cat,
+      label,
+      passed,
+      explanation: expl,
+      value,
+      levels: educationLevels(label, expl, value),
+    });
   }
 
   add(1, 'trend', 'Close > 50-day MA', m50 != null ? px > m50 : null,
@@ -230,7 +241,19 @@ export function screen(data: Record<string, unknown>): Record<string, unknown> {
       criteria_passed: passed.length,
       criteria_evaluated: counted.length,
       categories: keyMetrics,
+      formulas: {
+        rsi_14: rsiV,
+        macd: macdLine,
+        macd_signal: macdSig,
+        roc_12: rocV,
+        adx_14: adxV,
+        mfi_14: mfiV,
+        obv_trend: obvUp,
+        rel_volume: Math.round(relVol * 100) / 100,
+        atr: atrV,
+      },
     },
+    criteria: crit,
     reasoning,
     flags,
     disclaimer: DISCLAIMER,

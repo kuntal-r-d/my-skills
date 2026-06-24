@@ -1,0 +1,101 @@
+[
+  {
+    "id": "roe",
+    "term": "ROE (Return on Equity)",
+    "simple": "Profit generated per ৳100 of shareholder money.",
+    "bangla": "ইক্যুইটির উপর রিটার্ন — আপনার বিনিয়োগ থেকে কোম্পানি কত লাভ করে।",
+    "investor": "ROE > 15% for 5+ years suggests durable compounding.",
+    "trader": "Rising ROE can attract institutions and push price short-term.",
+    "good": ">15% excellent",
+    "bad": "<10% weak",
+    "action": "Compare vs DSE sector average before deciding timeframe."
+  },
+  {
+    "id": "pe",
+    "term": "P/E Ratio",
+    "simple": "Years of profit you pay for at today's earnings.",
+    "bangla": "আপনি কোম্পানির এক বছরের লাভের জন্য কত বছরের দাম দিচ্ছেন।",
+    "investor": "Lower P/E vs DSE average (~18) may mean value if quality is intact.",
+    "trader": "Very low P/E can mean value trap; moderate P/E + momentum is ideal.",
+    "good": "12–18 vs DSE peers",
+    "bad": ">25 without growth",
+    "action": "Cross-check with earnings growth and sector."
+  },
+  {
+    "id": "peg",
+    "term": "PEG Ratio",
+    "simple": "P/E divided by growth rate — under 1 is cheap for growth.",
+    "bangla": "দাম বনাম গrowth — ১ এর নিচে সাধারণত ভালো ডিল।",
+    "investor": "PEG < 1 is Peter Lynch sweet spot for GARP.",
+    "trader": "PEG dropping below 1 often triggers buying waves.",
+    "good": "<1.0",
+    "bad": ">1.5",
+    "action": "Use with confirmed earnings trend."
+  },
+  {
+    "id": "adx",
+    "term": "ADX",
+    "simple": "Trend strength — above 25 means a real trend, not chop.",
+    "bangla": "ট্রেন্ড কত শক্তিশালী — ২৫ এর উপরে মানে স্পষ্ট ট্রেন্ড।",
+    "investor": "Less relevant for 5-year holds unless trend breaks badly.",
+    "trader": "ADX > 25 confirms momentum trades; < 20 = avoid trend plays.",
+    "good": ">25",
+    "bad": "<20",
+    "action": "Pair with volume confirmation."
+  },
+  {
+    "id": "atr",
+    "term": "ATR",
+    "simple": "Average daily price range — sets stop distance.",
+    "bangla": "গড় দৈনিক দোল — স্টপ লস কত দূরে রাখবেন তা নির্ধারণ করে।",
+    "investor": "High ATR = wider stops needed; size down.",
+    "trader": "Entry/stop/target math uses ATR multiples.",
+    "good": "ATR/price < 6%",
+    "bad": ">10% very volatile",
+    "action": "Use risk-manager suggested stop zone."
+  },
+  {
+    "id": "rsi",
+    "term": "RSI",
+    "simple": "Speedometer for price — 40–70 is healthy momentum zone.",
+    "bangla": "দামের গতি — ৪০–৭০ মানে শক্তি আছে কিন্তু অতিরিক্ত নয়।",
+    "investor": "Extreme RSI alone rarely changes long-term thesis.",
+    "trader": "RSI > 80 warns of exhaustion; 40–70 ideal for trends.",
+    "good": "40–70",
+    "bad": ">80 or <30 extended",
+    "action": "Watch for divergence vs price."
+  },
+  {
+    "id": "macd",
+    "term": "MACD",
+    "simple": "Momentum cross — line above signal is bullish.",
+    "bangla": "মোমেন্টাম ক্রস — MACD সিগনালের উপরে = বুলিশ।",
+    "investor": "Monthly MACD cross can confirm long-term trend shifts.",
+    "trader": "Daily MACD cross + volume = short-term trigger.",
+    "good": "MACD > signal",
+    "bad": "MACD < signal",
+    "action": "Confirm with trend and volume."
+  },
+  {
+    "id": "debt_equity",
+    "term": "Debt/Equity",
+    "simple": "How much the company borrows vs owns.",
+    "bangla": "কোম্পানি কত ঋণ নিয়েছে বনাম নিজের টাকা।",
+    "investor": "Low debt (<0.5) survives downturns — Buffett preference.",
+    "trader": "High debt = bigger swings; tighten stops.",
+    "good": "<0.5",
+    "bad": ">1.0",
+    "action": "Bank stocks use different norms (NPL, CAR)."
+  },
+  {
+    "id": "margin_of_safety",
+    "term": "Margin of Safety",
+    "simple": "Discount to estimated intrinsic value.",
+    "bangla": "আসল মূল্যের চেয়ে কম দামে কেনা — নিরাপত্তার বাফার।",
+    "investor": "Buffett: seek 25%+ discount when possible.",
+    "trader": "Large margin limits downside if momentum fails.",
+    "good": ">25% discount",
+    "bad": "Price above fair value",
+    "action": "Combine with quality checklist pass rate."
+  }
+]

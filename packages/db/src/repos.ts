@@ -13,11 +13,30 @@ import {
   shareholdingMonthly,
   tickers,
   watchlistTickers,
+  predictionOutcomes,
 } from './schema.js';
+import { findUniqueNearMatch, isStubTicker } from './symbols.js';
 
 export async function getTickerBySymbol(db: Db, symbol: string) {
-  const rows = await db.select().from(tickers).where(eq(tickers.symbol, symbol.toUpperCase())).limit(1);
-  return rows[0] ?? null;
+  const upper = symbol.toUpperCase();
+  const active = await db.select().from(tickers).where(eq(tickers.isActive, true));
+  const bySymbol = new Map(active.map((t) => [t.symbol, t]));
+  const symbols = [...bySymbol.keys()];
+
+  const exact = bySymbol.get(upper);
+  if (exact) {
+    const neighbor = findUniqueNearMatch(upper, symbols.filter((s) => s !== upper));
+    if (neighbor) {
+      const neighborRow = bySymbol.get(neighbor)!;
+      if (isStubTicker(exact) && !isStubTicker(neighborRow)) {
+        return neighborRow;
+      }
+    }
+    return exact;
+  }
+
+  const neighbor = findUniqueNearMatch(upper, symbols);
+  return neighbor ? (bySymbol.get(neighbor) ?? null) : null;
 }
 
 export async function listTickers(db: Db) {
@@ -31,15 +50,101 @@ export async function ensureTicker(
 ) {
   const existing = await getTickerBySymbol(db, symbol);
   if (existing) return existing;
+
+  const upper = symbol.toUpperCase();
+  const active = await listTickers(db);
+  const neighbor = findUniqueNearMatch(upper, active.map((t) => t.symbol));
+  if (neighbor) {
+    return active.find((t) => t.symbol === neighbor)!;
+  }
+
   const [row] = await db
     .insert(tickers)
     .values({
-      symbol: symbol.toUpperCase(),
+      symbol: upper,
       name: meta?.name,
       sector: meta?.sector,
     })
     .returning();
   return row!;
+}
+
+/** Reassign FK rows from a stub typo ticker to its canonical neighbor, then deactivate the stub. */
+export async function mergeStubTicker(db: Db, stubSymbol: string, canonicalSymbol: string) {
+  const stub = await db
+    .select()
+    .from(tickers)
+    .where(eq(tickers.symbol, stubSymbol.toUpperCase()))
+    .limit(1);
+  const canonical = await getTickerBySymbol(db, canonicalSymbol);
+  if (!stub[0] || !canonical || stub[0].id === canonical.id) return false;
+
+  const stubId = stub[0].id;
+  const canonId = canonical.id;
+
+  await db
+    .update(analysisSnapshots)
+    .set({ tickerId: canonId })
+    .where(eq(analysisSnapshots.tickerId, stubId));
+  await db.update(ingestRuns).set({ tickerId: canonId }).where(eq(ingestRuns.tickerId, stubId));
+  await db
+    .update(predictionOutcomes)
+    .set({ tickerId: canonId })
+    .where(eq(predictionOutcomes.tickerId, stubId));
+  await db.update(newsItems).set({ tickerId: canonId }).where(eq(newsItems.tickerId, stubId));
+
+  // Stub rows on unique (entity, ticker) / (ticker, date) keys — drop rather than collide.
+  await db.delete(dataFreshness).where(eq(dataFreshness.tickerId, stubId));
+  await db.delete(ohlcvDaily).where(eq(ohlcvDaily.tickerId, stubId));
+  await db.delete(fundamentalsSnapshots).where(eq(fundamentalsSnapshots.tickerId, stubId));
+  await db.delete(shareholdingMonthly).where(eq(shareholdingMonthly.tickerId, stubId));
+
+  const stubWatch = await db
+    .select()
+    .from(watchlistTickers)
+    .where(eq(watchlistTickers.tickerId, stubId));
+  for (const w of stubWatch) {
+    const clash = await db
+      .select()
+      .from(watchlistTickers)
+      .where(
+        and(eq(watchlistTickers.tickerId, canonId), eq(watchlistTickers.purpose, w.purpose)),
+      )
+      .limit(1);
+    if (clash[0]) {
+      await db.delete(watchlistTickers).where(eq(watchlistTickers.id, w.id));
+    } else {
+      await db.update(watchlistTickers).set({ tickerId: canonId }).where(eq(watchlistTickers.id, w.id));
+    }
+  }
+
+  const stubPos = await db
+    .select()
+    .from(portfolioPositions)
+    .where(eq(portfolioPositions.tickerId, stubId));
+  for (const p of stubPos) {
+    const clash = await db
+      .select()
+      .from(portfolioPositions)
+      .where(
+        and(
+          eq(portfolioPositions.accountId, p.accountId),
+          eq(portfolioPositions.tickerId, canonId),
+        ),
+      )
+      .limit(1);
+    if (clash[0]) {
+      await db.delete(portfolioPositions).where(eq(portfolioPositions.id, p.id));
+    } else {
+      await db
+        .update(portfolioPositions)
+        .set({ tickerId: canonId })
+        .where(eq(portfolioPositions.id, p.id));
+    }
+  }
+
+  await db.update(tickers).set({ isActive: false }).where(eq(tickers.id, stubId));
+  return true;
 }
 
 export async function upsertOhlcvBatch(
@@ -127,7 +232,7 @@ export async function getLatestFundamentals(db: Db, tickerId: number) {
     .select()
     .from(fundamentalsSnapshots)
     .where(eq(fundamentalsSnapshots.tickerId, tickerId))
-    .orderBy(desc(fundamentalsSnapshots.asOf))
+    .orderBy(desc(fundamentalsSnapshots.asOf), desc(fundamentalsSnapshots.ingestedAt))
     .limit(1);
   return rows[0] ?? null;
 }
@@ -390,8 +495,47 @@ export async function getWatchlistSymbols(db: Db): Promise<string[]> {
   return rows.map((r) => r.symbol);
 }
 
-export async function addToWatchlist(db: Db, tickerId: number) {
-  await db.insert(watchlistTickers).values({ tickerId }).onConflictDoNothing();
+export async function listWatchlist(
+  db: Db,
+  purpose?: 'investment' | 'trading',
+) {
+  const conditions = purpose ? [eq(watchlistTickers.purpose, purpose)] : [];
+  return db
+    .select({
+      id: watchlistTickers.id,
+      tickerId: watchlistTickers.tickerId,
+      purpose: watchlistTickers.purpose,
+      addedAt: watchlistTickers.addedAt,
+      symbol: tickers.symbol,
+      name: tickers.name,
+      sector: tickers.sector,
+      commodityType: tickers.commodityType,
+    })
+    .from(watchlistTickers)
+    .innerJoin(tickers, eq(watchlistTickers.tickerId, tickers.id))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(watchlistTickers.addedAt);
+}
+
+export async function addToWatchlist(
+  db: Db,
+  tickerId: number,
+  purpose: 'investment' | 'trading' = 'investment',
+) {
+  await db
+    .insert(watchlistTickers)
+    .values({ tickerId, purpose })
+    .onConflictDoNothing({ target: [watchlistTickers.tickerId, watchlistTickers.purpose] });
+}
+
+export async function removeFromWatchlist(
+  db: Db,
+  tickerId: number,
+  purpose?: 'investment' | 'trading',
+) {
+  const conditions = [eq(watchlistTickers.tickerId, tickerId)];
+  if (purpose) conditions.push(eq(watchlistTickers.purpose, purpose));
+  await db.delete(watchlistTickers).where(and(...conditions));
 }
 
 export async function saveAnalysisSnapshot(
@@ -450,7 +594,16 @@ export async function listAnalysisSnapshots(
 }
 
 export async function listRecentAnalyses(db: Db, limit = 30) {
-  return db
+  const latestPerTicker = db
+    .select({
+      tickerId: analysisSnapshots.tickerId,
+      maxCreated: sql<Date>`max(${analysisSnapshots.createdAt})`.as('max_created'),
+    })
+    .from(analysisSnapshots)
+    .groupBy(analysisSnapshots.tickerId)
+    .as('latest_per_ticker');
+
+  const rows = await db
     .select({
       id: analysisSnapshots.id,
       skill: analysisSnapshots.skill,
@@ -464,6 +617,74 @@ export async function listRecentAnalyses(db: Db, limit = 30) {
     })
     .from(analysisSnapshots)
     .innerJoin(tickers, eq(analysisSnapshots.tickerId, tickers.id))
+    .innerJoin(
+      latestPerTicker,
+      and(
+        eq(analysisSnapshots.tickerId, latestPerTicker.tickerId),
+        eq(analysisSnapshots.createdAt, latestPerTicker.maxCreated),
+      ),
+    )
     .orderBy(desc(analysisSnapshots.createdAt))
     .limit(limit);
+
+  return rows;
+}
+
+export async function getAnalyticsKpi(db: Db) {
+  const [snapCount] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(analysisSnapshots);
+
+  const outcomes = await db
+    .select()
+    .from(predictionOutcomes)
+    .orderBy(desc(predictionOutcomes.signalDate))
+    .limit(500);
+
+  const with1m = outcomes.filter((o) => o.actualReturn1m != null);
+  const wins1m = with1m.filter((o) => (o.actualReturn1m ?? 0) > 0);
+
+  const agentStats = await db
+    .select({
+      agentName: predictionOutcomes.agentName,
+      total: sql<number>`count(*)::int`,
+      wins: sql<number>`count(*) filter (where ${predictionOutcomes.actualReturn1m} > 0)::int`,
+    })
+    .from(predictionOutcomes)
+    .where(sql`${predictionOutcomes.agentName} is not null`)
+    .groupBy(predictionOutcomes.agentName);
+
+  return {
+    total_snapshots: snapCount?.n ?? 0,
+    total_outcomes: outcomes.length,
+    win_rate_1m: with1m.length ? wins1m.length / with1m.length : null,
+    agent_leaderboard: agentStats.map((a) => ({
+      agent: a.agentName,
+      total: a.total,
+      wins: a.wins,
+      win_rate: a.total ? a.wins / a.total : 0,
+    })),
+    recent_outcomes: outcomes.slice(0, 20),
+    model_version: '2.0.0',
+    governance_note: 'Structural weight changes require analyst approval (REQ-060).',
+  };
+}
+
+export async function recordPredictionOutcome(
+  db: Db,
+  data: {
+    tickerId: number;
+    signalDate: string;
+    predictedAction: string;
+    predictedRating?: string;
+    snapshotId?: number;
+    agentName?: string;
+    criterionId?: number;
+    actualReturn1w?: number;
+    actualReturn1m?: number;
+    actualReturn3m?: number;
+  },
+) {
+  const [row] = await db.insert(predictionOutcomes).values(data).returning();
+  return row!;
 }

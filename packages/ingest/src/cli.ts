@@ -8,6 +8,7 @@ import {
   ingestOhlcv,
   ingestShareholding,
   ingestWatchlist,
+  ingestFundamentalsUniverse,
 } from './jobs.js';
 
 function parseArgs(argv: string[]) {
@@ -49,6 +50,9 @@ async function main(): Promise<void> {
     switch (job) {
       case 'ohlcv':
         console.log(await ingestOhlcv(db, ticker, days), 'OHLCV rows');
+        break;
+      case 'fundamentals-universe':
+        console.log(await ingestFundamentalsUniverse(db), 'tickers from Lankabd DataMatrix');
         break;
       case 'fundamentals':
         await ingestFundamentals(db, ticker);

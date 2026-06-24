@@ -5,19 +5,33 @@ import {
   updateFreshness,
   type Db,
 } from '@stock-buddy/db';
-import { analyzeTicker } from '@stock-buddy/mcp-server/composites';
+import { analyzeTicker, screenMarket, runSkill } from '@stock-buddy/mcp-server/composites';
 import { buildTickerContract, stripMeta } from './contract-builder.js';
+import { computeMomentumRotation } from './rotation.js';
 
 const MCP_VERSION = '2.0.0';
+
+export type AnalysisMode = 'standard' | 'investment' | 'momentum' | 'full';
 
 export interface RunAnalysisOptions {
   includePortfolio?: boolean;
   ohlcvDays?: number;
   clientId?: string;
   persist?: boolean;
+  mode?: AnalysisMode;
 }
 
-/** Build contract from DB, run analyze_ticker pipeline, optionally persist snapshot. */
+function runSkillSafe(tool: string, payload: Record<string, unknown>): Record<string, unknown> | null {
+  try {
+    const result = runSkill(tool, payload);
+    if (result && 'error' in result) return null;
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/** Build contract from DB, run analysis pipeline, optionally persist snapshot. */
 export async function runTickerAnalysis(
   db: Db,
   symbol: string,
@@ -26,11 +40,44 @@ export async function runTickerAnalysis(
   analysis: Record<string, unknown>;
   snapshotId?: number;
 }> {
+  const mode = opts.mode ?? 'full';
   const contract = await buildTickerContract(db, symbol, {
     includePortfolio: opts.includePortfolio ?? true,
     ohlcvDays: opts.ohlcvDays ?? 260,
   });
-  const analysis = analyzeTicker(stripMeta(contract));
+  const payload = stripMeta(contract);
+  payload.mode = mode === 'investment' ? 'investment' : mode === 'momentum' ? 'momentum' : payload.mode;
+
+  let analysis: Record<string, unknown>;
+
+  if (mode === 'standard') {
+    analysis = analyzeTicker(payload);
+  } else {
+    analysis = analyzeTicker(payload);
+    const stages = { ...(analysis.stages as Record<string, string> ?? {}) };
+
+    if (mode === 'full' || mode === 'momentum') {
+      const mom = runSkillSafe('momentum_screen', payload);
+      if (mom) {
+        analysis.momentum_screen = mom;
+        stages.momentum_screen = 'ok';
+      } else stages.momentum_screen = 'skipped';
+    }
+
+    if (mode === 'full' || mode === 'investment') {
+      const val = runSkillSafe('value_investment_checklist', payload);
+      if (val) {
+        analysis.value_investment_checklist = val;
+        stages.value_investment_checklist = 'ok';
+      } else stages.value_investment_checklist = 'skipped';
+    }
+
+    const ohlcv = (payload.ohlcv as import('@stock-buddy/core').OhlcvBar[]) ?? [];
+    analysis.momentum_rotation = computeMomentumRotation(ohlcv);
+
+    analysis.stages = stages;
+    analysis.analysis_mode = mode;
+  }
 
   let snapshotId: number | undefined;
   if (opts.persist ?? true) {
@@ -59,7 +106,7 @@ export async function ingestAnalysis(db: Db, symbol: string): Promise<number> {
   }
 
   try {
-    const { snapshotId } = await runTickerAnalysis(db, symbol, { persist: true });
+    const { snapshotId } = await runTickerAnalysis(db, symbol, { persist: true, mode: 'full' });
     await recordIngestRun(db, {
       jobName: 'ingest_analysis',
       tickerId: ticker.id,
@@ -83,3 +130,5 @@ export async function ingestAnalysis(db: Db, symbol: string): Promise<number> {
     throw err;
   }
 }
+
+export { screenMarket };

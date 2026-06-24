@@ -11,22 +11,35 @@
   <header class="header">
     <div class="header-inner">
       <h1>Stock Buddy</h1>
-      <p class="subtitle">DSE market data &amp; portfolio explorer</p>
+      <p class="subtitle">DSE analysis hub — educational use only</p>
+    </div>
+    <div class="mode-toggle" id="mode-toggle">
+      <span class="mode-label">View mode:</span>
+      <button type="button" class="mode-btn active" data-mode="both">Both</button>
+      <button type="button" class="mode-btn" data-mode="investment">Investment</button>
+      <button type="button" class="mode-btn" data-mode="momentum">Trading</button>
     </div>
     <nav class="tabs" id="tabs">
       <button type="button" class="tab active" data-panel="overview">Overview</button>
       <button type="button" class="tab" data-panel="tickers">Tickers</button>
-      <button type="button" class="tab" data-panel="ticker-detail">Ticker detail</button>
+      <button type="button" class="tab" data-panel="ticker-detail">Analysis</button>
+      <button type="button" class="tab" data-panel="discover">Discover</button>
       <button type="button" class="tab" data-panel="portfolio">Portfolio</button>
+      <button type="button" class="tab" data-panel="watchlist">Watchlist</button>
+      <button type="button" class="tab" data-panel="briefing">Briefing</button>
+      <button type="button" class="tab" data-panel="glossary">Glossary</button>
+      <button type="button" class="tab" data-panel="analytics">Analytics</button>
       <button type="button" class="tab" data-panel="news">News</button>
       <button type="button" class="tab" data-panel="macro">Macro</button>
-      <button type="button" class="tab" data-panel="ops">Ingest &amp; freshness</button>
+      <button type="button" class="tab" data-panel="ops">Ops</button>
     </nav>
   </header>
 
   <main class="main">
     <section id="panel-overview" class="panel active">
       <div class="cards" id="stat-cards"></div>
+      <h2>Recent analyses</h2>
+      <div class="table-wrap" id="overview-analyses"></div>
       <h2>Recent ingest runs</h2>
       <div class="table-wrap" id="overview-runs"></div>
     </section>
@@ -39,32 +52,133 @@
     </section>
 
     <section id="panel-ticker-detail" class="panel">
-      <div class="toolbar">
+      <div class="toolbar wrap">
         <select id="ticker-select"></select>
         <button type="button" id="load-ticker">Load</button>
-        <button type="button" id="run-analysis">Run analysis</button>
+        <button type="button" id="analyze-full">Analyze Full</button>
+        <button type="button" id="analyze-investment">Analyze Investment</button>
+        <button type="button" id="analyze-momentum">Analyze Trading</button>
+        <span id="analysis-status" class="analysis-status muted" aria-live="polite"></span>
+        <span id="analysis-stale" class="stale-badge hidden">Stale — refresh recommended</span>
       </div>
       <div id="ticker-meta" class="meta-bar"></div>
-      <div id="analysis-summary" class="cards analysis-cards"></div>
-      <h3>Analysis detail</h3>
-      <pre id="analysis-json" class="json-block"></pre>
+      <div id="ticker-commands-quick" class="ticker-commands-quick"></div>
+
+      <nav class="sub-tabs" id="analysis-subtabs">
+        <button type="button" class="sub-tab active" data-sub="summary">Summary</button>
+        <button type="button" class="sub-tab" data-sub="investment">Investment</button>
+        <button type="button" class="sub-tab" data-sub="momentum">Momentum</button>
+        <button type="button" class="sub-tab" data-sub="business">Business &amp; News</button>
+        <button type="button" class="sub-tab" data-sub="risk">Risk &amp; Prices</button>
+        <button type="button" class="sub-tab" data-sub="history">History</button>
+        <button type="button" class="sub-tab" data-sub="commands">Commands</button>
+      </nav>
+
+      <div id="sub-summary" class="sub-panel active"></div>
+      <div id="sub-investment" class="sub-panel"></div>
+      <div id="sub-momentum" class="sub-panel"></div>
+      <div id="sub-business" class="sub-panel"></div>
+      <div id="sub-risk" class="sub-panel"></div>
+      <div id="sub-history" class="sub-panel"></div>
+      <div id="sub-commands" class="sub-panel"></div>
+
       <div class="chart-row">
+        <div class="toolbar">
+          <label>Chart TF <select id="chart-tf"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label>
+        </div>
         <div class="chart-box"><canvas id="ohlcv-chart"></canvas></div>
       </div>
       <div class="grid-2">
-        <div><h3>Fundamentals</h3><pre id="fundamentals-json" class="json-block"></pre></div>
         <div><h3>Shareholding</h3><div class="chart-box sm"><canvas id="share-chart"></canvas></div></div>
+        <div><h3>Watchlist</h3><div id="ticker-watchlist-actions" class="toolbar wrap"></div></div>
       </div>
-      <h3>News</h3>
-      <div class="table-wrap" id="ticker-news"></div>
+      <details class="dev-json-panel" id="dev-json-panel" open>
+        <summary class="dev-json-summary">
+          <span>Developer JSON</span>
+          <span id="json-freshness-badge" class="json-freshness-badge hidden"></span>
+        </summary>
+        <div id="json-provenance" class="json-provenance"></div>
+        <nav id="json-key-nav" class="json-key-nav" aria-label="JSON section navigation"></nav>
+        <div class="json-toolbar">
+          <button type="button" id="json-copy" class="btn-sm">Copy JSON</button>
+          <button type="button" id="json-wrap" class="btn-sm" aria-pressed="false">Wrap lines</button>
+          <span id="json-meta-line" class="json-meta-line muted"></span>
+        </div>
+        <pre id="analysis-json" class="json-block json-block-lg"></pre>
+      </details>
+    </section>
+
+    <section id="panel-discover" class="panel">
+      <div class="toolbar wrap">
+        <select id="discover-template">
+          <option value="momentum_leaders">Momentum leaders</option>
+          <option value="value">Value</option>
+          <option value="dividend_champions">Dividend</option>
+          <option value="oversold_quality">Oversold quality</option>
+        </select>
+        <select id="discover-sector"><option value="">All sectors</option></select>
+        <button type="button" id="run-discover">Run scan</button>
+        <span id="discover-status" class="muted"></span>
+      </div>
+      <div id="discover-results"></div>
     </section>
 
     <section id="panel-portfolio" class="panel">
       <div id="portfolio-summary" class="meta-bar"></div>
+      <div class="toolbar wrap">
+        <input id="pos-symbol" placeholder="Symbol" />
+        <input id="pos-qty" type="number" placeholder="Qty" />
+        <input id="pos-cost" type="number" placeholder="Avg cost" />
+        <button type="button" id="add-position">Add position</button>
+      </div>
       <div class="grid-2">
         <div class="chart-box sm"><canvas id="sector-chart"></canvas></div>
         <div class="table-wrap" id="portfolio-table"></div>
       </div>
+    </section>
+
+    <section id="panel-watchlist" class="panel">
+      <p class="muted">Separate lists for long-term investment ideas and short-term trading setups.</p>
+      <div class="grid-2 watchlist-grid">
+        <div class="watchlist-panel">
+          <h3>Investment</h3>
+          <div class="watchlist-add">
+            <input type="search" class="watch-filter" data-purpose="investment" placeholder="Filter symbols…" autocomplete="off" spellcheck="false" />
+            <select id="watch-select-investment" class="watch-ticker-select" size="10" aria-label="Investment watchlist symbol">
+              <option value="">Choose symbol…</option>
+            </select>
+            <button type="button" class="watch-add-manual" data-purpose="investment">Add to investment</button>
+          </div>
+          <div id="watchlist-investment"></div>
+        </div>
+        <div class="watchlist-panel">
+          <h3>Trading</h3>
+          <div class="watchlist-add">
+            <input type="search" class="watch-filter" data-purpose="trading" placeholder="Filter symbols…" autocomplete="off" spellcheck="false" />
+            <select id="watch-select-trading" class="watch-ticker-select" size="10" aria-label="Trading watchlist symbol">
+              <option value="">Choose symbol…</option>
+            </select>
+            <button type="button" class="watch-add-manual" data-purpose="trading">Add to trading</button>
+          </div>
+          <div id="watchlist-trading"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-briefing" class="panel">
+      <div class="toolbar"><button type="button" id="load-briefing">Refresh briefing</button></div>
+      <div id="briefing-content"></div>
+    </section>
+
+    <section id="panel-glossary" class="panel">
+      <div class="toolbar"><input type="search" id="glossary-search" placeholder="Search terms…" /></div>
+      <div id="glossary-list"></div>
+      <div id="learn-panel"></div>
+    </section>
+
+    <section id="panel-analytics" class="panel">
+      <div class="toolbar"><button type="button" id="load-analytics">Refresh KPIs</button></div>
+      <div id="analytics-content"></div>
     </section>
 
     <section id="panel-news" class="panel">
@@ -85,6 +199,7 @@
   </main>
 
   <footer class="footer">Educational use only — not financial advice</footer>
+  <script src="/analysis-ui.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

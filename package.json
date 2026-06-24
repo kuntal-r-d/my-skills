@@ -11,11 +11,12 @@
     "stock-buddy-mcp": "./bin/stock-buddy-mcp.js"
   },
   "scripts": {
-    "build": "npm run build -w @stock-buddy/core && npm run build -w @stock-buddy/db && npm run build -w @stock-buddy/scraper && npm run build -w @stock-buddy/data-adapter && npm run build -w @stock-buddy/ingest && npm run build -w @stock-buddy/data-mcp-server && npm run build -w @stock-buddy/dashboard && npm run build -w @stock-buddy/skills && npm run build -w @stock-buddy/mcp-server && npm run build -w @stock-buddy/agents && npm run build -w @stock-buddy/prediction && npm run build -w @stock-buddy/ui",
+    "build": "npm run build -w @stock-buddy/core && npm run build -w @stock-buddy/db && npm run build -w @stock-buddy/scraper && npm run build -w @stock-buddy/data-adapter && npm run build -w @stock-buddy/skills && npm run build -w @stock-buddy/mcp-server && npm run build -w @stock-buddy/ingest && npm run build -w @stock-buddy/data-mcp-server && npm run build -w @stock-buddy/dashboard && npm run build -w @stock-buddy/agents && npm run build -w @stock-buddy/prediction && npm run build -w @stock-buddy/ui",
     "build:docker": "npm run build -w @stock-buddy/core && npm run build -w @stock-buddy/db && npm run build -w @stock-buddy/scraper && npm run build -w @stock-buddy/data-adapter && npm run build -w @stock-buddy/ingest && npm run build -w @stock-buddy/data-mcp-server && npm run build -w @stock-buddy/dashboard && npm run build -w @stock-buddy/skills && npm run build -w @stock-buddy/mcp-server",
     "db:migrate": "npm run db:migrate -w @stock-buddy/db",
     "db:seed": "npm run db:seed -w @stock-buddy/db",
     "ingest": "tsx packages/ingest/src/cli.ts",
+    "verify:fundamentals": "tsx scripts/verify-fundamentals-sources.ts",
     "portfolio:import": "node scripts/import-portfolio.mjs",
     "dashboard": "npm run dev -w @stock-buddy/dashboard",
     "dashboard:build": "npm run build -w @stock-buddy/dashboard",
