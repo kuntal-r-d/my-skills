@@ -1,41 +1,106 @@
 import * as ind from '@stock-buddy/core';
+import {
+  ATR_PERIOD,
+  atrReasoning,
+  computeAtrLevels,
+  minBarsForAtr,
+  resolveAtrEntry,
+} from './atr-strategy.js';
+import {
+  computeSizing,
+  evaluateGates,
+  num,
+  roundBdt,
+} from './risk-core.js';
+import type { SizedTrade, TradeLevels } from './risk-core.js';
+import {
+  computeStructureLevels,
+  minBarsForStructure,
+} from './structure-strategy.js';
 
 export const DISCLAIMER = 'Educational analysis only. Not financial advice.';
 export const SKILL = 'risk-manager';
 
-const ATR_PERIOD = 14;
-const BUY_ZONE_ATR = 0.25;
-const STOP_ATR = 2.0;
-const TARGET_ATR = 3.0;
-const KELLY_CAP = 0.25;
-const PER_POSITION_CAP = 0.05;
-const VOL_SCALE_THRESHOLD = 0.06;
-const VOL_SCALE_FACTOR = 0.5;
-const LIQUIDITY_FLOOR_BDT = 10_000_000;
-const SECTOR_CAP = 0.30;
-const HEAT_CAP = 0.06;
-const PROXY_POSITION_RISK = 0.01;
+export type RiskStrategyId = 'atr' | 'structure';
 
-function num(x: unknown, defaultVal = 0.0): number {
-  try {
-    const n = Number(x);
-    return Number.isNaN(n) ? defaultVal : n;
-  } catch {
-    return defaultVal;
-  }
-}
+function buildStrategyResult(input: {
+  strategy: RiskStrategyId;
+  levels: TradeLevels;
+  atrV: number;
+  capital: number;
+  riskPct: number;
+  mode: string;
+  ms: Record<string, unknown>;
+  portfolio: Record<string, unknown>;
+  sector?: string;
+  reasoning: string[];
+  flags: string[];
+}): Record<string, unknown> {
+  const { strategy, levels, atrV, capital, riskPct, mode, ms, portfolio, sector, reasoning, flags } =
+    input;
 
-function roundBdt(x: number | null): number | null {
-  if (x == null) return null;
-  return Math.round(x * 100) / 100;
+  const riskPerShare = levels.entry - levels.stop_loss;
+  const riskAmount = (capital * riskPct) / 100;
+  const rawShares = riskPerShare > 0 ? riskAmount / riskPerShare : 0;
+  const capValue = Math.min(0.25 * capital, 0.05 * capital);
+  const capShares = levels.entry > 0 ? capValue / levels.entry : 0;
+  const capped = rawShares > capShares;
+
+  const sized = computeSizing(levels, capital, riskPct, atrV, reasoning, flags);
+  const { rating, gates, score } = evaluateGates({
+    mode,
+    ms,
+    portfolio,
+    sector,
+    positionValue: sized.position_value_bdt,
+    capital,
+    actualRiskAmount: sized.risk_amount_bdt,
+    capped,
+    riskReward: sized.risk_reward,
+    flags,
+    reasoning,
+  });
+
+  const keyMetrics: Record<string, unknown> = {
+    atr: roundBdt(atrV),
+    entry: roundBdt(levels.entry),
+    buy_zone_low: roundBdt(levels.buy_zone_low),
+    buy_zone_high: roundBdt(levels.buy_zone_high),
+    stop_loss: roundBdt(levels.stop_loss),
+    target: roundBdt(levels.target),
+    risk_reward: sized.risk_reward,
+    suggested_shares: sized.suggested_shares,
+    position_value_bdt: roundBdt(sized.position_value_bdt),
+    pct_of_capital: sized.pct_of_capital,
+    trade_risk_pct: sized.trade_risk_pct,
+    risk_amount_bdt: roundBdt(sized.risk_amount_bdt),
+    risk_pct_of_capital: sized.risk_pct_of_capital,
+  };
+
+  if (levels.support != null) keyMetrics.support = levels.support;
+  if (levels.resistance != null) keyMetrics.resistance = levels.resistance;
+  keyMetrics.next_support = levels.next_support ?? null;
+  keyMetrics.next_resistance = levels.next_resistance ?? null;
+
+  return {
+    strategy,
+    score,
+    confidence: score,
+    rating,
+    key_metrics: keyMetrics,
+    gates,
+    reasoning,
+    flags,
+  };
 }
 
 export function analyze(data: Record<string, unknown>): Record<string, unknown> {
   const ohlcv = (data.ohlcv as ind.OhlcvBar[]) ?? [];
-  if (ohlcv.length < ATR_PERIOD + 1) {
+  const minBars = Math.max(minBarsForAtr(), minBarsForStructure());
+  if (ohlcv.length < minBars) {
     return {
       skill: SKILL,
-      error: `need >=${ATR_PERIOD + 1} OHLCV bars for ATR(${ATR_PERIOD})`,
+      error: `need >=${minBars} OHLCV bars for ATR(${ATR_PERIOD}) and structure levels`,
       bars_supplied: ohlcv.length,
     };
   }
@@ -52,189 +117,70 @@ export function analyze(data: Record<string, unknown>): Record<string, unknown> 
 
   const signal = (data.signal as Record<string, unknown>) ?? {};
   const mode = (signal.mode as string) ?? (data.mode as string) ?? 'momentum';
-  const entry = num(signal.entry) || c[c.length - 1]!;
-  if (entry <= 0) return { skill: SKILL, error: 'entry price must be > 0' };
-
-  const flags: string[] = [];
-  const reasoning: string[] = [];
-
-  const buyLow = entry - BUY_ZONE_ATR * atrV;
-  const buyHigh = entry;
-  const stop = entry - STOP_ATR * atrV;
-  const target = entry + TARGET_ATR * atrV;
-  const riskPerShare = entry - stop;
-  const rewardPerShare = target - entry;
-  const riskReward = riskPerShare ? rewardPerShare / riskPerShare : 0.0;
-  const tradeRiskPct = entry ? (riskPerShare / entry) * 100 : 0.0;
-
-  reasoning.push(
-    `ATR(${ATR_PERIOD})=${roundBdt(atrV)} BDT. Buy zone ${roundBdt(buyLow)}-${roundBdt(buyHigh)} (entry - 0.25*ATR).`,
-  );
-  reasoning.push(
-    `Stop ${roundBdt(stop)} (entry - 2*ATR), target ${roundBdt(target)} (entry + 3*ATR) -> risk:reward 1:${Math.round(riskReward * 100) / 100}.`,
-  );
-
-  const riskAmount = capital * riskPct / 100.0;
-  const rawShares = riskPerShare ? riskAmount / riskPerShare : 0.0;
-
-  const kellyValue = KELLY_CAP * capital;
-  const posCapValue = PER_POSITION_CAP * capital;
-  const capValue = Math.min(kellyValue, posCapValue);
-  const capShares = entry ? capValue / entry : 0.0;
-
-  let capped = false;
-  let shares = rawShares;
-  if (shares > capShares) {
-    shares = capShares;
-    capped = true;
-    reasoning.push(
-      `Size capped by min(Kelly 25%=${roundBdt(kellyValue)}, 5% per-position=${roundBdt(posCapValue)} BDT) -> ${roundBdt(capValue)} BDT ceiling.`,
-    );
+  const signalEntry = num(signal.entry);
+  const lastClose = c[c.length - 1]!;
+  const atrEntry = resolveAtrEntry(signalEntry, lastClose);
+  const structureEntry = signalEntry > 0 ? signalEntry : lastClose;
+  if (atrEntry <= 0 || structureEntry <= 0) {
+    return { skill: SKILL, error: 'entry price must be > 0' };
   }
-
-  const atrRatio = atrV / entry;
-  if (atrRatio > VOL_SCALE_THRESHOLD) {
-    shares *= VOL_SCALE_FACTOR;
-    flags.push('high_volatility_size_halved');
-    reasoning.push(`ATR/price ${Math.round(atrRatio * 1000) / 10}% > 6% — position halved (volatility scaling).`);
-  }
-
-  shares = Math.floor(shares);
-  const positionValue = shares * entry;
-  const pctOfCapital = capital ? (positionValue / capital) * 100 : 0.0;
-  const actualRiskAmount = shares * riskPerShare;
-  const actualRiskPctOfCapital = capital ? (actualRiskAmount / capital) * 100 : 0.0;
-
-  if (shares <= 0) {
-    flags.push('size_rounds_to_zero');
-    reasoning.push('Computed size rounds to 0 shares at this risk budget.');
-  }
-
-  const gates: Record<string, { pass: boolean; detail: string }> = {};
-  let rating = 'approved';
 
   const ms = (data.microstructure as Record<string, unknown>) ?? {};
-  const adv = num(ms.avg_daily_value_bdt, 0.0);
-  if (adv > LIQUIDITY_FLOOR_BDT) {
-    gates.liquidity = { pass: true, detail: `Avg daily value ${roundBdt(adv)} BDT > 1 crore floor.` };
-  } else {
-    gates.liquidity = {
-      pass: false,
-      detail: `Avg daily value ${roundBdt(adv)} BDT <= 1 crore floor — too illiquid; trade rejected.`,
-    };
-    rating = 'rejected';
-    reasoning.push('Liquidity gate FAILED — illiquid name, slippage/exit risk too high.');
-  }
-
   const portfolio = (data.portfolio as Record<string, unknown>) ?? {};
-  const totalValue = num(portfolio.total_value_bdt, 0.0);
   const sector = ((data.fundamentals as Record<string, unknown>) ?? {}).sector as string | undefined;
-  if (portfolio && totalValue > 0) {
-    const positions = (portfolio.positions as Record<string, unknown>[]) ?? [];
-    const existingSector = positions
-      .filter((p) => sector && p.sector === sector)
-      .reduce((sum, p) => sum + num(p.value_bdt), 0);
-    const sectorPct = ((existingSector + positionValue) / totalValue) * 100;
-    if (sectorPct <= SECTOR_CAP * 100) {
-      gates.sector = { pass: true, detail: `Sector '${sector}' exposure would be ${Math.round(sectorPct * 10) / 10}% <= 30%.` };
-    } else {
-      gates.sector = {
-        pass: false,
-        detail: `Sector '${sector}' exposure would be ${Math.round(sectorPct * 10) / 10}% > 30% — concentration limit.`,
-      };
-      if (rating !== 'rejected') rating = 'reduced';
-      flags.push('sector_concentration_breach');
-      reasoning.push('Sector gate FAILED — over-concentrated; reduce or skip.');
-    }
-  } else {
-    gates.sector = { pass: true, detail: 'No portfolio supplied — sector gate skipped.' };
-  }
 
-  if (portfolio) {
-    const positions = (portfolio.positions as unknown[]) ?? [];
-    const nPositions = positions.length;
-    const existingHeat = nPositions * PROXY_POSITION_RISK;
-    const thisHeat = capital ? actualRiskAmount / capital : 0.0;
-    const totalHeat = existingHeat + thisHeat;
-    if (totalHeat <= HEAT_CAP) {
-      gates.heat = {
-        pass: true,
-        detail: `Portfolio heat ${Math.round(totalHeat * 1000) / 10}% <= 6% (${nPositions} existing @1% proxy + this trade).`,
-      };
-    } else {
-      gates.heat = {
-        pass: false,
-        detail: `Portfolio heat ${Math.round(totalHeat * 1000) / 10}% > 6% — too much aggregate risk.`,
-      };
-      if (rating !== 'rejected') rating = 'reduced';
-      flags.push('portfolio_heat_breach');
-      reasoning.push('Heat gate FAILED — aggregate open risk exceeds 6%.');
-    }
-  } else {
-    gates.heat = { pass: true, detail: 'No portfolio supplied — heat gate skipped.' };
-  }
+  const atrLevels = computeAtrLevels(atrEntry, atrV);
+  const atrResult = buildStrategyResult({
+    strategy: 'atr',
+    levels: atrLevels,
+    atrV,
+    capital,
+    riskPct,
+    mode,
+    ms,
+    portfolio,
+    sector,
+    reasoning: atrReasoning(atrV, atrLevels),
+    flags: [],
+  });
 
-  const circuitHit =
-    ms.circuit_state === 'limit_up' ||
-    ms.circuit_state === 'limit_down' ||
-    Boolean(ms.floor_price) ||
-    Boolean(ms.halted);
-  if (circuitHit) {
-    const why =
-      ms.circuit_state === 'limit_up' || ms.circuit_state === 'limit_down'
-        ? `circuit_state=${ms.circuit_state}`
-        : ms.floor_price
-          ? 'floor_price set'
-          : 'trading halted';
-    gates.circuit = { pass: false, detail: `${why} — price discovery interrupted.` };
-    if (mode === 'momentum') {
-      rating = 'suppressed';
-      reasoning.push(
-        `Circuit gate: ${why}. Momentum recommendation SUPPRESSED — no reliable price discovery, do not enter until normal trading resumes.`,
-      );
-    } else {
-      flags.push('microstructure_circuit_or_floor');
-      reasoning.push(
-        `Circuit gate: ${why}. Investment levels stand but defer execution until normal trading resumes.`,
-      );
-    }
-  } else {
-    gates.circuit = { pass: true, detail: 'Normal trading — no circuit/floor/halt.' };
-  }
+  const structureSeed = computeStructureLevels(c, l, h, atrV, structureEntry);
+  const structureResult = buildStrategyResult({
+    strategy: 'structure',
+    levels: structureSeed.levels,
+    atrV,
+    capital,
+    riskPct,
+    mode,
+    ms,
+    portfolio,
+    sector,
+    reasoning: structureSeed.reasoning,
+    flags: structureSeed.flags,
+  });
 
-  if (capped && rating === 'approved') rating = 'reduced';
-
-  let score = 0.5 + Math.min(0.3, Math.max(0.0, (riskReward - 1.0) * 0.2));
-  score -= 0.05 * Object.values(gates).filter((g) => !g.pass).length;
-  if (flags.includes('high_volatility_size_halved')) score -= 0.1;
-  score = Math.round(Math.max(0.1, Math.min(0.95, score)) * 100) / 100;
+  const primary = atrResult;
 
   return {
     skill: SKILL,
     ticker: data.ticker,
     mode,
     as_of: data.as_of,
-    score,
-    confidence: score,
-    rating,
-    key_metrics: {
-      atr: roundBdt(atrV),
-      entry: roundBdt(entry),
-      buy_zone_low: roundBdt(buyLow),
-      buy_zone_high: roundBdt(buyHigh),
-      stop_loss: roundBdt(stop),
-      target: roundBdt(target),
-      risk_reward: Math.round(riskReward * 100) / 100,
-      suggested_shares: shares,
-      position_value_bdt: roundBdt(positionValue),
-      pct_of_capital: Math.round(pctOfCapital * 100) / 100,
-      trade_risk_pct: Math.round(tradeRiskPct * 100) / 100,
-      risk_amount_bdt: roundBdt(actualRiskAmount),
-      risk_pct_of_capital: Math.round(actualRiskPctOfCapital * 100) / 100,
+    active_strategy: 'atr',
+    strategy: 'atr',
+    score: primary.score,
+    confidence: primary.confidence,
+    rating: primary.rating,
+    key_metrics: primary.key_metrics,
+    gates: primary.gates,
+    reasoning: primary.reasoning,
+    flags: primary.flags,
+    strategies: {
+      atr: atrResult,
+      structure: structureResult,
     },
-    gates,
-    reasoning,
-    flags,
     disclaimer: DISCLAIMER,
   };
 }
+
+export type { SizedTrade, TradeLevels };

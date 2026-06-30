@@ -4,3 +4,6 @@ export * from './dse-config.js';
 export * from './education.js';
 export * from './ohlcv-quality.js';
 export * from './fundamentals-merge.js';
+export * from './acquisition-instructions.js';
+export * from './skill-store.js';
+export * from './advisory.js';

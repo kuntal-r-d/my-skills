@@ -1,95 +1,103 @@
 ---
-compatibility: Python 3.8+, standard library only. No network. No third-party packages.
-description: Converts a raw DSE trade signal plus OHLCV price data into a risk-checked recommendation with concrete BDT numbers — ATR-based buy zone, stop-loss, target, risk:reward, Kelly/percent position sizing, and pass/fail risk gates (liquidity, sector concentration, portfolio heat, circuit-breaker suppression). Use when the user asks "how many shares should I buy", "where's my stop", "what's the position size", "is this trade safe", "set my risk", or needs the risk gatekeeper for a Dhaka Stock Exchange ticker.
-license: Apache-2.0
-metadata:
-    author: stock-buddy
-    github-path: skills/risk-manager
-    github-pinned: main
-    github-ref: refs/heads/main
-    github-repo: https://github.com/kuntal-r-d/my-skills
-    github-tree-sha: 16dbdae4c9187cc5a99a50cb2b1bed76de9995a9
-    mode:
-        - investment
-        - momentum
-    prd_refs:
-        - PRD-002:REQ-108
-        - PRD-002:REQ-097
-        - PRD-001:REQ-004
-        - PRD-001:REQ-005
-        - PRD-001:REQ-029
-        - PRD-001:REQ-053
-    version: 0.1.0
 name: risk-manager
+description: Converts a raw DSE trade signal plus OHLCV price data into risk-checked recommendations with concrete BDT numbers — dual ATR and structure (support/resistance) strategies for buy zone, stop-loss, target, risk:reward, Kelly/percent position sizing, and pass/fail risk gates (liquidity, sector concentration, portfolio heat, circuit-breaker suppression). Use when the user asks "how many shares should I buy", "where's my stop", "what's the position size", "is this trade safe", "set my risk", or needs the risk gatekeeper for a Dhaka Stock Exchange ticker.
+license: Apache-2.0
+compatibility: Prompt-first Agent Skill. Usable with the script absent. Script is Python 3.8+ stdlib-only, no network.
+metadata:
+  author: stock-buddy
+  version: "0.2.0"
+  prd_refs: ["PRD-001:REQ-029", "PRD-001:REQ-053", "PRD-001:REQ-027"]
+  mode: ["momentum", "investment"]
 ---
+
 # Risk Manager
 
+> **Prompt-first skill.** Compute the levels, size and gates by following the rules below.
+> `scripts/analyze.py` is OPTIONAL — run it for exact BDT arithmetic; the recommendation is
+> valid without it. This is the gatekeeper: a failed gate overrides a bullish signal.
+
+## Role & objective
+You are the risk gatekeeper. Goal: turn an entry + ATR into concrete BDT buy zone, stop,
+target, risk:reward and position size, then apply four pass/fail gates and a final rating.
+
 ## When to use
+"How many shares should I buy?", "where's my stop?", "what's the position size?", "is this
+trade safe?", "set my risk". Run last in the pipeline, after `signal-synthesizer`.
 
-Activate when a signal exists and the user wants the *trade mechanics and risk gate*:
-"how many shares of GP should I buy", "where do I put my stop", "what's my position size",
-"is this trade within my risk", "size this for a 1% risk". This skill is the Risk Manager
-gatekeeper (PRD-002 REQ-108): it turns a directional view into concrete BDT levels and
-**approves, reduces, rejects, or suppresses** the trade against hard risk rules.
+## Inputs you need
+Gather via `dse-data-acquisition`:
+- **`ohlcv`** — daily bars, **≥60** (for structure support/resistance and ATR(14)).
+- **`account`** — `capital_bdt` (>0), `risk_per_trade_pct` (default 1.0).
+- *(optional)* **`signal`** — `entry`, `mode`; default entry = last close.
+- *(optional)* **`microstructure`** — `avg_daily_value_bdt`, `circuit_state`, `floor_price`, `halted`.
+- *(optional)* **`fundamentals.sector`**, **`portfolio`** (`total_value_bdt`, `positions[]`).
 
-## What it does
+## Method (follow in order)
+Run **both** strategies. Top-level `key_metrics` = ATR strategy (default). Also emit
+`strategies.structure` for support/resistance-based levels. See [references/RISK.md](references/RISK.md).
 
-From `ohlcv`, an `account`, and an optional `signal`, it computes (PRD-001 REQ-004/005/029):
+Let ATR = ATR(14), entry = signal.entry or last close.
 
-1. **ATR(14)** and the working entry (`signal.entry` or last close).
-2. **Buy zone** near support: `entry - 0.25×ATR` to `entry` (a range, not a point).
-3. **Stop-loss** `entry - 2×ATR` and **target** `entry + 3×ATR`, with the **risk:reward**.
-4. **Position size**: `risk_amount = capital × risk_per_trade_pct/100`;
-   `shares = risk_amount / (entry - stop)`; capped by a **Kelly 25%** ceiling and a
-   **5% per-position** cap (take the min); **halved** if ATR/price > 6% (volatility scaling).
+**1a. ATR levels** — buy zone = `entry − 0.25·ATR … entry`; stop = `entry − 2·ATR`;
+target = `entry + 3·ATR`; **R:R = 1.5**.
 
-Then it runs four **risk gates** (REQ-053), each pass/fail and explained:
+**1b. Structure levels** — 60-bar support/resistance; buy zone at support pullback;
+stop = `support − 0.5·ATR`; target = resistance or min 1.5:1 R:R.
 
-- **Liquidity** — `avg_daily_value_bdt` must exceed **BDT 10,000,000 (1 crore)** or the trade
-  is **rejected**.
-- **Sector concentration** — existing sector exposure + this position must stay **≤ 30%** of
-  portfolio value.
-- **Portfolio heat** — summed per-position risk (1% proxy where unknown) + this trade's risk
-  must stay **≤ 6%**.
-- **Circuit/floor (REQ-097)** — at a circuit limit, on a floor price, or halted, a momentum
-  recommendation is **suppressed** (price discovery interrupted).
+**2. Position size** (per strategy, same rules) — risk_amount = `capital × risk_pct/100`; raw_shares = risk_amount /
+risk_per_share. Cap by `min(Kelly 25% of capital, 5% per-position)` ÷ entry. If
+ATR/price > 6%, **halve** the size (flag `high_volatility_size_halved`). Round down to whole
+shares; if it rounds to 0, flag `size_rounds_to_zero`.
 
-## How to run
+**3. Four risk gates**
+- **Liquidity:** `avg_daily_value_bdt` > 1 crore (10,000,000). Fail → **rejected**.
+- **Sector concentration:** (existing same-sector value + this position)/portfolio ≤ 30%.
+  Fail → **reduced** + flag. (Skip if no portfolio.)
+- **Portfolio heat:** (#positions × 1% proxy + this trade's risk%) ≤ 6%. Fail → **reduced**.
+- **Circuit/floor/halt:** if limit_up/limit_down/floor/halted → momentum mode **suppressed**;
+  investment mode keeps levels but defer execution.
 
+## Scoring rubric
+Rating precedence: **rejected** (liquidity) > **suppressed** (circuit, momentum) >
+**reduced** (sector/heat breach, or size capped) > **approved**.
+
+**Score = confidence** = clamp(0.5 + min(0.3, (R:R − 1)·0.2) − 0.05·(#failed gates)
+− 0.1 (if volatility-halved), 0.1, 0.95).
+
+## Output (emit this Thinking Card)
+```json
+{ "skill": "risk-manager", "ticker": "..", "mode": "..", "as_of": "..",
+  "score": 0.0, "confidence": 0.0, "rating": "approved|reduced|suppressed|rejected",
+  "active_strategy": "atr",
+  "key_metrics": { "...": "ATR strategy — same shape as before" },
+  "gates": { "liquidity": {"pass": true, "detail": ".."}, "sector": {}, "heat": {}, "circuit": {} },
+  "strategies": {
+    "atr": { "strategy": "atr", "rating": "..", "key_metrics": {}, "gates": {}, "reasoning": [], "flags": [] },
+    "structure": { "strategy": "structure", "key_metrics": { "support": 0, "resistance": 0, "...": "..." }, "...": "..." }
+  },
+  "reasoning": ["..."], "flags": ["..."],
+  "disclaimer": "Educational analysis only. Not financial advice." }
+```
+
+## DSE pitfalls
+- **Circuit limits / floor prices** are common on DSE — suppress momentum entries; price
+  discovery is interrupted, so the stop/target are unreliable.
+- **Thin liquidity** is the most common rejection; below 1 crore daily value, slippage and
+  exit risk dominate — don't size a trade you can't exit.
+- Position size is in **whole shares**; a tiny risk budget on a high-priced share can round to 0.
+
+## Optional precision helper
 ```bash
 python3 scripts/analyze.py --input data.json --pretty
-cat data.json | python3 scripts/analyze.py
 ```
+Returns exact BDT levels, share count, gate verdicts and rating. Use it for the arithmetic;
+trust the script if your numbers differ.
 
-Input shape (uses the suite data contract):
+## Worked example
+entry 54, ATR 1.5, capital 500,000, risk 1% → stop 51, target 58.5, R:R 1.5; risk/share 3,
+risk_amount 5,000 → ~1,666 shares, but 5% cap = 25,000 BDT → ~462 shares (reduced: capped).
+Liquidity 2 crore → pass. Rating **reduced**, confidence ≈ 0.55.
 
-```json
-{
-  "ticker": "GP", "as_of": "2026-06-19", "ohlcv": [ ... ≥15 bars ... ],
-  "account": {"capital_bdt": 1000000, "risk_per_trade_pct": 1.0},
-  "signal": {"entry": 304.0, "mode": "momentum"},
-  "microstructure": {"circuit_state": "normal", "floor_price": null, "halted": false,
-                     "avg_daily_value_bdt": 25000000},
-  "fundamentals": {"sector": "Telecom"},
-  "portfolio": {"total_value_bdt": 5000000,
-                "positions": [{"ticker": "ROBI", "sector": "Telecom", "value_bdt": 800000}]}
-}
-```
-
-Reads `ohlcv` (required, ≥15 bars for ATR(14)) and `account` (required). `signal`,
-`microstructure`, `fundamentals.sector`, and `portfolio` are optional.
-
-## Interpreting output
-
-- `rating`: `approved`, `reduced` (a gate trimmed size), `rejected` (a hard gate failed),
-  or `suppressed` (circuit/floor/halt).
-- `key_metrics` carry every BDT number (buy zone, stop, target, shares, position value,
-  % of capital, risk:reward). `gates` shows each gate's pass/fail and why.
-- `score` reflects setup confidence; `flags` carry penalties and are never silently dropped.
-
-## Notes
-
-ATR math lives in `scripts/indicators.py` (copied verbatim from the suite). Stop/target/Kelly
-rules, the 5%/30%/6% caps, the liquidity floor, and the sizing formula are documented in
-[references/RISK.md](references/RISK.md). Output is educational analysis only, never financial
-advice.
+## References
+Sizing and gate detail: [references/RISK.md](references/RISK.md).
+Output is educational analysis only, never financial advice.

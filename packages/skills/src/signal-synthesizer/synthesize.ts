@@ -1,4 +1,6 @@
-export const DISCLAIMER = 'Educational analysis only. Not financial advice.';
+import { getDisclaimer } from '@stock-buddy/core';
+
+export const DISCLAIMER = getDisclaimer();
 export const SKILL = 'signal-synthesizer';
 
 const AGENT_KEYS = ['technical', 'fundamental', 'smart_money', 'sentiment', 'macro', 'volume_flow'] as const;
@@ -276,7 +278,7 @@ export function synthesize(data: Record<string, unknown>): Record<string, unknow
     contributions: momContrib,
     entry_trigger: entryTrigger(finalMomRating),
     stop_note:
-      'Place stop below the breakout base / recent swing low (see risk-manager for ATR-based levels).',
+      'Place stop below the breakout base / recent swing low (see risk-manager ATR and structure strategies).',
     reasoning: momReason,
   };
 

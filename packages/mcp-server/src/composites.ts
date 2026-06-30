@@ -7,6 +7,12 @@
  * stage in `stages` and continues, rather than dropping the result silently.
  */
 import { runSkill, SkillError } from './dispatch.js';
+import {
+  buildClientResearchInstructions,
+  detectMissingCoreFields,
+  getDisclaimer,
+  isBareTickerPayload,
+} from '@stock-buddy/core';
 
 const LEAVES: Record<string, string> = {
   technical_analysis: 'technical',
@@ -32,6 +38,28 @@ export function analyzeTicker(
   payload: Record<string, unknown>,
 ): Record<string, unknown> {
   const ticker = payload.ticker;
+
+  if (isBareTickerPayload(payload)) {
+    const missing = detectMissingCoreFields(payload);
+    return {
+      skill: 'analyze_ticker',
+      ticker,
+      error: 'insufficient_data_contract',
+      instructions: buildClientResearchInstructions({
+        ticker: String(ticker ?? ''),
+        missingFields: missing,
+        reason: 'bare_ticker_only',
+      }),
+      stages: Object.fromEntries(
+        ['technical_analysis', 'fundamental_analysis', 'smart_money_flow', 'sentiment_news', 'macro_regime'].map(
+          (s) => [s, 'skipped: pass full data contract — see instructions'],
+        ),
+      ),
+      disclaimer: getDisclaimer(),
+    };
+  }
+
+  const missing = detectMissingCoreFields(payload);
   const stages: Record<string, string> = {};
   const agents: Record<string, { score: number; confidence: number }> = {};
   const cards: Record<string, unknown> = {};
@@ -56,7 +84,14 @@ export function analyzeTicker(
       skill: 'analyze_ticker',
       ticker,
       error: 'no leaf analyses succeeded',
+      instructions: buildClientResearchInstructions({
+        ticker: String(ticker ?? ''),
+        missingFields: missing,
+        reason: missing.length >= 3 ? 'bare_ticker_only' : 'incomplete_contract',
+        partialContract: payload,
+      }),
       stages,
+      disclaimer: getDisclaimer(),
     };
   }
 
@@ -86,7 +121,7 @@ export function analyzeTicker(
     stages.risk_manager = `error: ${err instanceof SkillError ? err.message : String(err)}`;
   }
 
-  return {
+  const result: Record<string, unknown> = {
     skill: 'analyze_ticker',
     ticker,
     as_of: payload.as_of,
@@ -94,8 +129,22 @@ export function analyzeTicker(
     risk,
     agent_cards: cards,
     stages,
-    disclaimer: 'Educational analysis only. Not financial advice.',
+    disclaimer: getDisclaimer(),
   };
+
+  if (missing.length > 0) {
+    result.partial_data_warning = {
+      missing_core_fields: missing,
+      instructions: buildClientResearchInstructions({
+        ticker: String(ticker ?? ''),
+        missingFields: missing,
+        reason: 'incomplete_contract',
+        partialContract: payload,
+      }),
+    };
+  }
+
+  return result;
 }
 
 /** Thin wrapper over stock-screener (kept as a composite for a stable name). */
@@ -115,9 +164,7 @@ export const COMPOSITES: Record<string, CompositeSpec> = {
   analyze_ticker: {
     fn: analyzeTicker,
     description:
-      'End-to-end: run technical, fundamental, smart-money, sentiment and macro '
-      + 'analyses, fuse them via signal-synthesizer (dual-mode 1-10 composite), and '
-      + 'risk-check via risk-manager. One call, full pipeline, for a DSE ticker.',
+      'End-to-end analysis pipeline. Requires FULL data contract (ohlcv, fundamentals, shareholding, macro, news) from stock-buddy-data — not ticker-only. Returns an `instructions` block when data is missing so the client agent can research from any credible public source (example sites listed, not required).',
     reads: [
       'ticker',
       'ohlcv',

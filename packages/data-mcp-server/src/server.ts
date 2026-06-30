@@ -8,9 +8,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
 import { getDb, closeDb, getDatabaseUrl } from '@stock-buddy/db';
+import { buildClientResearchInstructions, CORE_CONTRACT_FIELDS, getDisclaimer } from '@stock-buddy/core';
 import { DATA_TOOLS, handleDataTool } from './tools.js';
 
-export const DISCLAIMER = 'Market data for educational analysis only. Not financial advice.';
+export const DISCLAIMER = getDisclaimer();
 
 function createServer(): Server {
   const server = new Server(
@@ -39,7 +40,20 @@ function createServer(): Server {
       const db = getDb();
       result = await handleDataTool(db, name, args);
     } catch (err) {
-      result = { error: err instanceof Error ? err.message : String(err), tool: name };
+      const message = err instanceof Error ? err.message : String(err);
+      const isDb =
+        /connect|ECONNREFUSED|DATABASE_URL|password authentication|timeout/i.test(message);
+      result = isDb
+        ? {
+            error: message,
+            tool: name,
+            instructions: buildClientResearchInstructions({
+              ticker: args.ticker ? String(args.ticker).toUpperCase() : undefined,
+              missingFields: [...CORE_CONTRACT_FIELDS],
+              reason: 'database_unavailable',
+            }),
+          }
+        : { error: message, tool: name };
     }
 
     return {

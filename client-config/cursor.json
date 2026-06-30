@@ -1,14 +1,10 @@
 {
   "mcpServers": {
+    "stock-buddy-data": {
+      "url": "http://localhost:8081/mcp"
+    },
     "stock-buddy": {
-      "command": "node",
-      "args": [
-        "/Users/kuntal/Developer/stock-buddy-skill-mcp/stock-buddy/packages/mcp-server/dist/server.js"
-      ],
-      "env": {
-        "STOCK_BUDDY_HTTP": "0",
-        "STOCK_BUDDY_SKILLS_DIR": "/Users/kuntal/Developer/stock-buddy-skill-mcp/stock-buddy/skills"
-      }
+      "url": "http://localhost:8080/mcp"
     }
   }
 }

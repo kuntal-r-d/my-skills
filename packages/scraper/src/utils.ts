@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { get as httpsGet } from 'node:https';
+import { get as httpsGet, request as httpsRequest } from 'node:https';
 
 export interface OhlcvRow {
   date: string;
@@ -65,7 +65,7 @@ function isDseHost(url: string): boolean {
   }
 }
 
-function fetchTextInsecure(url: string, headers: Record<string, string>): Promise<string | null> {
+function fetchTextInsecure(url: string, headers: Record<string, string>, quiet = false): Promise<string | null> {
   return new Promise((resolve) => {
     httpsGet(url, { headers, rejectUnauthorized: false }, (res) => {
       let data = '';
@@ -74,23 +74,28 @@ function fetchTextInsecure(url: string, headers: Record<string, string>): Promis
       });
       res.on('end', () => {
         const code = res.statusCode ?? 0;
-        resolve(code >= 200 && code < 300 ? data : null);
+        if (data.length > 0) resolve(data);
+        else resolve(code >= 200 && code < 300 ? data : null);
       });
     }).on('error', (e) => {
-      console.error(`Fetch error for ${url}:`, e);
+      if (!quiet) console.error(`Fetch error for ${url}:`, e);
       resolve(null);
     });
   });
 }
 
-export async function fetchText(url: string, init?: RequestInit): Promise<string | null> {
+export async function fetchText(
+  url: string,
+  init?: RequestInit,
+  opts?: { quiet?: boolean },
+): Promise<string | null> {
   const headers = {
     ...DEFAULT_HEADERS,
     ...(init?.headers as Record<string, string> | undefined),
   };
 
   if (isDseHost(url)) {
-    return fetchTextInsecure(url, headers);
+    return fetchTextInsecure(url, headers, opts?.quiet);
   }
 
   try {
@@ -102,10 +107,89 @@ export async function fetchText(url: string, init?: RequestInit): Promise<string
       return await response.text();
     }
   } catch (e) {
-    console.error(`Fetch error for ${url}:`, e);
+    if (!opts?.quiet) console.error(`Fetch error for ${url}:`, e);
   }
   return null;
 }
+
+function postTextInsecure(
+  url: string,
+  body: string,
+  headers: Record<string, string>,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const u = new URL(url);
+    const req = httpsRequest(
+      {
+        hostname: u.hostname,
+        path: `${u.pathname}${u.search}`,
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Length': Buffer.byteLength(body),
+        },
+        rejectUnauthorized: false,
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          const code = res.statusCode ?? 0;
+          // DSE often returns 302 with a full HTML body (no redirect follow needed).
+          if (data.length > 0) resolve(data);
+          else resolve(code >= 200 && code < 300 ? data : null);
+        });
+      },
+    );
+    req.on('error', (e) => {
+      console.error(`POST error for ${url}:`, e);
+      resolve(null);
+    });
+    req.write(body);
+    req.end();
+  });
+}
+
+/** POST form body; uses insecure TLS for dsebd.org (incomplete cert chain). */
+export async function fetchPostText(
+  url: string,
+  fields: Record<string, string>,
+): Promise<string | null> {
+  const body = new URLSearchParams(fields).toString();
+  const headers = {
+    ...DEFAULT_HEADERS,
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+
+  if (isDseHost(url)) {
+    return postTextInsecure(url, body, headers);
+  }
+
+  try {
+    const response = await fetch(url, { method: 'POST', headers, body });
+    if (response.ok) return await response.text();
+  } catch (e) {
+    console.error(`POST error for ${url}:`, e);
+  }
+  return null;
+}
+
+const MONTH_ABBR: Record<string, string> = {
+  jan: '01',
+  feb: '02',
+  mar: '03',
+  apr: '04',
+  may: '05',
+  jun: '06',
+  jul: '07',
+  aug: '08',
+  sep: '09',
+  oct: '10',
+  nov: '11',
+  dec: '12',
+};
 
 /** Normalize DSE / generic date strings to YYYY-MM-DD. */
 export function normalizeDate(raw: string): string | null {
@@ -121,6 +205,11 @@ export function normalizeDate(raw: string): string | null {
     const [, dd, mm, yy] = dmy;
     const yyyy = yy!.length === 2 ? `20${yy}` : yy;
     return `${yyyy}-${mm!.padStart(2, '0')}-${dd!.padStart(2, '0')}`;
+  }
+  const named = s.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),\s*(\d{4})$/);
+  if (named) {
+    const mm = MONTH_ABBR[named[1]!.slice(0, 3).toLowerCase()];
+    if (mm) return `${named[3]}-${mm}-${named[2]!.padStart(2, '0')}`;
   }
   return null;
 }

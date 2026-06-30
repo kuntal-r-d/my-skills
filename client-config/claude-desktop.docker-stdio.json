@@ -1,5 +1,22 @@
 {
   "mcpServers": {
+    "stock-buddy-data": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "STOCK_BUDDY_DATA_HTTP=0",
+        "-e",
+        "DATABASE_URL=postgresql://stockbuddy:stockbuddy@host.docker.internal:5432/stockbuddy",
+        "-e",
+        "STOCK_BUDDY_DATA_ADMIN=1",
+        "stock-buddy-mcp:latest",
+        "node",
+        "packages/data-mcp-server/dist/server.js"
+      ]
+    },
     "stock-buddy": {
       "command": "docker",
       "args": [

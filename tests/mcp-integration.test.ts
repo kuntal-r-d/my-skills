@@ -36,4 +36,15 @@ describe('Composites', () => {
     expect(result).toHaveProperty('risk');
     expect(result).toHaveProperty('stages');
   });
+
+  it('analyze_ticker with ticker-only returns client research instructions', () => {
+    const result = analyzeTicker({ ticker: 'WALTONHIL' });
+    expect(result.error).toBe('insufficient_data_contract');
+    expect(result.instructions).toBeDefined();
+    expect(result.instructions).toHaveProperty('client_agent_action');
+    expect(result.instructions).toHaveProperty('source_selection_policy');
+    expect(result.instructions).toHaveProperty('missing_core_fields');
+    expect(result.instructions).toHaveProperty('example_public_sources');
+    expect(result.instructions).toHaveProperty('suggested_public_sources');
+  });
 });

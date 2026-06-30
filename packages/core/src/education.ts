@@ -3,9 +3,102 @@ export interface CriterionEducation {
   bangla: string;
   example: string;
   formattedValue: string | null;
+  /** Plain-language pass bar derived from the criterion label. */
+  target: string;
+  /** Human-readable line for the stock's numbers (or a missing-data note). */
+  dataLine: string;
+  /** Where to find missing fields, when applicable. */
+  missingHint: string | null;
   beginner: string;
   intermediate: string;
   advanced: string;
+}
+
+export interface CriterionEducationOptions {
+  passed?: boolean | null;
+  missingFields?: string[];
+}
+
+const DATA_FIELD_LABELS: Record<string, string> = {
+  free_cash_flow: 'free cash flow (FCF)',
+  moat: 'economic moat (qualitative)',
+  roe: 'return on equity (ROE)',
+  debt_to_equity: 'debt-to-equity ratio',
+  profit_margin: 'profit margin',
+  eps_history: 'EPS history (multi-year)',
+  intrinsic_value: 'intrinsic / fair value estimate',
+  price: 'share price',
+  peg: 'PEG ratio',
+  earnings_growth: 'earnings growth rate',
+  revenue_growth: 'revenue growth rate',
+  inventory_turnover: 'inventory turnover',
+  insider_buying: 'insider buying activity',
+  institution_ownership: 'institutional ownership %',
+  buyback: 'share buyback program',
+  pe: 'P/E ratio',
+  pb: 'P/B ratio',
+  current_ratio: 'current ratio',
+  dividend_yield: 'dividend yield',
+  ncav_per_share: 'net current asset value per share',
+  operating_margin: 'operating margin',
+  return_on_assets: 'return on assets (ROA)',
+  interest_coverage: 'interest coverage',
+  earnings_surprise: 'recent earnings surprise',
+  market_index: 'market index comparison data',
+  ohlcv: 'price & volume history (OHLCV bars)',
+};
+
+const DATA_FIELD_HINTS: Record<string, string> = {
+  free_cash_flow:
+    'Check the annual report cash-flow statement (operating cash flow minus capital expenditure). Stock Buddy ingest does not auto-fill FCF yet.',
+  moat:
+    'Judgment call from brand strength, margins, and competitive position — not available from price feeds alone.',
+  eps_history:
+    'Multi-year EPS from DSE financial tables or annual reports. Run a full fundamentals ingest.',
+  intrinsic_value:
+    'Comes from fundamental-analysis after enough inputs exist, or from your own DCF / Graham estimate.',
+  inventory_turnover: 'From annual report operating metrics — not in basic DSE quote pages.',
+  insider_buying: 'From DSE sponsor/director trading disclosures.',
+  institution_ownership: 'From monthly DSE shareholding breakdown (ingest shareholding).',
+  buyback: 'From corporate announcements or annual report notes.',
+  ncav_per_share: 'Balance-sheet deep dive — current assets minus total liabilities, per share.',
+  earnings_surprise: 'Latest results vs prior consensus — often from news or research platforms.',
+  market_index: 'Needs benchmark index OHLCV loaded for relative-strength comparison.',
+  ohlcv: 'Run OHLCV ingest (Ops tab or ingest job) — at least 30 daily bars required.',
+};
+
+export function humanizeDataField(field: string): string {
+  const key = field.split('/')[0]!.trim();
+  return DATA_FIELD_LABELS[key] ?? key.replace(/_/g, ' ');
+}
+
+export function missingFieldsHint(fields: string[]): string | null {
+  if (!fields.length) return null;
+  const labels = fields.flatMap((f) => f.split('/').map((p) => humanizeDataField(p)));
+  const unique = [...new Set(labels)];
+  const hints = fields
+    .flatMap((f) => f.split('/'))
+    .map((k) => DATA_FIELD_HINTS[k])
+    .filter(Boolean);
+  const hintText = hints.length ? ` ${hints[0]}` : ' Run fundamentals ingest or add via research memo.';
+  return `Waiting on: ${unique.join(', ')}.${hintText}`;
+}
+
+/** Turn checklist labels like "ROE > 15%" into investor-friendly targets. */
+export function targetFromLabel(label: string): string {
+  const l = label.trim();
+  if (/^business understandable$/i.test(l)) return 'You should be able to explain what the company does in plain language.';
+  if (/positive$/i.test(l) || /present$/i.test(l) || /in place$/i.test(l)) {
+    return `Must satisfy: ${l.charAt(0).toLowerCase()}${l.slice(1)}`;
+  }
+  if (/buying$/i.test(l)) return `Must satisfy: ${l.charAt(0).toLowerCase()}${l.slice(1)}`;
+  if (l.includes('>=')) return `Need ${l.replace('>=', 'at least').replace('>', ' above ')}`;
+  if (l.includes('<=')) return `Need ${l.replace('<=', 'at most').replace('<', ' below ')}`;
+  if (l.includes('>')) return `Need ${l.replace('>', ' above ')}`;
+  if (l.includes('<')) return `Need ${l.replace('<', ' below ')}`;
+  if (/between/i.test(l)) return `Need ${l}`;
+  if (/understandable/i.test(l)) return l;
+  return `Need: ${l}`;
 }
 
 const RATIO_LABELS =
@@ -348,10 +441,26 @@ export function buildCriterionEducation(
   explanation: string,
   value: unknown,
   mode: 'investment' | 'momentum' = 'investment',
+  options?: CriterionEducationOptions,
 ): CriterionEducation {
   const map = mode === 'momentum' ? MOMENTUM_COPY : INVESTMENT_COPY;
   const copy = map[label] ?? fallbackCopy(label, explanation);
   const formattedValue = formatCriterionValue(label, value);
+  const target = targetFromLabel(label);
+  const missingFields = options?.missingFields ?? [];
+  const passed = options?.passed;
+  const missingHint = missingFields.length ? missingFieldsHint(missingFields) : null;
+
+  let dataLine: string;
+  if (formattedValue) {
+    dataLine = formattedValue;
+  } else if (missingHint) {
+    dataLine = missingHint;
+  } else if (passed === null) {
+    dataLine = 'Data not available for this check yet.';
+  } else {
+    dataLine = '—';
+  }
 
   let example = copy.example;
   if (formattedValue) {
@@ -368,6 +477,9 @@ export function buildCriterionEducation(
     bangla: copy.bangla,
     example,
     formattedValue,
+    target,
+    dataLine,
+    missingHint,
     beginner: copy.simple,
     intermediate: explanation,
     advanced,

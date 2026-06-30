@@ -6,12 +6,13 @@
   <title>Stock Buddy Dashboard</title>
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
 </head>
 <body>
   <header class="header">
     <div class="header-inner">
       <h1>Stock Buddy</h1>
-      <p class="subtitle">DSE analysis hub — educational use only</p>
+      <p class="subtitle">DSE portfolio intelligence</p>
     </div>
     <div class="mode-toggle" id="mode-toggle">
       <span class="mode-label">View mode:</span>
@@ -31,6 +32,8 @@
       <button type="button" class="tab" data-panel="analytics">Analytics</button>
       <button type="button" class="tab" data-panel="news">News</button>
       <button type="button" class="tab" data-panel="macro">Macro</button>
+      <button type="button" class="tab" data-panel="skills">Skills</button>
+      <button type="button" class="tab" data-panel="daily">Daily</button>
       <button type="button" class="tab" data-panel="ops">Ops</button>
     </nav>
   </header>
@@ -42,30 +45,21 @@
         <button type="button" id="refresh-home" class="btn-sm">Refresh</button>
       </div>
 
-      <section class="home-section" aria-labelledby="home-briefing-heading">
+      <section class="home-section home-section-briefing" aria-labelledby="home-briefing-heading">
         <div class="home-section-head">
           <h3 id="home-briefing-heading">Daily briefing</h3>
           <button type="button" class="btn-sm linkish" data-panel="briefing">Full briefing →</button>
         </div>
-        <div id="home-briefing-content"><p class="muted">Loading briefing…</p></div>
+        <div id="home-briefing-content" class="briefing-shell briefing-shell-compact"><p class="muted">Loading briefing…</p></div>
       </section>
 
-      <section class="home-section" aria-labelledby="home-news-heading">
+      <section class="home-section home-section-news" aria-labelledby="home-news-heading">
         <div class="home-section-head">
           <h3 id="home-news-heading">News to watch</h3>
           <button type="button" class="btn-sm linkish" data-panel="news">All news →</button>
         </div>
         <p class="home-news-intro muted">Disclosures, dividends, and headlines tied to your holdings, watchlist, and the wider DSE market.</p>
         <div id="home-important-news"><p class="muted">Loading news…</p></div>
-      </section>
-
-      <section class="home-section" aria-labelledby="home-portfolio-heading">
-        <div class="home-section-head">
-          <h3 id="home-portfolio-heading">Portfolio</h3>
-          <button type="button" class="btn-sm linkish" data-panel="portfolio">Manage →</button>
-        </div>
-        <div id="home-portfolio-summary" class="meta-bar"></div>
-        <div class="table-wrap" id="home-portfolio-table"></div>
       </section>
     </section>
 
@@ -86,6 +80,7 @@
         <span id="analysis-status" class="analysis-status muted" aria-live="polite"></span>
         <span id="analysis-stale" class="stale-badge hidden">Stale — refresh recommended</span>
       </div>
+      <div id="analysis-data-bar" class="analysis-data-bar" aria-label="Data as-of dates"></div>
       <div id="ticker-meta" class="meta-bar"></div>
       <div id="ticker-commands-quick" class="ticker-commands-quick"></div>
 
@@ -151,16 +146,40 @@
     </section>
 
     <section id="panel-portfolio" class="panel">
-      <div id="portfolio-summary" class="meta-bar"></div>
-      <div class="toolbar wrap">
-        <input id="pos-symbol" placeholder="Symbol" />
-        <input id="pos-qty" type="number" placeholder="Qty" />
-        <input id="pos-cost" type="number" placeholder="Avg cost" />
-        <button type="button" id="add-position">Add position</button>
-      </div>
-      <div class="grid-2">
-        <div class="chart-box sm"><canvas id="sector-chart"></canvas></div>
-        <div class="table-wrap" id="portfolio-table"></div>
+      <div id="portfolio-account-summary" class="meta-bar"></div>
+      <p class="muted">Separate portfolios for long-term investment holdings and momentum trading positions.</p>
+      <div class="portfolio-stack portfolio-grid">
+        <div class="watchlist-panel">
+          <h3>Investment</h3>
+          <div class="portfolio-add toolbar wrap">
+            <input class="pos-symbol" data-purpose="investment" placeholder="Symbol" />
+            <input class="pos-qty" data-purpose="investment" type="number" placeholder="Qty" />
+            <input class="pos-cost" data-purpose="investment" type="number" placeholder="Avg cost" />
+            <button type="button" class="add-position" data-purpose="investment">Add position</button>
+          </div>
+          <div id="portfolio-investment-summary" class="meta-bar"></div>
+          <div class="grid-2 portfolio-panel-grid">
+            <div class="chart-box sm"><canvas id="sector-chart-investment"></canvas></div>
+            <div class="table-wrap" id="portfolio-investment-table"></div>
+          </div>
+        </div>
+        <div class="watchlist-panel">
+          <h3>Momentum trading</h3>
+          <p class="muted momentum-trading-hint">Each level shows <strong>ATR</strong> and <strong>Struct</strong> rows — run <strong>Analyze Full</strong> on each holding to populate both. Hover for formulas. Developer JSON: <code>risk.strategies.structure</code>.</p>
+          <div class="portfolio-add toolbar wrap">
+            <input class="pos-symbol" data-purpose="trading" placeholder="Symbol" />
+            <input class="pos-qty" data-purpose="trading" type="number" placeholder="Qty" />
+            <input class="pos-cost" data-purpose="trading" type="number" placeholder="Avg cost" />
+            <button type="button" class="add-position" data-purpose="trading">Add position</button>
+          </div>
+          <div id="portfolio-trading-summary" class="meta-bar"></div>
+          <div id="portfolio-trading-mirror" class="portfolio-mirror-banner-wrap"></div>
+          <div class="portfolio-trading-actions toolbar wrap">
+            <button type="button" id="sync-trading-portfolio" class="btn-sm hidden">Copy to momentum trading</button>
+          </div>
+          <div class="table-wrap" id="portfolio-trading-table"></div>
+          <div class="chart-box sm portfolio-trading-chart"><canvas id="sector-chart-trading"></canvas></div>
+        </div>
       </div>
     </section>
 
@@ -192,9 +211,18 @@
       </div>
     </section>
 
-    <section id="panel-briefing" class="panel">
-      <div class="toolbar"><button type="button" id="load-briefing">Refresh briefing</button></div>
-      <div id="briefing-content"></div>
+    <section id="panel-briefing" class="panel briefing-panel-wrap">
+      <div class="briefing-toolbar toolbar wrap">
+        <div class="briefing-toolbar-title">
+          <h2 class="briefing-page-title">Pre-market briefing</h2>
+          <span id="briefing-as-of" class="muted briefing-as-of"></span>
+        </div>
+        <div class="briefing-toolbar-actions">
+          <button type="button" id="load-briefing">Refresh</button>
+          <button type="button" id="briefing-copy-md" class="btn-sm">Copy markdown</button>
+        </div>
+      </div>
+      <div id="briefing-content" class="briefing-shell"></div>
     </section>
 
     <section id="panel-glossary" class="panel">
@@ -222,8 +250,65 @@
     </section>
 
     <section id="panel-macro" class="panel">
-      <div id="macro-meta" class="meta-bar"></div>
-      <pre id="macro-json" class="json-block"></pre>
+      <div class="toolbar wrap">
+        <button type="button" id="refresh-macro">Refresh</button>
+        <span class="muted" id="macro-meta"></span>
+      </div>
+      <div id="macro-content"><p class="muted">Loading macro snapshot…</p></div>
+    </section>
+
+    <section id="panel-skills" class="panel">
+      <p class="muted skills-intro">Edit Agent Skill <code>SKILL.md</code> files. Saves go to PostgreSQL; optional sync writes <code>skills/{slug}/SKILL.md</code> on disk.</p>
+      <div class="toolbar skills-toolbar wrap">
+        <button type="button" id="skills-refresh">Refresh list</button>
+        <select id="skills-select" aria-label="Select skill"></select>
+        <span class="muted" id="skills-meta"></span>
+      </div>
+      <div class="skills-editor-grid">
+        <div class="skills-list-wrap">
+          <div class="table-wrap" id="skills-table"></div>
+        </div>
+        <div class="skills-edit-wrap">
+          <div class="toolbar wrap skills-edit-toolbar">
+            <div class="skills-action-group">
+              <button type="button" id="skills-save-db">Save to DB</button>
+              <button type="button" id="skills-save-disk">Save + sync disk</button>
+              <button type="button" class="btn-sm" id="skills-sync-disk">Sync effective → disk</button>
+              <button type="button" class="btn-sm" id="skills-reset">Reset DB override</button>
+              <button type="button" class="btn-sm" id="skills-reload-disk">Reload from disk</button>
+            </div>
+            <div class="skills-view-toggle" role="tablist" aria-label="Skill editor view">
+              <span class="muted skills-view-label">View</span>
+              <button type="button" class="btn-sm skills-view-btn" data-skills-view="edit" role="tab">Edit</button>
+              <button type="button" class="btn-sm skills-view-btn active" data-skills-view="split" role="tab">Split</button>
+              <button type="button" class="btn-sm skills-view-btn" data-skills-view="preview" role="tab">Preview</button>
+            </div>
+          </div>
+          <div id="skills-editor-pane" class="skills-editor-pane skills-view-split">
+            <div class="skills-editor-col">
+              <div class="skills-pane-head">
+                <span>SKILL.md</span>
+                <span class="muted skills-pane-hint">Markdown · Tab inserts two spaces</span>
+              </div>
+              <textarea id="skills-editor" class="skills-editor" spellcheck="false" wrap="off" placeholder="Select a skill to edit SKILL.md…"></textarea>
+            </div>
+            <div class="skills-preview-col">
+              <div class="skills-pane-head">
+                <span>Preview</span>
+                <span class="muted skills-pane-hint">Rendered body (frontmatter shown above)</span>
+              </div>
+              <div id="skills-preview" class="skills-preview">
+                <p class="muted">Select a skill or switch to Split / Preview to render markdown.</p>
+              </div>
+            </div>
+          </div>
+          <p class="muted skills-status" id="skills-status"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-daily" class="panel">
+      <div id="daily-content"><p class="muted">Loading daily commands…</p></div>
     </section>
 
     <section id="panel-ops" class="panel">
@@ -235,7 +320,8 @@
     </section>
   </main>
 
-  <footer class="footer">Educational use only — not financial advice</footer>
+  <footer class="footer" id="app-footer">Personal investment workspace — verify live prices before acting</footer>
+  <div id="toast-host" class="toast-host" aria-live="polite" aria-relevant="additions"></div>
   <script src="/analysis-ui.js"></script>
   <script src="/app.js"></script>
 </body>

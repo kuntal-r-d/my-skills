@@ -106,8 +106,8 @@ export const SKILLS: Record<string, SkillSpec> = {
   daily_briefing: {
     skill: 'daily-briefing',
     description:
-      'Produce a pre-market briefing (levels, events, risk items) in conditional, '
-      + 'non-imperative language.',
+      'Produce a pre-market briefing with regime, level alerts, news, risk items, '
+      + 'and portfolio/watchlist signal summary for decision-making.',
     reads: ['portfolio', 'watchlist', 'calendar', 'overnight_news', 'macro_regime', 'as_of'],
   },
   ticker_dossier: {

@@ -1,14 +1,34 @@
 {
   "mcpServers": {
-    "stock-buddy": {
-      "command": "node",
+    "stock-buddy-data": {
+      "command": "docker",
       "args": [
-        "/Users/kuntal/Developer/stock-buddy-skill-mcp/stock-buddy/packages/mcp-server/dist/server.js"
-      ],
-      "env": {
-        "STOCK_BUDDY_HTTP": "0",
-        "STOCK_BUDDY_SKILLS_DIR": "/Users/kuntal/Developer/stock-buddy-skill-mcp/stock-buddy/skills"
-      }
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "STOCK_BUDDY_DATA_HTTP=0",
+        "-e",
+        "DATABASE_URL=postgresql://stockbuddy:stockbuddy@host.docker.internal:5432/stockbuddy",
+        "-e",
+        "STOCK_BUDDY_DATA_ADMIN=1",
+        "stock-buddy-mcp:latest",
+        "node",
+        "packages/data-mcp-server/dist/server.js"
+      ]
+    },
+    "stock-buddy": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "STOCK_BUDDY_HTTP=0",
+        "-e",
+        "STOCK_BUDDY_SKILLS_DIR=/app/skills",
+        "stock-buddy-mcp:latest"
+      ]
     }
   }
 }

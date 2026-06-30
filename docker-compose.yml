@@ -31,8 +31,15 @@ services:
     environment:
       - STOCK_BUDDY_HTTP=1
       - STOCK_BUDDY_PORT=8080
+      - STOCK_BUDDY_SKILLS_DIR=/app/skills
+      - DATABASE_URL=postgresql://stockbuddy:stockbuddy@postgres:5432/stockbuddy
+      - STOCK_BUDDY_PERSIST_ANALYSIS=1
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
-      - ./skills/_fixtures:/app/skills/_fixtures:ro
+      # Live repo skills (read for analysis; same mount used by skill editor sync_to_disk)
+      - ./skills:/app/skills
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'node', '-e', 'process.exit(0)']
@@ -56,9 +63,14 @@ services:
       - STOCK_BUDDY_DATA_HTTP=1
       - STOCK_BUDDY_DATA_PORT=8081
       - STOCK_BUDDY_DATA_ADMIN=1
+      - STOCK_BUDDY_SKILLS_DIR=/app/skills
+      - STOCK_BUDDY_SKILLS_ADMIN=1
+      - STOCK_BUDDY_SKILLS_WRITE_DISK=1
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./skills:/app/skills
     restart: unless-stopped
     networks:
       - stock-buddy-net
@@ -72,7 +84,11 @@ services:
     command: ['node', 'packages/ingest/dist/scheduler.js']
     environment:
       - DATABASE_URL=postgresql://stockbuddy:stockbuddy@postgres:5432/stockbuddy
-      - INGEST_CRON_OHLCV=0 11 * * 0-4
+      - INGEST_DAILY_OHLCV_DAYS=90
+      - INGEST_OHLCV_SOURCES=dse,stockanalysis,yahoo
+      - INGEST_FUNDAMENTALS_SOURCES=dse,stockanalysis,stockanalysis_statistics,lankabd,amarstock
+      - INGEST_NEWS_SOURCES=dse_psn,dse_corporate,tbs_stocks,dhaka_tribune_stock,tbs_economy,financial_express,google_news_dse,daily_star_business,tbs_economy_bn,prothomalo,google_news_bn,financial_express_bn
+      - INGEST_SOURCE_RATE_MS=1000
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,9 +108,20 @@ services:
     environment:
       - DATABASE_URL=postgresql://stockbuddy:stockbuddy@postgres:5432/stockbuddy
       - STOCK_BUDDY_DASHBOARD_PORT=3000
+      - STOCK_BUDDY_SKILLS_DIR=/app/skills
+      - STOCK_BUDDY_SKILLS_WRITE_DISK=1
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./skills:/app/skills
+      - ./packages/skills/dist:/app/packages/skills/dist:ro
+      - ./packages/mcp-server/dist:/app/packages/mcp-server/dist:ro
+      - ./packages/ingest/dist:/app/packages/ingest/dist:ro
+      - ./packages/db/dist:/app/packages/db/dist:ro
+      - ./packages/core/dist:/app/packages/core/dist:ro
+      - ./packages/dashboard/public:/app/packages/dashboard/public:ro
+      - ./packages/dashboard/dist:/app/packages/dashboard/dist:ro
     restart: unless-stopped
     networks:
       - stock-buddy-net

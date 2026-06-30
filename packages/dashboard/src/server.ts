@@ -29,7 +29,13 @@ import {
   ensureTicker,
   roc1mPctFromOhlcv,
   extractAnalysisScores,
+  extractRiskMetrics,
+  type PortfolioPurpose,
   listImportantNews,
+  listSkillOverrides,
+  getSkillOverride,
+  upsertSkillOverride,
+  deleteSkillOverride,
 } from '@stock-buddy/db';
 import {
   analysisSnapshots,
@@ -47,9 +53,22 @@ import {
   screenMarket,
   buildUniverse,
   runDailyBriefing,
+  buildTickerContract,
+  stripMeta,
+  enrichRiskInAnalysis,
   type AnalysisMode,
 } from '@stock-buddy/ingest';
-import { sanitizeOhlcv, countSuspiciousOhlcvBars } from '@stock-buddy/core';
+import {
+  sanitizeOhlcv,
+  countSuspiciousOhlcvBars,
+  getMergedSkill,
+  listMergedSkills,
+  listSkillSlugsFromDisk,
+  parseSkillMd,
+  validateSkillSlug,
+  writeSkillToDisk,
+  SKILL_TOOL_NAMES,
+} from '@stock-buddy/core';
 
 loadEnv();
 
@@ -63,6 +82,32 @@ app.use(express.json());
 const discoverCache = new Map<string, { at: number; data: Record<string, unknown> }>();
 const DISCOVER_TTL_MS = 60 * 60 * 1000;
 
+function canDashboardWriteSkillsDisk(): boolean {
+  return process.env.STOCK_BUDDY_SKILLS_WRITE_DISK !== '0';
+}
+
+function formatSkillApiRow(
+  detail: NonNullable<ReturnType<typeof getMergedSkill>>,
+  overrideRow?: Awaited<ReturnType<typeof getSkillOverride>> | null,
+) {
+  return {
+    slug: detail.slug,
+    tool_name: detail.tool_name,
+    name: detail.name,
+    description: detail.description,
+    source: detail.source,
+    has_disk: detail.has_disk,
+    has_override: detail.has_override,
+    is_active: detail.is_active,
+    version: detail.version,
+    updated_at: detail.updated_at,
+    skill_md_length: detail.skill_md_length,
+    skill_md: detail.skill_md,
+    disk_skill_md: detail.disk_skill_md,
+    override_id: detail.override_id ?? overrideRow?.id ?? null,
+  };
+}
+
 async function withDb<T>(fn: (db: ReturnType<typeof getDb>) => Promise<T>): Promise<T> {
   return fn(getDb());
 }
@@ -73,35 +118,52 @@ function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
   };
 }
 
-async function fetchPortfolio(db: ReturnType<typeof getDb>) {
+async function fetchPortfolio(db: ReturnType<typeof getDb>, purpose: PortfolioPurpose) {
   const account = await getDefaultAccount(db);
-  if (!account) return { account: null, positions: [], sector_allocation: [], total_cost_basis: 0 };
+  if (!account) {
+    return { account: null, positions: [], sector_allocation: [], total_cost_basis: 0 };
+  }
 
-  const positions = await getPortfolioPositions(db, account.id);
+  const positions = await getPortfolioPositions(db, account.id, purpose);
+  let mirroredFromInvestment = false;
+  let rows = positions;
+  if (purpose === 'trading' && rows.length === 0) {
+    const investmentRows = await getPortfolioPositions(db, account.id, 'investment');
+    if (investmentRows.length > 0) {
+      rows = investmentRows;
+      mirroredFromInvestment = true;
+    }
+  }
+
   const enriched = await Promise.all(
-    positions.map(async (p) => {
+    rows.map(async (p) => {
       const cost = p.position.qty * p.position.avgCost;
       const ohlcv = await getOhlcv(db, p.position.tickerId, { limit: 23 });
       const lastClose = ohlcv[ohlcv.length - 1]?.close;
       const roc1m = roc1mPctFromOhlcv(ohlcv);
       const snap = await getLatestAnalysisSnapshot(db, p.position.tickerId);
-      const scores = extractAnalysisScores(snap?.payload as Record<string, unknown> | undefined);
+      const payload = snap?.payload as Record<string, unknown> | undefined;
+      const scores = extractAnalysisScores(payload);
+      const risk = extractRiskMetrics(payload);
+      const riskForTable = purpose === 'trading' || Object.keys(risk).length > 0 ? risk : undefined;
       const marketValue = lastClose != null ? p.position.qty * lastClose : null;
       const pnl = marketValue != null ? marketValue - cost : null;
       const pnlPct = pnl != null && cost ? (pnl / cost) * 100 : null;
       return {
         ticker: p.symbol,
+        purpose: p.position.purpose,
         qty: p.position.qty,
         avg_cost: p.position.avgCost,
         sector: p.position.sector ?? 'Unknown',
         cost_basis: cost,
-        stop_level: p.position.stopLevel,
-        target_level: p.position.targetLevel,
+        stop_level: p.position.stopLevel ?? riskForTable?.stop_loss,
+        target_level: p.position.targetLevel ?? riskForTable?.target,
         last_close: lastClose,
         roc_1m_pct: roc1m,
         market_value: marketValue,
         pnl,
         pnl_pct: pnlPct,
+        risk: riskForTable,
         ...scores,
       };
     }),
@@ -122,6 +184,8 @@ async function fetchPortfolio(db: ReturnType<typeof getDb>) {
     .sort((a, b) => b.value - a.value);
 
   return {
+    purpose,
+    mirrored_from_investment: mirroredFromInvestment,
     account: {
       label: account.label,
       capital_bdt: account.capitalBdt,
@@ -155,12 +219,11 @@ app.get('/api/stats', asyncHandler(async (_req, res) => {
 
 app.get('/api/overview', asyncHandler(async (_req, res) => {
   const data = await withDb(async (db) => {
-    const [briefing, portfolio, importantNews] = await Promise.all([
+    const [briefing, importantNews] = await Promise.all([
       runDailyBriefing(db),
-      fetchPortfolio(db),
       listImportantNews(db, 12, 14),
     ]);
-    return { briefing, portfolio, importantNews };
+    return { briefing, importantNews };
   });
   res.json(data);
 }));
@@ -212,12 +275,12 @@ app.get('/api/tickers/:symbol', asyncHandler(async (req, res) => {
     const freshness = await getFreshness(db, ticker.id);
 
     const dataWarnings: string[] = [];
-    if (!fundamentals) dataWarnings.push('fundamentals missing — run: npm run ingest -- --ticker ' + symbol + ' --job all');
-    if (ohlcv.length < 200) dataWarnings.push(`only ${ohlcv.length} price bars (need ~260 for full momentum)`);
+    if (!fundamentals) dataWarnings.push('fundamentals missing — run: npm run ingest -- --ticker ' + symbol + ' --job all (or npm run ingest:watchlist)');
+    if (ohlcv.length < 200) dataWarnings.push(`only ${ohlcv.length} price bars (need ~260 for full momentum) — run npm run ingest:daily`);
     if (suspicious > 0 || dropped > 0) {
-      dataWarnings.push(`${suspicious || dropped} corrupt price bar(s) filtered — re-ingest recommended`);
+      dataWarnings.push(`${suspicious || dropped} corrupt price bar(s) filtered — run npm run ingest:daily or per-ticker OHLCV ingest`);
     }
-    if (!news.length) dataWarnings.push('no news ingested');
+    if (!news.length) dataWarnings.push('no news ingested — run: npm run ingest:daily or npm run ingest:news');
     if (!shareholding.length) dataWarnings.push('shareholding missing');
 
     return {
@@ -296,6 +359,11 @@ app.get('/api/tickers/:symbol/analysis', asyncHandler(async (req, res) => {
     }
 
     const latest = await getLatestAnalysisSnapshot(db, ticker.id);
+    let payload = latest?.payload as Record<string, unknown> | undefined;
+    if (payload) {
+      const contract = await buildTickerContract(db, ticker.symbol, { includePortfolio: true });
+      payload = enrichRiskInAnalysis(payload, stripMeta(contract));
+    }
     return {
       ticker: { symbol: ticker.symbol, name: ticker.name },
       snapshot: latest
@@ -305,7 +373,7 @@ app.get('/api/tickers/:symbol/analysis', asyncHandler(async (req, res) => {
             as_of: latest.asOf,
             created_at: latest.createdAt,
             model_version: latest.modelVersion,
-            payload: latest.payload,
+            payload,
           }
         : null,
     };
@@ -376,8 +444,17 @@ app.post('/api/discover', asyncHandler(async (req, res) => {
 
 app.get('/api/watchlist', asyncHandler(async (req, res) => {
   const purpose = req.query.purpose as 'investment' | 'trading' | undefined;
-  const rows = await withDb((db) => listWatchlist(db, purpose));
-  res.json({ watchlist: rows });
+  const watchlist = await withDb(async (db) => {
+    const rows = await listWatchlist(db, purpose);
+    return Promise.all(
+      rows.map(async (w) => {
+        const snap = await getLatestAnalysisSnapshot(db, w.tickerId);
+        const scores = extractAnalysisScores(snap?.payload as Record<string, unknown> | undefined);
+        return { ...w, ...scores, analysis_as_of: snap?.asOf ?? null };
+      }),
+    );
+  });
+  res.json({ watchlist });
 }));
 
 app.post('/api/watchlist', asyncHandler(async (req, res) => {
@@ -483,6 +560,7 @@ app.post('/api/portfolio/positions', asyncHandler(async (req, res) => {
   const symbol = String(req.body?.symbol ?? '').toUpperCase();
   const qty = Number(req.body?.qty);
   const avgCost = Number(req.body?.avg_cost);
+  const purpose = (req.body?.purpose === 'trading' ? 'trading' : 'investment') as PortfolioPurpose;
   if (!symbol || !qty || !avgCost) {
     res.status(400).json({ error: 'symbol, qty, avg_cost required' });
     return;
@@ -497,6 +575,7 @@ app.post('/api/portfolio/positions', asyncHandler(async (req, res) => {
       sector: req.body?.sector ?? t.sector ?? undefined,
       stopLevel: req.body?.stop_level != null ? Number(req.body.stop_level) : undefined,
       targetLevel: req.body?.target_level != null ? Number(req.body.target_level) : undefined,
+      purpose,
     });
   });
   res.json({ ok: true });
@@ -504,16 +583,53 @@ app.post('/api/portfolio/positions', asyncHandler(async (req, res) => {
 
 app.delete('/api/portfolio/positions/:symbol', asyncHandler(async (req, res) => {
   const symbol = String(req.params.symbol).toUpperCase();
+  const purpose = (req.query.purpose === 'trading' ? 'trading' : 'investment') as PortfolioPurpose;
   await withDb(async (db) => {
     const account = await getDefaultAccount(db);
     const t = await getTickerBySymbol(db, symbol);
-    if (account && t) await removePosition(db, account.id, t.id);
+    if (account && t) await removePosition(db, account.id, t.id, purpose);
   });
   res.json({ ok: true });
 }));
 
-app.get('/api/portfolio', asyncHandler(async (_req, res) => {
-  const data = await withDb((db) => fetchPortfolio(db));
+app.post('/api/portfolio/sync-trading', asyncHandler(async (_req, res) => {
+  const copied = await withDb(async (db) => {
+    const account = await getDefaultAccount(db);
+    if (!account) return 0;
+    const investment = await getPortfolioPositions(db, account.id, 'investment');
+    let n = 0;
+    for (const { position } of investment) {
+      await upsertPosition(db, account.id, position.tickerId, {
+        qty: position.qty,
+        avgCost: position.avgCost,
+        sector: position.sector ?? undefined,
+        stopLevel: position.stopLevel ?? undefined,
+        targetLevel: position.targetLevel ?? undefined,
+        purpose: 'trading',
+      });
+      n += 1;
+    }
+    return n;
+  });
+  res.json({ ok: true, copied });
+}));
+
+app.get('/api/portfolio', asyncHandler(async (req, res) => {
+  const purpose = req.query.purpose as PortfolioPurpose | undefined;
+  const data = await withDb(async (db) => {
+    if (purpose === 'investment' || purpose === 'trading') {
+      return fetchPortfolio(db, purpose);
+    }
+    const [investment, trading] = await Promise.all([
+      fetchPortfolio(db, 'investment'),
+      fetchPortfolio(db, 'trading'),
+    ]);
+    return {
+      account: investment.account ?? trading.account,
+      investment,
+      trading,
+    };
+  });
   res.json(data);
 }));
 
@@ -600,6 +716,119 @@ app.get('/api/freshness', asyncHandler(async (_req, res) => {
       .orderBy(desc(dataFreshness.lastSuccessAt)),
   );
   res.json({ freshness: rows });
+}));
+
+app.get('/api/skills', asyncHandler(async (_req, res) => {
+  const skills = await withDb(async (db) => {
+    const diskSlugs = listSkillSlugsFromDisk();
+    const overrides = await listSkillOverrides(db);
+    return listMergedSkills(diskSlugs, overrides);
+  });
+  res.json({ skills, count: skills.length });
+}));
+
+app.get('/api/skills/:slug', asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug).trim();
+  try {
+    validateSkillSlug(slug);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    return;
+  }
+  const data = await withDb(async (db) => {
+    const override = await getSkillOverride(db, slug);
+    const detail = getMergedSkill(slug, override, { include_disk_copy: true });
+    if (!detail) return null;
+    return formatSkillApiRow(detail, override);
+  });
+  if (!data) {
+    res.status(404).json({ error: `Skill not found: ${slug}` });
+    return;
+  }
+  res.json({ skill: data });
+}));
+
+app.put('/api/skills/:slug', asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug).trim();
+  const skillMd = String(req.body?.skill_md ?? '').trim();
+  if (!skillMd) {
+    res.status(400).json({ error: 'skill_md required' });
+    return;
+  }
+  try {
+    validateSkillSlug(slug);
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    return;
+  }
+
+  const parsed = parseSkillMd(skillMd);
+  const syncToDisk = req.body?.sync_to_disk === true;
+
+  const result = await withDb(async (db) => {
+    const row = await upsertSkillOverride(db, {
+      slug,
+      skillMd,
+      toolName: SKILL_TOOL_NAMES[slug],
+      name: parsed.name ?? undefined,
+      description: parsed.description ?? undefined,
+      clientId: typeof req.body?.client_id === 'string' ? req.body.client_id : 'dashboard',
+      isActive: req.body?.is_active !== false,
+    });
+    let diskPath: string | undefined;
+    if (syncToDisk) {
+      if (!canDashboardWriteSkillsDisk()) {
+        throw new Error('Disk write disabled. Set STOCK_BUDDY_SKILLS_WRITE_DISK=1');
+      }
+      diskPath = writeSkillToDisk(slug, skillMd).path;
+    }
+    const detail = getMergedSkill(slug, row, { include_disk_copy: true });
+    return { row, diskPath, detail };
+  });
+
+  res.json({
+    ok: true,
+    slug,
+    version: result.row.version,
+    synced_to_disk: Boolean(result.diskPath),
+    disk_path: result.diskPath,
+    skill: result.detail ? formatSkillApiRow(result.detail, result.row) : undefined,
+  });
+}));
+
+app.delete('/api/skills/:slug', asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug).trim();
+  const removed = await withDb((db) => deleteSkillOverride(db, slug));
+  if (!removed) {
+    res.status(404).json({ error: `No DB override for skill: ${slug}` });
+    return;
+  }
+  const detail = getMergedSkill(slug, null, { include_disk_copy: true });
+  res.json({
+    ok: true,
+    slug,
+    skill: detail ? formatSkillApiRow(detail, null) : null,
+  });
+}));
+
+app.post('/api/skills/:slug/sync-disk', asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug).trim();
+  if (!canDashboardWriteSkillsDisk()) {
+    res.status(403).json({ error: 'Disk write disabled. Set STOCK_BUDDY_SKILLS_WRITE_DISK=1' });
+    return;
+  }
+  const data = await withDb(async (db) => {
+    const override = await getSkillOverride(db, slug);
+    const detail = getMergedSkill(slug, override, { include_disk_copy: false });
+    if (!detail) return null;
+    const { path: diskPath } = writeSkillToDisk(slug, detail.skill_md);
+    return { detail, diskPath, source: detail.source };
+  });
+  if (!data) {
+    res.status(404).json({ error: `Skill not found: ${slug}` });
+    return;
+  }
+  res.json({ ok: true, slug, disk_path: data.diskPath, source: data.source });
 }));
 
 app.use(express.static(publicDir));

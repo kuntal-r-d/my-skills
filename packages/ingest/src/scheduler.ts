@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /** Simple scheduler: run OHLCV ingest daily, full watchlist weekly. */
 import { createDb, closeDb, loadEnv } from '@stock-buddy/db';
-import { ingestWatchlist, ingestOhlcv, ingestMacro } from './jobs.js';
-import { getWatchlistSymbols } from '@stock-buddy/db';
+import { ingestWatchlist, ingestDaily } from './jobs.js';
 
 loadEnv();
 
@@ -13,16 +12,8 @@ async function runDaily(): Promise<void> {
   const db = createDb();
   try {
     console.log(`[${new Date().toISOString()}] Daily ingest starting`);
-    await ingestMacro(db);
-    const symbols = await getWatchlistSymbols(db);
-    for (const symbol of symbols) {
-      try {
-        const n = await ingestOhlcv(db, symbol, 30);
-        console.log(`  ${symbol}: ${n} OHLCV rows`);
-      } catch (e) {
-        console.error(`  ${symbol} failed:`, e);
-      }
-    }
+    const result = await ingestDaily(db);
+    console.log(`  news: ${result.news_rows} rows, symbols: ${result.symbols.join(', ') || '(none)'}`);
   } finally {
     await closeDb(db);
   }
@@ -38,7 +29,14 @@ async function runWeekly(): Promise<void> {
   }
 }
 
+function schedule(label: string, fn: () => Promise<void>): void {
+  void fn().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[${new Date().toISOString()}] ${label} failed: ${msg}`);
+  });
+}
+
 console.log('Stock Buddy ingest worker started');
-void runDaily();
-setInterval(() => void runDaily(), OHLCV_INTERVAL_MS);
-setInterval(() => void runWeekly(), FULL_INTERVAL_MS);
+schedule('daily', runDaily);
+setInterval(() => schedule('daily', runDaily), OHLCV_INTERVAL_MS);
+setInterval(() => schedule('weekly', runWeekly), FULL_INTERVAL_MS);

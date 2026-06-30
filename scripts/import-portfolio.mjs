@@ -35,14 +35,16 @@ try {
 
   for (const p of data.positions) {
     const t = await ensureTicker(db, p.ticker, { sector: p.sector });
+    const purpose = p.purpose === 'trading' ? 'trading' : 'investment';
     await upsertPosition(db, account.id, t.id, {
       qty: p.qty,
       avgCost: p.avg_cost,
       sector: p.sector ?? t.sector ?? undefined,
       stopLevel: p.stop_level,
       targetLevel: p.target_level,
+      purpose,
     });
-    console.log(`  ${p.ticker}: ${p.qty} @ ${p.avg_cost}`);
+    console.log(`  ${p.ticker} [${purpose}]: ${p.qty} @ ${p.avg_cost}`);
   }
 
   console.log(`\nImported ${data.positions.length} positions from ${jsonPath}`);

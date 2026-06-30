@@ -10,6 +10,9 @@ import {
   ohlcvDaily,
   portfolioAccounts,
   portfolioPositions,
+  researchMemos,
+  researchSources,
+  skillOverrides,
   shareholdingMonthly,
   tickers,
   watchlistTickers,
@@ -401,7 +404,16 @@ export async function getDefaultAccount(db: Db) {
   return rows[0] ?? null;
 }
 
-export async function getPortfolioPositions(db: Db, accountId: number) {
+export type PortfolioPurpose = 'investment' | 'trading';
+
+export async function getPortfolioPositions(
+  db: Db,
+  accountId: number,
+  purpose?: PortfolioPurpose,
+) {
+  const conditions = [eq(portfolioPositions.accountId, accountId)];
+  if (purpose) conditions.push(eq(portfolioPositions.purpose, purpose));
+
   return db
     .select({
       position: portfolioPositions,
@@ -409,7 +421,7 @@ export async function getPortfolioPositions(db: Db, accountId: number) {
     })
     .from(portfolioPositions)
     .innerJoin(tickers, eq(portfolioPositions.tickerId, tickers.id))
-    .where(eq(portfolioPositions.accountId, accountId));
+    .where(and(...conditions));
 }
 
 export async function upsertPosition(
@@ -422,13 +434,16 @@ export async function upsertPosition(
     sector?: string;
     stopLevel?: number;
     targetLevel?: number;
+    purpose?: PortfolioPurpose;
   },
 ) {
+  const purpose = data.purpose ?? 'investment';
   await db
     .insert(portfolioPositions)
     .values({
       accountId,
       tickerId,
+      purpose,
       qty: data.qty,
       avgCost: data.avgCost,
       sector: data.sector,
@@ -436,7 +451,7 @@ export async function upsertPosition(
       targetLevel: data.targetLevel,
     })
     .onConflictDoUpdate({
-      target: [portfolioPositions.accountId, portfolioPositions.tickerId],
+      target: [portfolioPositions.accountId, portfolioPositions.tickerId, portfolioPositions.purpose],
       set: {
         qty: data.qty,
         avgCost: data.avgCost,
@@ -448,10 +463,21 @@ export async function upsertPosition(
     });
 }
 
-export async function removePosition(db: Db, accountId: number, tickerId: number) {
+export async function removePosition(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  purpose: PortfolioPurpose = 'investment',
+) {
   await db
     .delete(portfolioPositions)
-    .where(and(eq(portfolioPositions.accountId, accountId), eq(portfolioPositions.tickerId, tickerId)));
+    .where(
+      and(
+        eq(portfolioPositions.accountId, accountId),
+        eq(portfolioPositions.tickerId, tickerId),
+        eq(portfolioPositions.purpose, purpose),
+      ),
+    );
 }
 
 export async function setAccount(
@@ -753,7 +779,49 @@ export function extractAnalysisScores(payload: Record<string, unknown> | undefin
   return {
     investment_score: inv?.composite_1_10 as number | undefined,
     momentum_score: mom?.composite_1_10 as number | undefined,
+    investment_rating: inv?.rating as string | undefined,
+    momentum_rating: mom?.rating as string | undefined,
     risk_rating: risk?.rating as string | undefined,
+  };
+}
+
+export function extractRiskMetrics(payload: Record<string, unknown> | undefined) {
+  const risk = payload?.risk as Record<string, unknown> | undefined;
+  const km = risk?.key_metrics as Record<string, unknown> | undefined;
+  if (!km) return {};
+  const strategies = risk?.strategies as Record<string, Record<string, unknown>> | undefined;
+  const structKm = strategies?.structure?.key_metrics as Record<string, unknown> | undefined;
+  const structure = structKm
+    ? {
+        buy_zone_low: structKm.buy_zone_low as number | undefined,
+        buy_zone_high: structKm.buy_zone_high as number | undefined,
+        stop_loss: structKm.stop_loss as number | undefined,
+        target: structKm.target as number | undefined,
+        support: structKm.support as number | undefined,
+        resistance: structKm.resistance as number | undefined,
+        next_support: structKm.next_support as number | undefined,
+        next_resistance: structKm.next_resistance as number | undefined,
+        position_value_bdt: structKm.position_value_bdt as number | undefined,
+        suggested_shares: structKm.suggested_shares as number | undefined,
+        pct_of_capital: structKm.pct_of_capital as number | undefined,
+        risk_reward: structKm.risk_reward as number | undefined,
+        entry: structKm.entry as number | undefined,
+      }
+    : undefined;
+  return {
+    atr: km.atr as number | undefined,
+    entry: km.entry as number | undefined,
+    buy_zone_low: km.buy_zone_low as number | undefined,
+    buy_zone_high: km.buy_zone_high as number | undefined,
+    stop_loss: km.stop_loss as number | undefined,
+    target: km.target as number | undefined,
+    position_value_bdt: km.position_value_bdt as number | undefined,
+    suggested_shares: km.suggested_shares as number | undefined,
+    pct_of_capital: km.pct_of_capital as number | undefined,
+    risk_reward: km.risk_reward as number | undefined,
+    strategies,
+    structure,
+    structure_rating: strategies?.structure?.rating as string | undefined,
   };
 }
 
@@ -798,4 +866,403 @@ export async function listTopPerformers(db: Db, limit = 10, lookbackBars = 21): 
     LIMIT ${limit}
   `);
   return rows as unknown as TopPerformerRow[];
+}
+
+export type ResearchSourceInput = {
+  tickerId?: number | null;
+  url?: string;
+  title: string;
+  publisher?: string;
+  publishedDate?: string;
+  queryContext?: string;
+  category?: string;
+  extractedFacts?: Record<string, unknown>;
+  sessionId?: string;
+  clientId?: string;
+  notes?: string;
+};
+
+function researchSourceKey(url: string | null | undefined, tickerId: number | null | undefined): string {
+  return `${url ?? ''}::${tickerId ?? 'none'}`;
+}
+
+/** Save agent/web research citations; dedupes by url + ticker_id. */
+export async function upsertResearchSources(
+  db: Db,
+  items: ResearchSourceInput[],
+  defaults?: {
+    tickerId?: number | null;
+    memoId?: number | null;
+    sessionId?: string;
+    clientId?: string;
+    queryContext?: string;
+  },
+): Promise<{ inserted: number; updated: number; ids: number[] }> {
+  if (items.length === 0) return { inserted: 0, updated: 0, ids: [] };
+
+  const memoId = defaults?.memoId ?? null;
+
+  const normalized = items.map((item) => ({
+    tickerId: item.tickerId ?? defaults?.tickerId ?? null,
+    url: item.url?.trim() || undefined,
+    title: item.title.trim(),
+    publisher: item.publisher?.trim(),
+    publishedDate: item.publishedDate,
+    queryContext: item.queryContext ?? defaults?.queryContext,
+    category: item.category,
+    extractedFacts: item.extractedFacts,
+    sessionId: item.sessionId ?? defaults?.sessionId,
+    clientId: item.clientId ?? defaults?.clientId,
+    notes: item.notes,
+  }));
+
+  const urls = [...new Set(normalized.map((i) => i.url).filter(Boolean))] as string[];
+  const existingByKey = new Map<string, { id: number }>();
+
+  if (urls.length) {
+    const rows = await db
+      .select({
+        id: researchSources.id,
+        url: researchSources.url,
+        tickerId: researchSources.tickerId,
+      })
+      .from(researchSources)
+      .where(inArray(researchSources.url, urls));
+    for (const row of rows) {
+      existingByKey.set(researchSourceKey(row.url, row.tickerId), { id: row.id });
+    }
+  }
+
+  let inserted = 0;
+  let updated = 0;
+  const ids: number[] = [];
+
+  for (const item of normalized) {
+    const key = researchSourceKey(item.url, item.tickerId);
+    const existing = item.url ? existingByKey.get(key) : undefined;
+
+    if (existing) {
+      const [row] = await db
+        .update(researchSources)
+        .set({
+          memoId,
+          title: item.title,
+          publisher: item.publisher,
+          publishedDate: item.publishedDate,
+          queryContext: item.queryContext,
+          category: item.category,
+          extractedFacts: item.extractedFacts,
+          sessionId: item.sessionId,
+          clientId: item.clientId,
+          notes: item.notes,
+          fetchedAt: new Date(),
+          ingestedAt: new Date(),
+        })
+        .where(eq(researchSources.id, existing.id))
+        .returning({ id: researchSources.id });
+      if (row) {
+        updated++;
+        ids.push(row.id);
+      }
+      continue;
+    }
+
+    const [row] = await db
+      .insert(researchSources)
+      .values({
+        memoId,
+        tickerId: item.tickerId,
+        url: item.url,
+        title: item.title,
+        publisher: item.publisher,
+        publishedDate: item.publishedDate,
+        queryContext: item.queryContext,
+        category: item.category,
+        extractedFacts: item.extractedFacts,
+        sessionId: item.sessionId,
+        clientId: item.clientId,
+        notes: item.notes,
+      })
+      .returning({ id: researchSources.id });
+
+    if (row) {
+      inserted++;
+      ids.push(row.id);
+      if (item.url) existingByKey.set(key, { id: row.id });
+    }
+  }
+
+  return { inserted, updated, ids };
+}
+
+export async function getResearchSources(
+  db: Db,
+  opts?: {
+    tickerId?: number;
+    memoId?: number;
+    sessionId?: string;
+    category?: string;
+    days?: number;
+    limit?: number;
+  },
+) {
+  const days = opts?.days ?? 90;
+  const limit = opts?.limit ?? 50;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffDate = cutoff.toISOString().slice(0, 10);
+
+  const conditions = [gte(researchSources.fetchedAt, new Date(`${cutoffDate}T00:00:00Z`))];
+  if (opts?.tickerId != null) conditions.push(eq(researchSources.tickerId, opts.tickerId));
+  if (opts?.memoId != null) conditions.push(eq(researchSources.memoId, opts.memoId));
+  if (opts?.sessionId) conditions.push(eq(researchSources.sessionId, opts.sessionId));
+  if (opts?.category) conditions.push(eq(researchSources.category, opts.category));
+
+  return db
+    .select()
+    .from(researchSources)
+    .where(and(...conditions))
+    .orderBy(desc(researchSources.fetchedAt))
+    .limit(limit);
+}
+
+export type ResearchMemoInput = {
+  tickerId?: number | null;
+  sessionId?: string;
+  clientId?: string;
+  title: string;
+  bodyMd: string;
+  summaryJson?: Record<string, unknown>;
+  asOf?: string;
+  parentMemoId?: number;
+};
+
+/** Save or update a full markdown research memo. Upserts by memo id, or session_id + ticker_id. */
+export async function upsertResearchMemo(
+  db: Db,
+  input: ResearchMemoInput,
+  opts?: { memoId?: number; linkSessionSources?: boolean },
+): Promise<{ id: number; version: number; sources_linked: number }> {
+  const bodyMd = input.bodyMd.trim();
+  if (!bodyMd) throw new Error('body_md required');
+
+  let row: typeof researchMemos.$inferSelect | undefined;
+
+  if (opts?.memoId) {
+    const [updated] = await db
+      .update(researchMemos)
+      .set({
+        title: input.title.trim(),
+        bodyMd,
+        summaryJson: input.summaryJson,
+        asOf: input.asOf,
+        sessionId: input.sessionId,
+        clientId: input.clientId,
+        updatedAt: new Date(),
+      })
+      .where(eq(researchMemos.id, opts.memoId))
+      .returning();
+    row = updated;
+  } else if (input.sessionId && input.tickerId != null) {
+    const existing = await db
+      .select()
+      .from(researchMemos)
+      .where(and(eq(researchMemos.sessionId, input.sessionId), eq(researchMemos.tickerId, input.tickerId)))
+      .orderBy(desc(researchMemos.createdAt))
+      .limit(1);
+    if (existing[0]) {
+      const [updated] = await db
+        .update(researchMemos)
+        .set({
+          title: input.title.trim(),
+          bodyMd,
+          summaryJson: input.summaryJson,
+          asOf: input.asOf,
+          clientId: input.clientId,
+          version: existing[0].version + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(researchMemos.id, existing[0].id))
+        .returning();
+      row = updated;
+    }
+  }
+
+  if (!row) {
+    const [inserted] = await db
+      .insert(researchMemos)
+      .values({
+        tickerId: input.tickerId ?? null,
+        sessionId: input.sessionId,
+        clientId: input.clientId,
+        title: input.title.trim(),
+        bodyMd,
+        summaryJson: input.summaryJson,
+        asOf: input.asOf,
+        parentMemoId: input.parentMemoId,
+        version: 1,
+      })
+      .returning();
+    row = inserted;
+  }
+
+  if (!row) throw new Error('Failed to save research memo');
+
+  let sourcesLinked = 0;
+  if (opts?.linkSessionSources !== false && input.sessionId) {
+    sourcesLinked = await linkResearchSourcesToMemo(db, row.id, {
+      sessionId: input.sessionId,
+      tickerId: input.tickerId ?? undefined,
+    });
+  }
+
+  return { id: row.id, version: row.version, sources_linked: sourcesLinked };
+}
+
+export async function linkResearchSourcesToMemo(
+  db: Db,
+  memoId: number,
+  opts: { sourceIds?: number[]; sessionId?: string; tickerId?: number },
+): Promise<number> {
+  if (opts.sourceIds?.length) {
+    const updated = await db
+      .update(researchSources)
+      .set({ memoId })
+      .where(inArray(researchSources.id, opts.sourceIds))
+      .returning({ id: researchSources.id });
+    return updated.length;
+  }
+
+  const conditions = [isNull(researchSources.memoId)];
+  if (opts.sessionId) conditions.push(eq(researchSources.sessionId, opts.sessionId));
+  if (opts.tickerId != null) conditions.push(eq(researchSources.tickerId, opts.tickerId));
+
+  const updated = await db
+    .update(researchSources)
+    .set({ memoId })
+    .where(and(...conditions))
+    .returning({ id: researchSources.id });
+  return updated.length;
+}
+
+export async function getResearchMemo(
+  db: Db,
+  opts: { id?: number; tickerId?: number; sessionId?: string; includeBody?: boolean },
+) {
+  if (opts.id) {
+    const rows = await db.select().from(researchMemos).where(eq(researchMemos.id, opts.id)).limit(1);
+    return rows[0] ?? null;
+  }
+
+  const conditions = [];
+  if (opts.tickerId != null) conditions.push(eq(researchMemos.tickerId, opts.tickerId));
+  if (opts.sessionId) conditions.push(eq(researchMemos.sessionId, opts.sessionId));
+  if (conditions.length === 0) return null;
+
+  const rows = await db
+    .select()
+    .from(researchMemos)
+    .where(and(...conditions))
+    .orderBy(desc(researchMemos.createdAt))
+    .limit(1);
+
+  const row = rows[0] ?? null;
+  if (row && opts.includeBody === false) {
+    const { bodyMd: _body, ...rest } = row;
+    return { ...rest, body_md_length: row.bodyMd.length };
+  }
+  return row;
+}
+
+export async function listResearchMemos(
+  db: Db,
+  opts?: { tickerId?: number; limit?: number; includeBody?: boolean },
+) {
+  const limit = opts?.limit ?? 20;
+  const conditions = [];
+  if (opts?.tickerId != null) conditions.push(eq(researchMemos.tickerId, opts.tickerId));
+
+  const rows = await db
+    .select()
+    .from(researchMemos)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(researchMemos.createdAt))
+    .limit(limit);
+
+  if (opts?.includeBody === false) {
+    return rows.map(({ bodyMd, ...rest }) => ({ ...rest, body_md_length: bodyMd.length }));
+  }
+  return rows;
+}
+
+export async function listSkillOverrides(db: Db) {
+  return db.select().from(skillOverrides).orderBy(skillOverrides.slug);
+}
+
+export async function getSkillOverride(db: Db, slug: string) {
+  const rows = await db.select().from(skillOverrides).where(eq(skillOverrides.slug, slug)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertSkillOverride(
+  db: Db,
+  input: {
+    slug: string;
+    skillMd: string;
+    toolName?: string;
+    name?: string;
+    description?: string;
+    metadataJson?: Record<string, unknown>;
+    isActive?: boolean;
+    clientId?: string;
+  },
+): Promise<typeof skillOverrides.$inferSelect> {
+  const skillMd = input.skillMd.trim();
+  if (!skillMd) throw new Error('skill_md required');
+
+  const existing = await getSkillOverride(db, input.slug);
+  if (existing) {
+    const [row] = await db
+      .update(skillOverrides)
+      .set({
+        skillMd,
+        toolName: input.toolName ?? existing.toolName,
+        name: input.name ?? existing.name,
+        description: input.description ?? existing.description,
+        metadataJson: input.metadataJson ?? existing.metadataJson,
+        isActive: input.isActive ?? existing.isActive,
+        clientId: input.clientId ?? existing.clientId,
+        version: existing.version + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(skillOverrides.id, existing.id))
+      .returning();
+    if (!row) throw new Error('Failed to update skill override');
+    return row;
+  }
+
+  const [row] = await db
+    .insert(skillOverrides)
+    .values({
+      slug: input.slug,
+      skillMd,
+      toolName: input.toolName,
+      name: input.name,
+      description: input.description,
+      metadataJson: input.metadataJson,
+      isActive: input.isActive ?? true,
+      clientId: input.clientId,
+      version: 1,
+    })
+    .returning();
+  if (!row) throw new Error('Failed to insert skill override');
+  return row;
+}
+
+export async function deleteSkillOverride(db: Db, slug: string): Promise<boolean> {
+  const deleted = await db
+    .delete(skillOverrides)
+    .where(eq(skillOverrides.slug, slug))
+    .returning({ id: skillOverrides.id });
+  return deleted.length > 0;
 }

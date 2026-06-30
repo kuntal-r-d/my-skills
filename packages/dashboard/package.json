@@ -12,6 +12,7 @@
     "dev": "tsx src/server.ts"
   },
   "dependencies": {
+    "@stock-buddy/core": "file:../core",
     "@stock-buddy/db": "file:../db",
     "@stock-buddy/ingest": "file:../ingest",
     "express": "^4.21.2"

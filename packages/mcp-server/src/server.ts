@@ -18,9 +18,9 @@ import express from 'express';
 import { COMPOSITES } from './composites.js';
 import { runSkill, SkillError } from './dispatch.js';
 import { inputSchema, SKILLS } from './registry.js';
-import { maybePersistAnalysis } from './persist-analysis.js';
+import { getDisclaimer } from '@stock-buddy/core';
 
-export const DISCLAIMER = 'Educational analysis only. Not financial advice.';
+import { maybePersistAnalysis } from './persist-analysis.js';
 
 function toolList(): Tool[] {
   const tools: Tool[] = [];
@@ -28,7 +28,7 @@ function toolList(): Tool[] {
   for (const [name, spec] of Object.entries(SKILLS)) {
     tools.push({
       name,
-      description: `${spec.description}  [${DISCLAIMER}]`,
+      description: `${spec.description}  [${getDisclaimer()}]`,
       inputSchema: inputSchema(name) as Tool['inputSchema'],
     });
   }
@@ -36,7 +36,7 @@ function toolList(): Tool[] {
   for (const [name, spec] of Object.entries(COMPOSITES)) {
     tools.push({
       name,
-      description: `${spec.description}  [${DISCLAIMER}]`,
+      description: `${spec.description}  [${getDisclaimer()}]`,
       inputSchema: {
         type: 'object',
         description: `Shared data-contract object. Reads: ${spec.reads.join(', ')}`,

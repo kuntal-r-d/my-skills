@@ -11,7 +11,7 @@ if (!UI) {
 
 let ohlcvChart = null;
 let shareChart = null;
-let sectorChart = null;
+let sectorCharts = { investment: null, trading: null };
 let currentTickerData = null;
 let allTickers = [];
 let currentAnalysis = null;
@@ -22,6 +22,40 @@ let glossaryTerms = [];
 let glossarySections = [];
 let rawOhlcv = [];
 let activeJsonKey = null;
+
+const TOAST_DEFAULT_MS = 3200;
+const TOAST_ERROR_MS = 5000;
+const MAX_TOASTS = 4;
+
+function showToast(message, kind = 'info', durationMs) {
+  const host = $('#toast-host');
+  if (!host || !message) return;
+  while (host.children.length >= MAX_TOASTS) {
+    host.firstElementChild?.remove();
+  }
+  const ms =
+    durationMs ??
+    (kind === 'error' ? TOAST_ERROR_MS : kind === 'busy' ? 0 : TOAST_DEFAULT_MS);
+  const el = document.createElement('div');
+  el.className = `toast toast-${kind}`;
+  el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  el.textContent = message;
+  host.appendChild(el);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => el.classList.add('toast-visible'));
+  });
+  const dismiss = () => {
+    if (el.classList.contains('toast-out')) return;
+    el.classList.remove('toast-visible');
+    el.classList.add('toast-out');
+    window.setTimeout(() => el.remove(), 220);
+  };
+  const timer = ms > 0 ? window.setTimeout(dismiss, ms) : null;
+  el.addEventListener('click', () => {
+    if (timer) window.clearTimeout(timer);
+    dismiss();
+  });
+}
 
 async function copyCommand(text, label) {
   if (!text) return false;
@@ -88,6 +122,9 @@ function setAnalysisStatus(message, kind = 'muted') {
   if (!el) return;
   el.textContent = message ?? '';
   el.className = `analysis-status ${kind}`;
+  if (kind === 'ok' || kind === 'error') {
+    showToast(message, kind);
+  }
 }
 
 function bindClick(sel, handler) {
@@ -99,9 +136,116 @@ function bindClick(sel, handler) {
   el.addEventListener('click', handler);
 }
 
-function showPanel(name) {
-  $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.panel === name));
-  $$('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${name}`));
+const VALID_PANELS = new Set([
+  'overview',
+  'tickers',
+  'ticker-detail',
+  'discover',
+  'portfolio',
+  'watchlist',
+  'briefing',
+  'glossary',
+  'analytics',
+  'news',
+  'macro',
+  'skills',
+  'daily',
+  'ops',
+]);
+
+function parseHashRoute() {
+  const raw = decodeURIComponent(window.location.hash.replace(/^#/, '').trim());
+  if (!raw || raw === 'overview' || raw === 'home') {
+    return { panel: 'overview', ticker: null };
+  }
+  const slash = raw.indexOf('/');
+  const panel = (slash === -1 ? raw : raw.slice(0, slash)).trim();
+  const ticker = slash === -1 ? null : raw.slice(slash + 1).trim().toUpperCase() || null;
+  if (!VALID_PANELS.has(panel)) {
+    return { panel: 'overview', ticker: null };
+  }
+  return { panel, ticker };
+}
+
+function buildHash(panel, ticker) {
+  if (panel === 'overview') return '';
+  if (panel === 'ticker-detail' && ticker) {
+    return `#${panel}/${encodeURIComponent(ticker)}`;
+  }
+  return `#${panel}`;
+}
+
+function setHashRoute(panel, ticker, { replace = true } = {}) {
+  const base = `${window.location.pathname}${window.location.search}`;
+  const hash = buildHash(panel, ticker);
+  const url = hash ? `${base}${hash}` : base;
+  if (replace) {
+    window.history.replaceState({ panel, ticker }, '', url);
+  } else {
+    window.history.pushState({ panel, ticker }, '', url);
+  }
+}
+
+function showPanel(name, { updateHash = true, ticker = null, historyMode = 'replace' } = {}) {
+  const panel = VALID_PANELS.has(name) ? name : 'overview';
+  $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.panel === panel));
+  $$('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${panel}`));
+  if (updateHash) {
+    setHashRoute(panel, panel === 'ticker-detail' ? ticker : null, {
+      replace: historyMode === 'replace',
+    });
+  }
+}
+
+async function loadPanelData(panel, { ticker } = {}) {
+  switch (panel) {
+    case 'overview':
+      return loadOverview();
+    case 'portfolio':
+      return loadPortfolio();
+    case 'briefing':
+      return loadBriefing();
+    case 'news':
+      return loadNews();
+    case 'macro':
+      return loadMacro();
+    case 'analytics':
+      return loadAnalytics();
+    case 'watchlist':
+      await loadWatchlists();
+      populateWatchSelects('investment', $(`.watch-filter[data-purpose="investment"]`)?.value ?? '');
+      populateWatchSelects('trading', $(`.watch-filter[data-purpose="trading"]`)?.value ?? '');
+      break;
+    case 'skills':
+      return loadSkillsList();
+    case 'daily':
+      return loadDaily();
+    case 'ticker-detail': {
+      const sym = (ticker || $('#ticker-select')?.value || 'LHB').toUpperCase();
+      if ($('#ticker-select')) $('#ticker-select').value = sym;
+      return loadTickerDetail(sym);
+    }
+    default:
+      break;
+  }
+}
+
+async function navigateToPanel(name, { ticker = null, updateHash = true, loadData = true, historyMode = 'replace' } = {}) {
+  const panel = VALID_PANELS.has(name) ? name : 'overview';
+  const sym = panel === 'ticker-detail' ? (ticker || $('#ticker-select')?.value || null) : null;
+  showPanel(panel, { updateHash, ticker: sym, historyMode });
+  if (loadData) await loadPanelData(panel, { ticker: sym });
+}
+
+async function onRouteChange() {
+  const route = parseHashRoute();
+  showPanel(route.panel, { updateHash: false, ticker: route.ticker });
+  await loadPanelData(route.panel, { ticker: route.ticker });
+}
+
+function goHome() {
+  navigateToPanel('overview', { historyMode: 'replace' });
+  window.scrollTo(0, 0);
 }
 
 function showSubPanel(name) {
@@ -180,6 +324,7 @@ function renderFullAnalysis() {
     const jsonNav = $('#json-key-nav');
     if (jsonNav) jsonNav.innerHTML = '';
     activeJsonKey = null;
+    updateAnalysisDataBar();
     if (currentTickerData?.news) {
       $('#sub-summary').innerHTML = UI.renderTickerNewsTeaser(currentTickerData.news, 3);
       bindSubPanelLinks('#sub-summary');
@@ -208,7 +353,7 @@ function renderFullAnalysis() {
     currentTickerData?.ticker,
     currentTickerData?.data_warnings,
   );
-  $('#sub-risk').innerHTML = UI.renderRiskPanel(a.risk);
+  $('#sub-risk').innerHTML = UI.renderRiskPanel(a.risk, a);
 
   const histEl = $('#sub-history');
   if (currentSnapshotMeta) {
@@ -242,9 +387,9 @@ function renderFullAnalysis() {
   if (staleEl) {
     staleEl.classList.toggle('hidden', !stale);
     if (stale && currentSnapshotMeta?.created_at) {
-      staleEl.textContent = `Stale (${UI.formatAge(currentSnapshotMeta.created_at)} · ${UI.fmtDate(currentSnapshotMeta.created_at)}) — re-ingest, then Analyze`;
+      staleEl.textContent = `Stale (${UI.formatAge(currentSnapshotMeta.created_at)} · ${UI.fmtDate(currentSnapshotMeta.created_at)}) — npm run ingest:daily, then Analyze`;
     } else if (stale) {
-      staleEl.textContent = 'Stale — re-ingest, then Analyze';
+      staleEl.textContent = 'Stale — npm run ingest:daily, then Analyze';
     }
   }
 
@@ -254,6 +399,7 @@ function renderFullAnalysis() {
       renderFullAnalysis();
     };
   });
+  updateAnalysisDataBar();
 }
 
 async function loadTickerAnalysis(symbol) {
@@ -279,7 +425,7 @@ async function runAnalyze(mode) {
   const sym = ($('#ticker-select')?.value ?? '').trim().toUpperCase();
   if (!sym) {
     setAnalysisStatus('Pick a ticker first (Tickers tab → View, or use the dropdown).', 'error');
-    showPanel('ticker-detail');
+    navigateToPanel('ticker-detail');
     return;
   }
 
@@ -310,7 +456,7 @@ async function runAnalyze(mode) {
       $('#ticker-select').value = data.symbol;
     }
     await loadTickerDetail(data.symbol ?? sym);
-    showPanel('ticker-detail');
+    navigateToPanel('ticker-detail', { ticker: data.symbol ?? sym, updateHash: true, loadData: false });
     showSubPanel('summary');
     renderFullAnalysis();
     $('#analysis-subtabs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -328,9 +474,13 @@ async function runAnalyze(mode) {
 }
 
 function openTicker(symbol) {
-  $('#ticker-select').value = symbol;
-  showPanel('ticker-detail');
-  loadTickerDetail(symbol);
+  navigateToPanel('ticker-detail', { ticker: symbol, historyMode: 'push' });
+}
+
+function updateAnalysisDataBar() {
+  const el = $('#analysis-data-bar');
+  if (!el || !UI?.renderAnalysisDataBar) return;
+  el.innerHTML = UI.renderAnalysisDataBar(currentSnapshotMeta, currentAnalysis, currentTickerData);
 }
 
 function renderDataWarnings(warnings) {
@@ -357,6 +507,8 @@ async function loadTickerDetail(symbol) {
   $('#ticker-meta').innerHTML =
     `<strong>${t.symbol}</strong> — ${t.name ?? ''} · ${t.sector ?? 'No sector'} · ${data.ohlcv.length} bars`
     + renderDataWarnings(data.data_warnings);
+
+  updateAnalysisDataBar();
 
   rawOhlcv = data.ohlcv;
   renderChart(resampleOhlcv(rawOhlcv, $('#chart-tf').value));
@@ -404,15 +556,7 @@ function bindPanelLinks(root = 'body') {
   $$(`${root} [data-panel].linkish, ${root} button[data-panel]`).forEach((btn) => {
     btn.addEventListener('click', () => {
       const panel = btn.dataset.panel;
-      if (panel) showPanel(panel);
-      if (panel === 'briefing') loadBriefing();
-      if (panel === 'portfolio') loadPortfolio();
-      if (panel === 'news') loadNews();
-      if (panel === 'watchlist') {
-        loadWatchlists();
-        populateWatchSelects('investment', $(`.watch-filter[data-purpose="investment"]`)?.value ?? '');
-        populateWatchSelects('trading', $(`.watch-filter[data-purpose="trading"]`)?.value ?? '');
-      }
+      if (panel) navigateToPanel(panel, { historyMode: 'push' });
     });
   });
 }
@@ -420,12 +564,11 @@ function bindPanelLinks(root = 'body') {
 async function loadOverview() {
   $('#home-briefing-content').innerHTML = '<p class="muted">Loading…</p>';
   const data = await api('/api/overview');
+  lastBriefingPayload = data.briefing ?? null;
   const home = UI.renderHome(data);
 
   $('#home-briefing-content').innerHTML = home.briefing;
   $('#home-important-news').innerHTML = home.importantNews;
-  $('#home-portfolio-summary').innerHTML = home.portfolioSummary;
-  $('#home-portfolio-table').innerHTML = home.portfolioTable;
 
   bindHomeClicks('#panel-overview');
   bindPanelLinks('#panel-overview');
@@ -488,46 +631,103 @@ function populateWatchSelects(purpose, filter = '') {
   if (cur && slice.some((t) => t.symbol === cur)) sel.value = cur;
 }
 
-async function loadPortfolio() {
-  const data = await api('/api/portfolio');
-  if (!data.account) {
-    $('#portfolio-summary').textContent = 'No portfolio account — run npm run db:seed';
-    return;
-  }
+function renderSectorChart(purpose, portfolio, { canvasPrefix = '' } = {}) {
+  const canvas = $(`#${canvasPrefix}sector-chart-${purpose}`);
+  if (!canvas) return;
+  const chartKey = canvasPrefix ? `${canvasPrefix}${purpose}` : purpose;
+  sectorCharts[chartKey] = destroyChart(sectorCharts[chartKey]);
+  if (!portfolio?.sector_allocation?.length) return;
 
-  const totalPnl = data.positions.reduce((s, p) => s + (p.pnl ?? 0), 0);
-  $('#portfolio-summary').innerHTML =
-    `Account <strong>${data.account.label}</strong> · Capital ৳${UI.fmtNum(data.account.capital_bdt, 0)} · `
-    + `Cost ৳${UI.fmtNum(data.total_cost_basis, 0)} · Unrealized P&amp;L ৳${UI.fmtNum(totalPnl, 0)} · ${data.positions.length} positions`;
-
-  sectorChart = destroyChart(sectorChart);
-  sectorChart = new Chart($('#sector-chart'), {
+  sectorCharts[chartKey] = new Chart(canvas, {
     type: 'pie',
     data: {
-      labels: data.sector_allocation.map((s) => s.sector),
+      labels: portfolio.sector_allocation.map((s) => s.sector),
       datasets: [{
-        data: data.sector_allocation.map((s) => s.value),
+        data: portfolio.sector_allocation.map((s) => s.value),
         backgroundColor: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b'],
       }],
     },
     options: {
       plugins: {
         legend: { labels: { color: '#8b9cb3' } },
-        title: { display: true, text: 'Sector allocation', color: '#8b9cb3' },
+        title: {
+          display: true,
+          text: purpose === 'trading' ? 'Trading sector allocation' : 'Investment sector allocation',
+          color: '#8b9cb3',
+        },
       },
     },
   });
+}
 
-  $('#portfolio-table').innerHTML = UI.renderPortfolioTable(data.positions);
-  $$('#portfolio-table [data-symbol]').forEach((el) => {
+function bindPortfolioPanel(root, purpose) {
+  root.querySelectorAll('[data-symbol].clickable').forEach((el) => {
     el.addEventListener('click', () => openTicker(el.dataset.symbol));
   });
-  $$('.del-pos').forEach((btn) => {
+  root.querySelectorAll('.del-pos').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      await api(`/api/portfolio/positions/${btn.dataset.symbol}`, { method: 'DELETE' });
+      const sym = btn.dataset.symbol;
+      const posPurpose = btn.dataset.purpose ?? purpose;
+      await api(`/api/portfolio/positions/${sym}?purpose=${posPurpose}`, { method: 'DELETE' });
       loadPortfolio();
+      showToast(`Removed ${sym} from ${posPurpose} portfolio`, 'info');
     });
   });
+}
+
+async function loadPortfolio() {
+  const data = await api('/api/portfolio');
+  const account = data.account ?? data.investment?.account ?? data.trading?.account;
+  if (!account) {
+    $('#portfolio-account-summary').textContent = 'No portfolio account — run npm run db:seed';
+    return;
+  }
+
+  $('#portfolio-account-summary').innerHTML =
+    `Account <strong>${account.label}</strong> · Capital ৳${UI.fmtNum(account.capital_bdt, 0)} · Risk/trade ${UI.fmtNum(account.risk_per_trade_pct, 1)}%`;
+
+  for (const purpose of ['investment', 'trading']) {
+    const portfolio = data[purpose] ?? data;
+    $(`#portfolio-${purpose}-summary`).innerHTML = UI.renderPortfolioSummary({ ...portfolio, purpose });
+
+    const tableEl = $(`#portfolio-${purpose}-table`);
+    if (purpose === 'trading') {
+      $('#portfolio-trading-mirror').innerHTML = UI.renderTradingMirrorBanner(portfolio.mirrored_from_investment);
+      const syncBtn = $('#sync-trading-portfolio');
+      if (syncBtn) {
+        syncBtn.classList.toggle('hidden', !portfolio.mirrored_from_investment);
+      }
+      tableEl.innerHTML = UI.renderMomentumPortfolioTable(portfolio.positions, {
+        purpose,
+        showActions: !portfolio.mirrored_from_investment,
+      });
+    } else {
+      tableEl.innerHTML = UI.renderPortfolioTable(portfolio.positions, { purpose });
+    }
+    bindPortfolioPanel(tableEl, purpose);
+
+    renderSectorChart(purpose, portfolio);
+  }
+}
+
+async function addPortfolioPosition(purpose) {
+  const symbol = $(`.pos-symbol[data-purpose="${purpose}"]`)?.value.trim();
+  const qty = Number($(`.pos-qty[data-purpose="${purpose}"]`)?.value);
+  const avg_cost = Number($(`.pos-cost[data-purpose="${purpose}"]`)?.value);
+  if (!symbol || !qty || !avg_cost) return false;
+
+  await api('/api/portfolio/positions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol, qty, avg_cost, purpose }),
+  });
+
+  $(`.pos-symbol[data-purpose="${purpose}"]`).value = '';
+  $(`.pos-qty[data-purpose="${purpose}"]`).value = '';
+  $(`.pos-cost[data-purpose="${purpose}"]`).value = '';
+  showToast(`Added ${symbol.toUpperCase()} to ${purpose} portfolio`, 'ok');
+  await loadPortfolio();
+  return true;
 }
 
 async function addWatchlistSymbol(purpose, symbol) {
@@ -544,6 +744,7 @@ async function addWatchlistSymbol(purpose, symbol) {
   if (filter) filter.value = '';
   populateWatchSelects(purpose);
   await loadWatchlists();
+  showToast(`Added ${sym} to ${purpose} watchlist`, 'ok');
   return true;
 }
 
@@ -552,25 +753,16 @@ async function loadWatchlists() {
     const { watchlist } = await api(`/api/watchlist?purpose=${purpose}`);
     const el = $(`#watchlist-${purpose}`);
     if (!el) continue;
-    el.innerHTML = watchlist.length
-      ? `<ul class="watch-list">${watchlist.map((w) => {
-        const meta = [w.name, w.sector].filter(Boolean).join(' · ');
-        return `<li>
-          <div class="watch-meta">
-            <span class="clickable watch-symbol" data-symbol="${UI.esc(w.symbol)}">${UI.esc(w.symbol)}</span>
-            ${meta ? `<span class="muted"> ${UI.esc(meta)}</span>` : ''}
-          </div>
-          <button type="button" class="btn-sm rm-watch" data-symbol="${UI.esc(w.symbol)}" data-purpose="${purpose}" title="Remove">Remove</button>
-        </li>`;
-      }).join('')}</ul>`
-      : '<p class="muted">No symbols yet — add one above.</p>';
+    el.innerHTML = UI.renderWatchlistTable(watchlist);
     el.querySelectorAll('[data-symbol].clickable').forEach((n) => {
       n.addEventListener('click', () => openTicker(n.dataset.symbol));
     });
     el.querySelectorAll('.rm-watch').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        await api(`/api/watchlist/${btn.dataset.symbol}?purpose=${btn.dataset.purpose}`, { method: 'DELETE' });
+        const sym = btn.dataset.symbol;
+        await api(`/api/watchlist/${sym}?purpose=${btn.dataset.purpose}`, { method: 'DELETE' });
         loadWatchlists();
+        showToast(`Removed ${sym} from ${btn.dataset.purpose} watchlist`, 'info');
       });
     });
   }
@@ -579,12 +771,14 @@ async function loadWatchlists() {
 function bindWatchlistButtons(root) {
   $$(`${root} .watch-add`).forEach((btn) => {
     btn.onclick = async () => {
+      const sym = btn.dataset.symbol;
       await api('/api/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: btn.dataset.symbol, purpose: btn.dataset.purpose }),
+        body: JSON.stringify({ symbol: sym, purpose: btn.dataset.purpose }),
       });
       loadWatchlists();
+      showToast(`Added ${sym} to ${btn.dataset.purpose} watchlist`, 'ok');
     };
   });
 }
@@ -620,10 +814,29 @@ async function runDiscover() {
   }
 }
 
+let lastBriefingPayload = null;
+
 async function loadBriefing() {
   $('#briefing-content').innerHTML = '<p class="muted">Loading…</p>';
   const { briefing } = await api('/api/briefing');
+  lastBriefingPayload = briefing;
   $('#briefing-content').innerHTML = UI.renderBriefing(briefing);
+  const asOfEl = $('#briefing-as-of');
+  if (asOfEl) asOfEl.textContent = briefing?.as_of ? `As of ${briefing.as_of}` : '';
+}
+
+async function copyBriefingMarkdown() {
+  const md = lastBriefingPayload?.markdown;
+  if (!md) {
+    showToast('Refresh briefing first', 'info');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(md);
+    showToast('Briefing markdown copied', 'ok');
+  } catch {
+    showToast('Could not copy to clipboard', 'info');
+  }
 }
 
 const GLOSSARY_SECTION_ORDER = [
@@ -730,7 +943,7 @@ async function loadNews() {
   const tagged = news.filter((n) => n.symbol).length;
   const meta = $('#news-meta');
   if (meta) {
-    meta.textContent = `${news.length} items · ${tagged} with ticker · run: npm run ingest -- --job retag-news`;
+    meta.textContent = `${news.length} items · ${tagged} with ticker · run: npm run ingest:daily`;
   }
 
   const SOURCE_LABELS = {
@@ -788,14 +1001,234 @@ async function loadNews() {
 }
 
 async function loadMacro() {
-  const { macro } = await api('/api/macro');
-  if (!macro) {
-    $('#macro-meta').textContent = 'No macro snapshot';
-    $('#macro-json').textContent = '';
+  const content = $('#macro-content');
+  const meta = $('#macro-meta');
+  if (content) content.innerHTML = '<p class="muted">Loading macro snapshot…</p>';
+  try {
+    const { macro } = await api('/api/macro');
+    if (!macro) {
+      if (meta) meta.textContent = '';
+      if (content) content.innerHTML = UI.renderMacroPanel(null);
+      return;
+    }
+    if (meta) {
+      meta.textContent = `As of ${UI.fmtDate(macro.as_of)} · ${UI.macroSourceLabel(macro.source)}`;
+    }
+    if (content) content.innerHTML = UI.renderMacroPanel(macro);
+  } catch (e) {
+    if (meta) meta.textContent = '';
+    if (content) {
+      content.innerHTML = `<p class="muted">Failed to load macro data: ${UI.esc(e.message)}</p>`;
+    }
+  }
+}
+
+let skillsCache = [];
+let activeSkillSlug = '';
+let skillsViewMode = 'split';
+let skillsPreviewTimer = null;
+
+const SKILL_FM_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
+
+function parseSkillMarkdown(skillMd) {
+  const m = skillMd.match(SKILL_FM_RE);
+  if (!m) return { frontmatter: '', body: skillMd };
+  return { frontmatter: m[1] ?? '', body: m[2] ?? '' };
+}
+
+function renderSkillPreview(skillMd) {
+  const preview = $('#skills-preview');
+  if (!preview) return;
+  const esc = UI?.esc ?? ((s) => String(s ?? ''));
+  const text = skillMd ?? '';
+  if (!text.trim()) {
+    preview.innerHTML = '<p class="muted">Nothing to preview yet.</p>';
     return;
   }
-  $('#macro-meta').textContent = `As of ${UI.fmtDate(macro.as_of)} · ${macro.source}`;
-  $('#macro-json').textContent = JSON.stringify(macro.payload, null, 2);
+
+  const { frontmatter, body } = parseSkillMarkdown(text);
+  let html = '';
+
+  if (frontmatter.trim()) {
+    html += `<section class="skill-preview-fm" aria-label="YAML frontmatter">
+      <div class="skill-preview-fm-label">YAML frontmatter</div>
+      <pre><code>${esc(frontmatter.trim())}</code></pre>
+    </section>`;
+  }
+
+  const bodyTrim = body.trim();
+  if (!bodyTrim) {
+    html += '<p class="muted">No markdown body after frontmatter.</p>';
+  } else if (typeof marked !== 'undefined') {
+    html += `<article class="skill-preview-body">${marked.parse(bodyTrim, { breaks: true, gfm: true })}</article>`;
+  } else {
+    html += `<pre class="skill-preview-fallback">${esc(bodyTrim)}</pre>`;
+  }
+
+  preview.innerHTML = html;
+}
+
+function setSkillsViewMode(mode) {
+  skillsViewMode = mode;
+  $$('.skills-view-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.skillsView === mode);
+    btn.setAttribute('aria-selected', btn.dataset.skillsView === mode ? 'true' : 'false');
+  });
+  const pane = $('#skills-editor-pane');
+  if (pane) {
+    pane.classList.remove('skills-view-edit', 'skills-view-split', 'skills-view-preview');
+    pane.classList.add(`skills-view-${mode}`);
+  }
+  if (mode !== 'edit') {
+    renderSkillPreview($('#skills-editor')?.value ?? '');
+  }
+}
+
+function scheduleSkillPreview() {
+  if (skillsViewMode === 'edit') return;
+  clearTimeout(skillsPreviewTimer);
+  skillsPreviewTimer = setTimeout(() => {
+    renderSkillPreview($('#skills-editor')?.value ?? '');
+  }, 180);
+}
+
+async function loadSkillsList() {
+  const { skills } = await api('/api/skills');
+  skillsCache = skills ?? [];
+  const esc = UI?.esc ?? ((s) => String(s ?? ''));
+  $('#skills-table').innerHTML = table(
+    ['Skill', 'Source', 'Version', 'Updated'],
+    skillsCache.map((s) => [
+      `<span class="clickable skills-pick" data-slug="${esc(s.slug)}">${esc(s.slug)}</span>`,
+      `<span class="badge source-${esc(s.source)}">${esc(s.source)}</span>`,
+      s.version != null ? esc(String(s.version)) : '—',
+      s.updated_at ? UI.fmtDate(s.updated_at) : '—',
+    ]),
+  );
+  const sel = $('#skills-select');
+  if (sel) {
+    sel.innerHTML = skillsCache.map((s) => `<option value="${esc(s.slug)}">${esc(s.slug)}</option>`).join('');
+    if (activeSkillSlug && skillsCache.some((s) => s.slug === activeSkillSlug)) {
+      sel.value = activeSkillSlug;
+    } else if (skillsCache[0]) {
+      activeSkillSlug = skillsCache[0].slug;
+      sel.value = activeSkillSlug;
+    }
+  }
+  $$('.skills-pick').forEach((el) => {
+    el.addEventListener('click', () => loadSkillEditor(el.dataset.slug));
+  });
+  if (activeSkillSlug) await loadSkillEditor(activeSkillSlug, { keepEditorIfSame: true });
+}
+
+async function loadSkillEditor(slug, opts = {}) {
+  if (!slug) return;
+  activeSkillSlug = slug;
+  const sel = $('#skills-select');
+  if (sel) sel.value = slug;
+  $$('#skills-table tr').forEach((tr) => {
+    tr.classList.toggle('skills-row-active', tr.textContent?.includes(slug));
+  });
+  const { skill } = await api(`/api/skills/${encodeURIComponent(slug)}`);
+  const meta = `${skill.slug} · ${skill.source}${skill.tool_name ? ` · MCP: ${skill.tool_name}` : ''} · ${skill.skill_md_length} chars`;
+  $('#skills-meta').textContent = meta;
+  const editor = $('#skills-editor');
+  if (editor && (!opts.keepEditorIfSame || editor.value.trim() === '' || editor.dataset.slug !== slug)) {
+    editor.value = skill.skill_md ?? '';
+    editor.dataset.slug = slug;
+  }
+  scheduleSkillPreview();
+  if (skillsViewMode !== 'edit') renderSkillPreview(editor?.value ?? '');
+  setSkillsStatus('');
+}
+
+function setSkillsStatus(msg, kind = '') {
+  const el = $('#skills-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `muted skills-status${kind ? ` ${kind}` : ''}`;
+  if (kind === 'ok' || kind === 'error') {
+    showToast(msg, kind);
+  }
+}
+
+async function saveSkill(syncToDisk) {
+  const slug = activeSkillSlug || $('#skills-select')?.value;
+  const skillMd = $('#skills-editor')?.value ?? '';
+  if (!slug || !skillMd.trim()) {
+    setSkillsStatus('Select a skill and enter SKILL.md content', 'error');
+    return;
+  }
+  setSkillsStatus('Saving…');
+  try {
+    const data = await api(`/api/skills/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skill_md: skillMd, sync_to_disk: syncToDisk, client_id: 'dashboard' }),
+    });
+    setSkillsStatus(`Saved v${data.version}${data.synced_to_disk ? ' · synced to disk' : ''}`, 'ok');
+    await loadSkillsList();
+    await loadSkillEditor(slug, { keepEditorIfSame: true });
+  } catch (e) {
+    setSkillsStatus(e.message, 'error');
+  }
+}
+
+async function resetSkillOverride() {
+  const slug = activeSkillSlug || $('#skills-select')?.value;
+  if (!slug) return;
+  if (!confirm(`Remove DB override for ${slug} and revert to on-disk SKILL.md?`)) return;
+  setSkillsStatus('Resetting…');
+  try {
+    await api(`/api/skills/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+    setSkillsStatus('Reverted to disk', 'ok');
+    await loadSkillsList();
+    await loadSkillEditor(slug);
+  } catch (e) {
+    setSkillsStatus(e.message, 'error');
+  }
+}
+
+async function syncSkillToDisk() {
+  const slug = activeSkillSlug || $('#skills-select')?.value;
+  if (!slug) return;
+  setSkillsStatus('Syncing to disk…');
+  try {
+    const data = await api(`/api/skills/${encodeURIComponent(slug)}/sync-disk`, { method: 'POST' });
+    setSkillsStatus(`Synced (${data.source}) → ${data.disk_path}`, 'ok');
+  } catch (e) {
+    setSkillsStatus(e.message, 'error');
+  }
+}
+
+async function reloadSkillFromDisk() {
+  const slug = activeSkillSlug || $('#skills-select')?.value;
+  if (!slug) return;
+  await loadSkillEditor(slug);
+  setSkillsStatus('Reloaded effective skill', 'ok');
+}
+
+async function loadDaily() {
+  const el = $('#daily-content');
+  if (!el || !UI) return;
+  const sym = currentTickerData?.ticker?.symbol ?? $('#ticker-select')?.value ?? 'GP';
+  el.innerHTML = UI.renderDailyCommands(sym);
+  bindPanelLinks('#panel-daily');
+  $('#panel-daily [data-daily-analysis-tab]')?.addEventListener('click', () => {
+    navigateToPanel('ticker-detail', { historyMode: 'push' });
+    showSubPanel('commands');
+  });
+  try {
+    const { runs } = await api('/api/ingest-runs?limit=20');
+    const banner = $('#daily-status-banner');
+    if (banner) banner.outerHTML = UI.renderDailyStatusBanner(runs);
+  } catch {
+    const banner = $('#daily-status-banner');
+    if (banner) {
+      banner.className = 'daily-status-banner daily-status-warn';
+      banner.textContent = 'Could not load ingest status — is Postgres running?';
+    }
+  }
 }
 
 async function loadOps() {
@@ -826,14 +1259,18 @@ async function loadOps() {
 
 $$('.tab').forEach((btn) => {
   btn.addEventListener('click', () => {
-    showPanel(btn.dataset.panel);
-    if (btn.dataset.panel === 'overview') loadOverview();
-    if (btn.dataset.panel === 'watchlist') {
-      loadWatchlists();
-      populateWatchSelects('investment', $(`.watch-filter[data-purpose="investment"]`)?.value ?? '');
-      populateWatchSelects('trading', $(`.watch-filter[data-purpose="trading"]`)?.value ?? '');
-    }
+    navigateToPanel(btn.dataset.panel, { historyMode: 'push' });
   });
+});
+
+$('#panel-daily')?.addEventListener('click', async (e) => {
+  const copyBtn = e.target.closest('[data-copy-cmd]');
+  if (!copyBtn) return;
+  const cmd = copyBtn.getAttribute('data-copy-cmd');
+  const label = copyBtn.classList.contains('cmd-quick-chip')
+    ? copyBtn.textContent?.trim()
+    : copyBtn.closest('.cmd-row')?.querySelector('strong')?.textContent?.trim();
+  await copyCommand(cmd, label);
 });
 
 $$('.watch-add-manual').forEach((btn) => {
@@ -866,7 +1303,9 @@ $$('.mode-btn').forEach((btn) => {
   });
 });
 
-bindClick('#load-ticker', () => loadTickerDetail());
+bindClick('#load-ticker', () => {
+  navigateToPanel('ticker-detail', { ticker: $('#ticker-select').value, historyMode: 'replace' });
+});
 bindClick('#analyze-full', () => runAnalyze('full'));
 bindClick('#analyze-investment', () => runAnalyze('investment'));
 bindClick('#analyze-momentum', () => runAnalyze('momentum'));
@@ -915,35 +1354,66 @@ $('#panel-ticker-detail')?.addEventListener('click', async (e) => {
 
 bindClick('#run-discover', runDiscover);
 bindClick('#load-briefing', loadBriefing);
-bindClick('#refresh-home', loadOverview);
+bindClick('#briefing-copy-md', copyBriefingMarkdown);
+bindClick('#refresh-home', () => loadOverview());
+
+window.addEventListener('hashchange', () => {
+  onRouteChange();
+});
+
+window.addEventListener('popstate', () => {
+  onRouteChange();
+});
 bindClick('#load-analytics', loadAnalytics);
 bindClick('#refresh-news', loadNews);
+bindClick('#refresh-macro', loadMacro);
+bindClick('#skills-refresh', loadSkillsList);
+bindClick('#skills-save-db', () => saveSkill(false));
+bindClick('#skills-save-disk', () => saveSkill(true));
+bindClick('#skills-sync-disk', syncSkillToDisk);
+bindClick('#skills-reset', resetSkillOverride);
+bindClick('#skills-reload-disk', reloadSkillFromDisk);
+$$('.skills-view-btn').forEach((btn) => {
+  btn.addEventListener('click', () => setSkillsViewMode(btn.dataset.skillsView ?? 'split'));
+});
+$('#skills-select')?.addEventListener('change', (e) => loadSkillEditor(e.target.value));
+const skillsEditorEl = $('#skills-editor');
+skillsEditorEl?.addEventListener('input', scheduleSkillPreview);
+skillsEditorEl?.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return;
+  e.preventDefault();
+  const ta = e.target;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  ta.value = `${ta.value.slice(0, start)}  ${ta.value.slice(end)}`;
+  ta.selectionStart = ta.selectionEnd = start + 2;
+  scheduleSkillPreview();
+});
 $('#glossary-search')?.addEventListener('input', renderGlossary);
 
 $('#chart-tf').addEventListener('change', () => {
   renderChart(resampleOhlcv(rawOhlcv, $('#chart-tf').value));
 });
 
-$('#add-position').addEventListener('click', async () => {
-  const symbol = $('#pos-symbol').value.trim();
-  const qty = Number($('#pos-qty').value);
-  const avg_cost = Number($('#pos-cost').value);
-  if (!symbol || !qty || !avg_cost) return;
-  await api('/api/portfolio/positions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ symbol, qty, avg_cost }),
+$$('.add-position').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    addPortfolioPosition(btn.dataset.purpose);
   });
-  $('#pos-symbol').value = '';
-  loadPortfolio();
+});
+
+$('#sync-trading-portfolio')?.addEventListener('click', async () => {
+  const { copied } = await api('/api/portfolio/sync-trading', { method: 'POST' });
+  showToast(`Copied ${copied} positions to momentum trading`, 'ok');
+  await loadPortfolio();
 });
 
 async function init() {
+  const route = parseHashRoute();
+  showPanel(route.panel, { updateHash: false, ticker: route.ticker });
   try {
+    await loadTickers();
     await Promise.all([
-      loadOverview(),
-      loadTickers(),
-      loadPortfolio(),
+      loadPanelData(route.panel, { ticker: route.ticker }),
       loadWatchlists(),
       loadNews(),
       loadMacro(),
@@ -951,7 +1421,9 @@ async function init() {
       loadDiscover(),
       loadGlossary(),
     ]);
-    await loadTickerDetail($('#ticker-select').value || 'LHB');
+    if (route.panel !== 'ticker-detail') {
+      await loadTickerDetail(route.ticker || $('#ticker-select').value || 'LHB');
+    }
   } catch (e) {
     document.body.insertAdjacentHTML(
       'afterbegin',

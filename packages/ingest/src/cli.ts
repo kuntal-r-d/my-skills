@@ -10,6 +10,7 @@ import {
   ingestOhlcv,
   ingestShareholding,
   ingestWatchlist,
+  ingestDaily,
   ingestFundamentalsUniverse,
 } from './jobs.js';
 
@@ -75,6 +76,25 @@ async function main(): Promise<void> {
         break;
       case 'retag-news':
         console.log(await ingestRetagNews(db), 'news rows tagged');
+        break;
+      case 'daily':
+        console.log('Running daily ingest (macro + news + OHLCV for portfolio/watchlist)...');
+        {
+          const result = await ingestDaily(db);
+          console.log('  macro: ok');
+          console.log(`  news: ${result.news_rows} rows (${result.retagged_news} retagged)`);
+          console.log(`  symbols: ${result.symbols.length ? result.symbols.join(', ') : '(none — add portfolio or watchlist tickers)'}`);
+          const failed = [];
+          for (const [sym, n] of Object.entries(result.ohlcv)) {
+            console.log(`  ${sym}: ${n} OHLCV rows`);
+            if (n === 0) failed.push(sym);
+          }
+          if (failed.length) {
+            console.warn(
+              `  ⚠ No OHLCV for: ${failed.join(', ')} — DSE archive may be empty for these symbols; try Analyze after a full ingest.`,
+            );
+          }
+        }
         break;
       case 'analysis':
         const { ingestAnalysis } = await import('./analysis.js');

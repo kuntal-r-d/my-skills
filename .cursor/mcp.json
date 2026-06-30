@@ -1,26 +1,10 @@
 {
   "mcpServers": {
     "stock-buddy-data": {
-      "command": "node",
-      "args": [
-        "/Users/kuntal/Developer/stock-buddy-skill-mcp/stock-buddy/packages/data-mcp-server/dist/server.js"
-      ],
-      "env": {
-        "DATABASE_URL": "postgresql://stockbuddy:stockbuddy@localhost:5432/stockbuddy",
-        "STOCK_BUDDY_DATA_ADMIN": "1"
-      }
+      "url": "http://localhost:8081/mcp"
     },
     "stock-buddy": {
-      "command": "node",
-      "args": [
-        "/Users/kuntal/Developer/stock-buddy-skill-mcp/stock-buddy/packages/mcp-server/dist/server.js"
-      ],
-      "env": {
-        "STOCK_BUDDY_HTTP": "0",
-        "STOCK_BUDDY_SKILLS_DIR": "/Users/kuntal/Developer/stock-buddy-skill-mcp/stock-buddy/skills",
-        "DATABASE_URL": "postgresql://stockbuddy:stockbuddy@localhost:5432/stockbuddy",
-        "STOCK_BUDDY_PERSIST_ANALYSIS": "1"
-      }
+      "url": "http://localhost:8080/mcp"
     }
   }
 }

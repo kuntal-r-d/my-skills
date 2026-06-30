@@ -120,6 +120,7 @@ export const portfolioPositions = pgTable(
     tickerId: integer('ticker_id')
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
+    purpose: text('purpose').notNull().default('investment'),
     qty: doublePrecision('qty').notNull(),
     avgCost: doublePrecision('avg_cost').notNull(),
     sector: text('sector'),
@@ -127,7 +128,7 @@ export const portfolioPositions = pgTable(
     targetLevel: doublePrecision('target_level'),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [unique('portfolio_account_ticker').on(table.accountId, table.tickerId)],
+  (table) => [unique('portfolio_account_ticker_purpose').on(table.accountId, table.tickerId, table.purpose)],
 );
 
 export const ingestRuns = pgTable('ingest_runs', {
@@ -186,6 +187,79 @@ export const analysisSnapshots = pgTable(
   (table) => [
     index('analysis_snapshots_ticker_created_idx').on(table.tickerId, table.createdAt),
     index('analysis_snapshots_skill_idx').on(table.skill),
+  ],
+);
+
+/** Web/agent research citations saved from client sessions (REQ-014 lineage). */
+export const researchMemos = pgTable(
+  'research_memos',
+  {
+    id: serial('id').primaryKey(),
+    tickerId: integer('ticker_id').references(() => tickers.id, { onDelete: 'cascade' }),
+    sessionId: text('session_id'),
+    clientId: text('client_id'),
+    title: text('title').notNull(),
+    bodyMd: text('body_md').notNull(),
+    summaryJson: jsonb('summary_json').$type<Record<string, unknown>>(),
+    asOf: date('as_of'),
+    version: integer('version').notNull().default(1),
+    parentMemoId: integer('parent_memo_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('research_memos_ticker_created_idx').on(table.tickerId, table.createdAt),
+    index('research_memos_session_idx').on(table.sessionId),
+  ],
+);
+
+export const researchSources = pgTable(
+  'research_sources',
+  {
+    id: serial('id').primaryKey(),
+    memoId: integer('memo_id').references(() => researchMemos.id, { onDelete: 'set null' }),
+    tickerId: integer('ticker_id').references(() => tickers.id, { onDelete: 'cascade' }),
+    url: text('url'),
+    title: text('title').notNull(),
+    publisher: text('publisher'),
+    publishedDate: date('published_date'),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+    queryContext: text('query_context'),
+    category: text('category'),
+    extractedFacts: jsonb('extracted_facts').$type<Record<string, unknown>>(),
+    sessionId: text('session_id'),
+    clientId: text('client_id'),
+    notes: text('notes'),
+    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('research_sources_ticker_fetched_idx').on(table.tickerId, table.fetchedAt),
+    index('research_sources_session_idx').on(table.sessionId),
+    index('research_sources_category_idx').on(table.category),
+    index('research_sources_memo_idx').on(table.memoId),
+  ],
+);
+
+/** Custom SKILL.md overrides (dashboard / MCP skill editor). */
+export const skillOverrides = pgTable(
+  'skill_overrides',
+  {
+    id: serial('id').primaryKey(),
+    slug: text('slug').notNull().unique(),
+    toolName: text('tool_name'),
+    name: text('name'),
+    description: text('description'),
+    skillMd: text('skill_md').notNull(),
+    metadataJson: jsonb('metadata_json').$type<Record<string, unknown>>(),
+    isActive: boolean('is_active').notNull().default(true),
+    clientId: text('client_id'),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('skill_overrides_slug_idx').on(table.slug),
+    index('skill_overrides_updated_idx').on(table.updatedAt),
   ],
 );
 

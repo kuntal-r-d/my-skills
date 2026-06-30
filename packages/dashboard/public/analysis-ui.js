@@ -127,12 +127,49 @@ window.AnalysisUI = (function () {
       </div>`;
   }
 
-  function renderRiskPanel(risk) {
+  function renderRiskPriceRow(km, labelPrefix = '') {
+    return `
+        <div class="price-row">
+          <div class="price-card"><div class="label">${labelPrefix}Buy zone</div><div class="value">৳${fmtNum(km.buy_zone_low)} – ৳${fmtNum(km.buy_zone_high)}</div></div>
+          <div class="price-card stop"><div class="label">${labelPrefix}Stop-loss</div><div class="value">৳${fmtNum(km.stop_loss)}</div></div>
+          <div class="price-card target"><div class="label">${labelPrefix}Target</div><div class="value">৳${fmtNum(km.target)}</div></div>
+          <div class="price-card"><div class="label">${labelPrefix}Position size</div><div class="value">৳${fmtNum(km.position_value_bdt, 0)}</div><div class="muted">${fmtNum(km.suggested_shares, 0)} shares · ${fmtPct(km.pct_of_capital)} cap</div></div>
+        </div>`;
+  }
+
+  function renderStructureLevelCard(label, value, extraClass, hint) {
+    const display = value != null && value !== '' ? `৳${fmtNum(value)}` : '—';
+    const hintHtml = hint ? `<div class="muted structure-card-hint">${hint}</div>` : '';
+    return `<div class="price-card ${extraClass}"><div class="label">${label}</div><div class="value">${display}</div>${hintHtml}</div>`;
+  }
+
+  function renderStructureStrategyCards(km) {
+    return `
+        <div class="price-row structure-strategy-cards">
+          <div class="price-card"><div class="label">Buy zone</div><div class="value">৳${fmtNum(km.buy_zone_low)} – ৳${fmtNum(km.buy_zone_high)}</div></div>
+          <div class="price-card stop"><div class="label">Stop-loss</div><div class="value">৳${fmtNum(km.stop_loss)}</div></div>
+          <div class="price-card target"><div class="label">Target</div><div class="value">৳${fmtNum(km.target)}</div></div>
+          <div class="price-card"><div class="label">Position size</div><div class="value">৳${fmtNum(km.position_value_bdt, 0)}</div><div class="muted">${fmtNum(km.suggested_shares, 0)} shares · ${fmtPct(km.pct_of_capital)} cap</div></div>
+          ${renderStructureLevelCard('Support', km.support, 'support', 'Nearest floor')}
+          ${renderStructureLevelCard('Next support', km.next_support, 'support next', 'If support breaks')}
+          ${renderStructureLevelCard('Resistance', km.resistance, 'resistance', 'Nearest ceiling')}
+          ${renderStructureLevelCard('Next resistance', km.next_resistance, 'resistance next', 'If resistance clears')}
+        </div>`;
+  }
+
+  function renderRiskPanel(risk, analysis) {
     if (!risk || risk.error) {
-      return `<p class="muted">${esc(risk?.error ?? 'Risk analysis unavailable')}</p>`;
+      const detail = risk?.error ? ` — ${esc(String(risk.error))}` : '';
+      return `<p class="muted">${esc(risk?.error ?? 'Risk analysis unavailable')}${detail}</p>`;
     }
     const km = risk.key_metrics ?? {};
     const gates = risk.gates ?? {};
+    const structure = risk.strategies?.structure;
+    const structKm = structure?.key_metrics ?? {};
+    const structureMissing = !structure?.key_metrics;
+    const enrichHint = analysis?.risk_enrich_skipped
+      ? `<p class="muted risk-structure-missing">Could not add structure strategy: ${esc(String(analysis.risk_enrich_skipped))}. Run <code>npm run build -w @stock-buddy/skills</code> then restart the dashboard.</p>`
+      : '';
     const gateRows = Object.entries(gates)
       .map(
         ([name, g]) =>
@@ -140,17 +177,25 @@ window.AnalysisUI = (function () {
       )
       .join('');
 
+    const structureBlock = structure && !structure.error
+      ? `
+        <h4>Structure strategy <span class="muted">(support / resistance)</span></h4>
+        ${renderStructureStrategyCards(structKm)}
+        <div class="meta-bar">Rating: <strong>${esc(structure.rating)}</strong> · R:R 1:${fmtNum(structKm.risk_reward)} ${confidenceBadge(structure.confidence)}</div>`
+      : structureMissing
+        ? '<p class="muted risk-structure-missing">Structure strategy not in this snapshot — click <strong>Analyze Full</strong> to refresh. If it persists, rebuild skills: <code>npm run build -w @stock-buddy/skills</code> and restart the dashboard (Docker: rebuild or use mounted <code>packages/*/dist</code> volumes).</p>'
+        : '';
+
     return `
       <div class="risk-panel">
-        <div class="price-row">
-          <div class="price-card"><div class="label">Buy zone</div><div class="value">৳${fmtNum(km.buy_zone_low)} – ৳${fmtNum(km.buy_zone_high)}</div></div>
-          <div class="price-card stop"><div class="label">Stop-loss</div><div class="value">৳${fmtNum(km.stop_loss)}</div></div>
-          <div class="price-card target"><div class="label">Target</div><div class="value">৳${fmtNum(km.target)}</div></div>
-          <div class="price-card"><div class="label">Position size</div><div class="value">৳${fmtNum(km.position_value_bdt, 0)}</div><div class="muted">${fmtNum(km.suggested_shares, 0)} shares · ${fmtPct(km.pct_of_capital)} cap</div></div>
-        </div>
+        ${enrichHint}
+        <h4>ATR strategy <span class="muted">(default)</span></h4>
+        ${renderRiskPriceRow(km)}
         <div class="meta-bar">Rating: <strong>${esc(risk.rating)}</strong> · R:R 1:${fmtNum(km.risk_reward)} · ATR ৳${fmtNum(km.atr)} ${confidenceBadge(risk.confidence)}</div>
-        <h4>Risk gates</h4>
+        ${structureBlock}
+        <h4>Risk gates <span class="muted">(ATR strategy)</span></h4>
         <div class="table-wrap"><table><tr><th>Gate</th><th>Status</th><th>Detail</th></tr>${gateRows}</table></div>
+        ${structure && !structure.error ? `<p class="muted">Structure gates: <strong>${esc(structure.rating)}</strong> — see <code>risk.strategies.structure</code> in Developer JSON.</p>` : ''}
       </div>`;
   }
 
@@ -211,24 +256,45 @@ window.AnalysisUI = (function () {
     return '';
   }
 
+  function criterionVerdictText(passed) {
+    if (passed === true) return 'Passes this check.';
+    if (passed === false) return 'Does not pass yet.';
+    return 'Waiting on data — not scored in GPA.';
+  }
+
   function renderCriterionBody(c) {
-    const levels = c.levels;
-    const simple = levels?.simple ?? c.explanation;
-    const example = levels?.example ?? '';
-    const bangla = levels?.bangla ?? '';
-    const stock = levels?.formattedValue ?? formatCriterionSummaryValue(c);
-    const verdict =
-      c.passed === true
-        ? 'Passes this check.'
-        : c.passed === false
-          ? 'Does not pass yet.'
-          : 'Waiting on data for this check.';
+    const levels = c.levels ?? {};
+    const simple = levels.simple ?? c.explanation;
+    const example = levels.example ?? '';
+    const bangla = levels.bangla ?? '';
+    const target = levels.target ?? c.label;
+    const dataLine =
+      levels.dataLine ??
+      (Array.isArray(c.missing_fields) && c.missing_fields.length
+        ? `Waiting on: ${c.missing_fields.join(', ')}. Run fundamentals ingest or add via research.`
+        : null) ??
+      formatCriterionSummaryValue(c) ??
+      (c.passed == null ? 'Data not available for this check yet.' : '—');
+    const verdict = criterionVerdictText(c.passed);
 
     return `
       <div class="criterion-edu">
-        <p class="criterion-verdict ${criterionClass(c.passed)}">${esc(verdict)}${stock ? ` <span class="criterion-stock">(${esc(stock)})</span>` : ''}</p>
-        <p class="criterion-simple">${esc(simple)}</p>
-        ${example ? `<p class="criterion-example">${esc(example)}</p>` : ''}
+        <dl class="criterion-facts">
+          <div class="criterion-fact">
+            <dt>Target</dt>
+            <dd>${esc(target)}</dd>
+          </div>
+          <div class="criterion-fact">
+            <dt>This stock</dt>
+            <dd class="${c.passed == null && !levels.formattedValue ? 'criterion-missing' : ''}">${esc(dataLine)}</dd>
+          </div>
+          <div class="criterion-fact">
+            <dt>Result</dt>
+            <dd class="criterion-verdict ${criterionClass(c.passed)}">${esc(verdict)}</dd>
+          </div>
+        </dl>
+        <p class="criterion-simple"><strong>What it means:</strong> ${esc(simple)}</p>
+        ${example ? `<p class="criterion-example"><strong>Example:</strong> ${esc(example)}</p>` : ''}
         ${bangla ? `<p class="criterion-bn" lang="bn">${esc(bangla)}</p>` : ''}
       </div>`;
   }
@@ -247,10 +313,14 @@ window.AnalysisUI = (function () {
       const summaryVal = formatCriterionSummaryValue(c);
       const val = summaryVal ? ` · ${esc(summaryVal)}` : '';
       html += `
-        <details class="criterion ${criterionClass(c.passed)}">
-          <summary><span class="c-icon">${criterionIcon(c.passed)}</span> ${esc(c.label)}${val}</summary>
+        <article class="criterion ${criterionClass(c.passed)}">
+          <header class="criterion-head">
+            <span class="c-icon" aria-hidden="true">${criterionIcon(c.passed)}</span>
+            <strong class="criterion-title">${esc(c.label)}</strong>
+            ${summaryVal ? `<span class="criterion-inline-data">${esc(summaryVal)}</span>` : ''}
+          </header>
           ${renderCriterionBody(c)}
-        </details>`;
+        </article>`;
     }
     if (current) html += '</div>';
     return html;
@@ -282,8 +352,8 @@ window.AnalysisUI = (function () {
 
     return `
       <div class="checklist-intro">
-        <p><strong>Momentum checklist</strong> — Short-term trading: is price, volume, and relative strength aligned for a trend trade? Not a buy signal on its own — pair with risk rules.</p>
-        <p class="checklist-intro-bn" lang="bn">স্বল্পমেয়াদি ট্রেডিং: দাম, ভলিউম ও আপেক্ষিক শক্তি একসাথে ঊর্ধ্বমুখী কিনা। একা কেনার সংকেত নয় — ঝুঁকি নিয়মের সাথে দেখুন।</p>
+        <p><strong>Momentum checklist</strong> — Each row shows the target, calculated values for this stock, pass/fail, and what it means for short-term trend trading.</p>
+        <p class="checklist-intro-bn" lang="bn">প্রতিটি সারিতে লক্ষ্য, এই স্টকের সংখ্যা, ফলাফল ও সহজ ব্যাখ্যা — একা কেনার সংকেত নয়।</p>
       </div>
       <div class="checklist-header">
         <div><span class="grade-badge lg">${esc(ms.rating)}</span> ${esc(ms.key_metrics?.overall_count ?? '')} ${confidenceBadge(ms.confidence)}</div>
@@ -309,8 +379,8 @@ window.AnalysisUI = (function () {
 
     return `
       <div class="checklist-intro">
-        <p><strong>Investment checklist</strong> — Long-term quality: can this business compound your money for years? Each row is pass ✓, fail ✗, or needs data ⏳.</p>
-        <p class="checklist-intro-bn" lang="bn">দীর্ঘমেয়াদি বিনিয়োগ: ব্যবসাটি বছরের পর বছর টাকা বাড়াতে পারে কিনা। প্রতিটি সারি পাস, ফেল বা ডেটা অপেক্ষা।</p>
+        <p><strong>Investment checklist</strong> — Long-term quality: each row shows the <em>target</em>, <em>this stock's data</em>, <em>pass/fail</em>, and a plain-language explanation (English + Bangla where available).</p>
+        <p class="checklist-intro-bn" lang="bn">দীর্ঘমেয়াদি বিনিয়োগ: প্রতিটি সারিতে লক্ষ্য, স্টকের ডেটা, ফলাফল ও সহজ ব্যাখ্যা দেখুন। ⏳ = ডেটা এখনো নেই, GPA-তে গণনা হয় না।</p>
       </div>
       <div class="checklist-header">
         <div><span class="grade-badge lg">${esc(vc.rating)}</span> GPA ${fmtNum(vc.key_metrics?.gpa)} · ${esc(vc.key_metrics?.overall_count ?? '')} ${confidenceBadge(vc.confidence)}</div>
@@ -390,9 +460,9 @@ window.AnalysisUI = (function () {
       return `<div class="ticker-news-empty">
         <p class="muted">No news tagged to <strong>${esc(sym)}</strong> yet.</p>
         <p class="muted">Run market news ingest, then DSE company news:</p>
-        <pre class="cmd-snippet">npm run ingest -- --job news-market
-npm run ingest -- --ticker ${esc(sym)} --job news
-npm run ingest -- --job retag-news</pre>
+        <pre class="cmd-snippet">npm run ingest:daily
+npm run ingest -- --ticker ${esc(sym)} --job all
+npm run ingest -- --ticker ${esc(sym)} --job news</pre>
       </div>`;
     }
 
@@ -511,7 +581,7 @@ npm run ingest -- --job retag-news</pre>
 
     const fundNote = hasFund
       ? ''
-      : `<p class="data-warnings">⚠ Fundamentals not in database. Run full ingest: <code>${esc(getFullIngestCommand(ticker?.symbol))}</code></p>`;
+      : `<p class="data-warnings">⚠ Fundamentals not in database. Run <code>${esc(getFullIngestCommand(ticker?.symbol))}</code> or <code>npm run ingest:watchlist</code> for all watchlist names.</p>`;
     const warnHtml = (warnings ?? []).length
       ? `<div class="data-warnings">${warnings.map((w) => `<p>⚠ ${esc(w)}</p>`).join('')}</div>`
       : '';
@@ -636,9 +706,125 @@ npm run ingest -- --job retag-news</pre>
       </div>`;
   }
 
-  function renderBriefing(briefing) {
-    if (!briefing?.markdown) return '<p class="muted">Briefing unavailable</p>';
-    return `<div class="briefing-md"><pre class="briefing-pre">${esc(briefing.markdown)}</pre></div>`;
+  function formatBriefingInline(text) {
+    if (text == null) return '';
+    return String(text)
+      .split(/(\*\*[^*]+\*\*)/g)
+      .map((part) => {
+        if (part.startsWith('**') && part.endsWith('**')) return `<strong>${esc(part.slice(2, -2))}</strong>`;
+        return esc(part);
+      })
+      .join('');
+  }
+
+  function regimeTone(rating) {
+    const r = String(rating ?? '').toLowerCase();
+    if (r === 'risk_on') return 'good';
+    if (r === 'risk_off' || r === 'cautious') return 'bad';
+    return 'neutral';
+  }
+
+  function briefingKpiChip(label, value, tone) {
+    const cls = tone ? ` briefing-kpi-${tone}` : '';
+    return `<span class="briefing-kpi${cls}"><span class="briefing-kpi-val">${esc(String(value))}</span><span class="briefing-kpi-label">${esc(label)}</span></span>`;
+  }
+
+  function renderBriefingList(lines) {
+    if (!lines?.length) return '<p class="muted briefing-empty">Nothing to report.</p>';
+    let html = '<ul class="briefing-list">';
+    for (const line of lines) {
+      const raw = String(line);
+      if (raw.startsWith('**') && raw.endsWith('**') && !raw.slice(2, -2).includes('**')) {
+        html += `<li class="briefing-subhead">${formatBriefingInline(raw)}</li>`;
+        continue;
+      }
+      if (raw === '') continue;
+      html += `<li>${formatBriefingInline(raw.replace(/^-\s*/, ''))}</li>`;
+    }
+    return `${html}</ul>`;
+  }
+
+  function renderBriefingCard(title, section, { alert = false, compact = false } = {}) {
+    const lines = section?.lines ?? (section?.line ? [section.line] : []);
+    if (compact && !lines.length) return '';
+    return `
+      <article class="briefing-card${alert ? ' briefing-card-alert' : ''}">
+        <header class="briefing-card-head">
+          <h4>${esc(title)}</h4>
+        </header>
+        <div class="briefing-card-body">${renderBriefingList(lines)}</div>
+      </article>`;
+  }
+
+  function renderBriefing(briefing, { compact = false } = {}) {
+    if (!briefing?.sections && !briefing?.markdown) {
+      return '<p class="muted">Briefing unavailable — run npm run ingest:daily, then Refresh.</p>';
+    }
+
+    const sections = briefing.sections ?? {};
+    const counts = briefing.item_counts ?? {};
+    const regimeMeta = sections.market_regime?.meta ?? {};
+    const rating = regimeMeta.rating ?? 'unknown';
+    const tone = regimeTone(rating);
+    const flags = briefing.flags ?? [];
+
+    const hero = `
+      <div class="briefing-hero briefing-hero-${tone}">
+        <div class="briefing-hero-main">
+          <div class="briefing-hero-label">Market regime</div>
+          <div class="briefing-hero-rating">${esc(String(rating).replace(/_/g, ' '))}</div>
+          ${regimeMeta.risk_multiplier != null ? `<div class="briefing-hero-meta">Risk multiplier ${esc(String(regimeMeta.risk_multiplier))}</div>` : ''}
+        </div>
+        ${sections.market_regime?.line ? `<p class="briefing-hero-copy">${formatBriefingInline(sections.market_regime.line)}</p>` : ''}
+      </div>`;
+
+    const kpis = `
+      <div class="briefing-kpis">
+        ${briefingKpiChip('Near levels', (counts.positions_near_level ?? 0) + (counts.watchlist_near_entry ?? 0), (counts.positions_near_level ?? 0) + (counts.watchlist_near_entry ?? 0) ? 'warn' : '')}
+        ${briefingKpiChip('Risk items', counts.risk_items ?? 0, counts.risk_items ? 'warn' : '')}
+        ${briefingKpiChip('News', counts.news ?? 0, '')}
+        ${briefingKpiChip('Events today', counts.events_today ?? 0, '')}
+      </div>`;
+
+    const flagHtml = flags.length
+      ? `<div class="briefing-flags">${flags.map((f) => `<span class="briefing-flag">${esc(String(f).replace(/_/g, ' '))}</span>`).join('')}</div>`
+      : '';
+
+    const summary = briefing.summary
+      ? `<p class="briefing-summary">${formatBriefingInline(briefing.summary)}</p>`
+      : '';
+
+    const cards = [
+      renderBriefingCard('Positions near stop / target', sections.positions_near_levels, { alert: counts.positions_near_level > 0, compact }),
+      renderBriefingCard('Watchlist near entry', sections.watchlist_near_entry, { alert: counts.watchlist_near_entry > 0, compact }),
+      renderBriefingCard('Risk items', sections.risk_items, { alert: counts.risk_items > 0, compact: false }),
+      ...(compact ? [] : [
+        renderBriefingCard('Overnight news & disclosures', sections.overnight_news, { compact }),
+        renderBriefingCard('Calendar today', sections.calendar_today, { compact }),
+        renderBriefingCard('Portfolio & watchlist signals', sections.signal_summary, { compact }),
+      ]),
+    ].filter(Boolean);
+
+    if (compact) {
+      const compactCards = cards.slice(0, 2).filter(Boolean);
+      return `
+        <div class="briefing-view briefing-view-compact">
+          ${hero}
+          ${summary}
+          ${kpis}
+          <div class="briefing-grid briefing-grid-compact">${compactCards.join('')}</div>
+          ${flagHtml}
+        </div>`;
+    }
+
+    return `
+      <div class="briefing-view">
+        ${hero}
+        ${summary}
+        ${kpis}
+        ${flagHtml}
+        <div class="briefing-grid">${cards.join('')}</div>
+      </div>`;
   }
 
   function roc1mCell(pct) {
@@ -647,7 +833,51 @@ npm run ingest -- --job retag-news</pre>
     return `<span class="${n >= 0 ? 'pos' : 'neg'}">${fmtPct(n)}</span>`;
   }
 
-  function renderPortfolioTable(positions, { compact = false } = {}) {
+  function formatSignalRating(rating) {
+    if (!rating) return '—';
+    return String(rating)
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function ratingClass(rating) {
+    if (!rating) return '';
+    const r = String(rating).toLowerCase();
+    if (r.includes('strong_buy') || r === 'buy') return 'rating-buy';
+    if (r.includes('sell')) return 'rating-sell';
+    if (r === 'stand_aside' || r === 'suppressed') return 'rating-warn';
+    return 'rating-hold';
+  }
+
+  function renderSignalRatingCell(rating, score) {
+    if (!rating && score == null) return '—';
+    const label = formatSignalRating(rating);
+    const scoreTxt = score != null ? `<span class="muted">${score}/10</span>` : '';
+    return `<span class="signal-rating ${ratingClass(rating)}">${esc(label)}</span>${scoreTxt ? ` ${scoreTxt}` : ''}`;
+  }
+
+  function renderWatchlistTable(items) {
+    if (!items?.length) return '<p class="muted">No symbols yet — add one above.</p>';
+
+    const sorted = [...items].sort((a, b) => a.symbol.localeCompare(b.symbol));
+    let html = '<div class="table-wrap"><table class="watchlist-table"><tr>'
+      + '<th>Symbol</th><th>Sector</th><th>Investment</th><th>Momentum</th><th></th></tr>';
+
+    for (const w of sorted) {
+      const sym = `<span class="clickable" data-symbol="${esc(w.symbol)}">${esc(w.symbol)}</span>`;
+      const meta = w.name ? `<div class="muted watch-name">${esc(w.name)}</div>` : '';
+      html += `<tr>
+        <td>${sym}${meta}</td>
+        <td class="muted">${esc(w.sector ?? '—')}</td>
+        <td>${renderSignalRatingCell(w.investment_rating, w.investment_score)}</td>
+        <td>${renderSignalRatingCell(w.momentum_rating, w.momentum_score)}</td>
+        <td><button type="button" class="btn-sm rm-watch" data-symbol="${esc(w.symbol)}" data-purpose="${esc(w.purpose)}" title="Remove">Remove</button></td>
+      </tr>`;
+    }
+    return html + '</table></div>';
+  }
+
+  function renderPortfolioTable(positions, { compact = false, purpose = 'investment' } = {}) {
     if (!positions?.length) return '<p class="muted">No open positions.</p>';
 
     const sorted = [...positions].sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0));
@@ -663,27 +893,179 @@ npm run ingest -- --job retag-news</pre>
         : (p.pnl != null ? `৳${fmtNum(p.pnl, 0)} (${fmtPct(p.pnl_pct)})` : '—');
       const cells = compact
         ? [sym, fmtNum(p.qty, 0), roc1mCell(p.roc_1m_pct), fmtNum(p.last_close), esc(p.sector ?? '—'), pnlCell, p.investment_score ?? '—', p.momentum_score ?? '—', esc(p.risk_rating ?? '—')]
-        : [sym, fmtNum(p.qty, 0), fmtNum(p.avg_cost), roc1mCell(p.roc_1m_pct), fmtNum(p.last_close), esc(p.sector ?? '—'), pnlCell, p.investment_score ?? '—', p.momentum_score ?? '—', esc(p.risk_rating ?? '—'), `<button type="button" class="btn-sm del-pos" data-symbol="${esc(p.ticker)}">×</button>`];
+        : [sym, fmtNum(p.qty, 0), fmtNum(p.avg_cost), roc1mCell(p.roc_1m_pct), fmtNum(p.last_close), esc(p.sector ?? '—'), pnlCell, p.investment_score ?? '—', p.momentum_score ?? '—', esc(p.risk_rating ?? '—'), `<button type="button" class="btn-sm del-pos" data-symbol="${esc(p.ticker)}" data-purpose="${esc(purpose)}">×</button>`];
       html += `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
     }
     return html + '</table>';
   }
 
-  function renderHomePortfolio(portfolio) {
-    if (!portfolio?.account) {
+  function renderPortfolioSummary(portfolio) {
+    const mirrored = portfolio?.mirrored_from_investment;
+    if (!portfolio?.positions?.length) {
+      return `<span class="muted">${portfolio?.purpose === 'trading' ? 'No trading positions.' : 'No investment positions.'}</span>`;
+    }
+    const totalPnl = portfolio.positions.reduce((s, p) => s + (p.pnl ?? 0), 0);
+    const line = `Cost ৳${fmtNum(portfolio.total_cost_basis, 0)} · Unrealized P&amp;L ৳${fmtNum(totalPnl, 0)} · ${portfolio.positions.length} positions`;
+    if (mirrored) {
+      return `${line} · <span class="muted">Showing investment holdings until you split or add trading positions</span>`;
+    }
+    return line;
+  }
+
+  function renderTradingMirrorBanner(mirrored) {
+    if (!mirrored) return '';
+    return `<div class="portfolio-mirror-banner">Showing your investment holdings with momentum risk levels. Use <strong>Copy to momentum trading</strong> to maintain a separate trading book, or add positions below.</div>`;
+  }
+
+  function riskTipPopup(lines) {
+    const body = lines.map((l) => `<div class="risk-tip-line">${l}</div>`).join('');
+    return `<span class="risk-level-tip-popup" role="tooltip">${body}</span>`;
+  }
+
+  function riskTipCell(display, lines) {
+    if (!display || display === '—') return '—';
+    return `<span class="risk-level-tip" tabindex="0">${display}${riskTipPopup(lines)}</span>`;
+  }
+
+  function riskZoneDisplay(km) {
+    if (km?.buy_zone_low != null && km?.buy_zone_high != null) {
+      return `৳${fmtNum(km.buy_zone_low)} – ৳${fmtNum(km.buy_zone_high)}`;
+    }
+    return null;
+  }
+
+  function renderDualRiskStack(atrDisplay, structDisplay, atrLines, structLines) {
+    const rows = [];
+    if (atrDisplay && atrDisplay !== '—') {
+      rows.push(`<div class="risk-dual-row"><span class="risk-dual-label">ATR</span>${riskTipCell(atrDisplay, atrLines)}</div>`);
+    }
+    if (structDisplay && structDisplay !== '—') {
+      rows.push(`<div class="risk-dual-row"><span class="risk-dual-label">Struct</span>${riskTipCell(structDisplay, structLines)}</div>`);
+    }
+    if (!rows.length) return '—';
+    return `<div class="risk-dual-cell">${rows.join('')}</div>`;
+  }
+
+  function momentumRiskCells(p) {
+    const atr = p.risk ?? {};
+    const struct = p.risk?.structure ?? {};
+    const entry = atr.entry ?? p.last_close;
+    const hasAtrLevels = atr.atr != null && entry != null;
+    const analysisFooter = '<span class="muted">risk-manager · latest analysis snapshot</span>';
+    const atrBase = hasAtrLevels
+      ? [
+          `<strong>Entry</strong> ৳${fmtNum(entry)} <span class="muted">(last close)</span>`,
+          `<strong>ATR(14)</strong> ৳${fmtNum(atr.atr)}`,
+        ]
+      : [];
+    const structBase = struct.support != null
+      ? [
+          `<strong>Support</strong> ৳${fmtNum(struct.support)}`,
+          struct.next_support != null ? `<strong>Next support</strong> ৳${fmtNum(struct.next_support)}` : '',
+          `<strong>Resistance</strong> ৳${fmtNum(struct.resistance)}`,
+          struct.next_resistance != null ? `<strong>Next resistance</strong> ৳${fmtNum(struct.next_resistance)}` : '',
+          struct.entry != null ? `<strong>Entry</strong> ৳${fmtNum(struct.entry)} <span class="muted">(buy-zone high)</span>` : '',
+        ].filter(Boolean)
+      : [];
+
+    const buyZone = renderDualRiskStack(
+      riskZoneDisplay(atr),
+      riskZoneDisplay(struct),
+      [...atrBase, '<strong>Formula</strong> entry − 0.25×ATR … entry', '<span class="muted">Pullback band from last close.</span>', analysisFooter],
+      [...structBase, '<strong>Formula</strong> pullback to 60-bar support', analysisFooter],
+    );
+
+    const stopDisplay = atr.stop_loss != null ? `৳${fmtNum(atr.stop_loss)}` : (p.stop_level != null ? `৳${fmtNum(p.stop_level)}` : null);
+    const structStopDisplay = struct.stop_loss != null ? `৳${fmtNum(struct.stop_loss)}` : null;
+    const stop = renderDualRiskStack(
+      stopDisplay,
+      structStopDisplay,
+      [...atrBase, '<strong>Formula</strong> entry − 2×ATR', analysisFooter],
+      [...structBase, '<strong>Formula</strong> support − 0.5×ATR', analysisFooter],
+    );
+
+    const targetDisplay = atr.target != null ? `৳${fmtNum(atr.target)}` : (p.target_level != null ? `৳${fmtNum(p.target_level)}` : null);
+    const structTargetDisplay = struct.target != null ? `৳${fmtNum(struct.target)}` : null;
+    const target = renderDualRiskStack(
+      targetDisplay,
+      structTargetDisplay,
+      [...atrBase, '<strong>Formula</strong> entry + 3×ATR', analysisFooter],
+      [...structBase, '<strong>Formula</strong> resistance or min 1.5:1 R:R', analysisFooter],
+    );
+
+    const sizeDisplay = atr.position_value_bdt != null ? `৳${fmtNum(atr.position_value_bdt, 0)}` : (p.market_value != null ? `৳${fmtNum(p.market_value, 0)}` : null);
+    const structSizeDisplay = struct.position_value_bdt != null ? `৳${fmtNum(struct.position_value_bdt, 0)}` : null;
+    const size = renderDualRiskStack(
+      sizeDisplay,
+      structSizeDisplay,
+      [...atrBase, '<strong>Size</strong> from 1% risk / stop distance + caps', analysisFooter],
+      [...structBase, '<strong>Size</strong> from structure stop distance + caps', analysisFooter],
+    );
+
+    return { buyZone, stop, target, size, hasStructure: Boolean(struct.stop_loss) };
+  }
+
+  function renderMomentumPortfolioTable(positions, { compact = false, purpose = 'trading', showActions = !compact } = {}) {
+    if (!positions?.length) {
+      return '<p class="muted">No open trading positions.</p>';
+    }
+
+    const sorted = [...positions].sort((a, b) => (b.market_value ?? 0) - (a.market_value ?? 0));
+    const headers = compact
+      ? ['Symbol', 'Qty', 'Last', 'P&amp;L %', 'Buy zone', 'Stop-loss', 'Target', 'Position size']
+      : ['Ticker', 'Qty', 'Avg', 'Last', 'Sector', 'P&amp;L', 'Buy zone', 'Stop-loss', 'Target', 'Position size', 'Mom', 'Risk', ''];
+    if (showActions && !headers.includes('')) headers.push('');
+
+    let html = `<table class="momentum-portfolio-table"><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>`;
+    let anyMissingStructure = false;
+    for (const p of sorted) {
+      const sym = `<span class="clickable" data-symbol="${esc(p.ticker)}">${esc(p.ticker)}</span>`;
+      const risk = momentumRiskCells(p);
+      if (!risk.hasStructure) anyMissingStructure = true;
+      const pnlCell = compact
+        ? (p.pnl_pct != null ? `<span class="${p.pnl_pct >= 0 ? 'pos' : 'neg'}">${fmtPct(p.pnl_pct)}</span>` : '—')
+        : (p.pnl != null ? `৳${fmtNum(p.pnl, 0)} (${fmtPct(p.pnl_pct)})` : '—');
+      const cells = compact
+        ? [sym, fmtNum(p.qty, 0), fmtNum(p.last_close), pnlCell, risk.buyZone, risk.stop, risk.target, risk.size]
+        : [sym, fmtNum(p.qty, 0), fmtNum(p.avg_cost), fmtNum(p.last_close), esc(p.sector ?? '—'), pnlCell, risk.buyZone, risk.stop, risk.target, risk.size, p.momentum_score ?? '—', esc(p.risk_rating ?? '—')];
+      if (showActions) {
+        cells.push(`<button type="button" class="btn-sm del-pos" data-symbol="${esc(p.ticker)}" data-purpose="${esc(purpose)}">×</button>`);
+      }
+      html += `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
+    }
+    const structureNote = anyMissingStructure
+      ? '<p class="muted portfolio-structure-hint">Struct rows appear after <strong>Analyze Full</strong> on each symbol (snapshots before dual-strategy risk-manager show ATR only).</p>'
+      : '<p class="muted portfolio-structure-hint">Each level shows <span class="risk-dual-label">ATR</span> and <span class="risk-dual-label">Struct</span> — hover for formulas.</p>';
+    return structureNote + html + '</table>';
+  }
+
+  function renderHomePortfolio(portfolios) {
+    const investment = portfolios?.investment;
+    const trading = portfolios?.trading;
+    const account = investment?.account ?? trading?.account;
+
+    if (!account) {
       return {
-        summary: '<p class="muted">No portfolio yet — add positions on the Portfolio tab or run <code>npm run db:seed</code>.</p>',
-        table: '',
+        account: '<p class="muted">No portfolio yet — add positions on the Portfolio tab or run <code>npm run db:seed</code>.</p>',
+        investmentSummary: '',
+        investmentTable: '',
+        tradingSummary: '',
+        tradingTable: '',
+        tradingMirrorBanner: '',
       };
     }
-    const totalPnl = (portfolio.positions ?? []).reduce((s, p) => s + (p.pnl ?? 0), 0);
-    const summary =
-      `Account <strong>${esc(portfolio.account.label)}</strong> · Capital ৳${fmtNum(portfolio.account.capital_bdt, 0)} · `
-      + `Cost ৳${fmtNum(portfolio.total_cost_basis, 0)} · Unrealized P&amp;L ৳${fmtNum(totalPnl, 0)}`;
 
     return {
-      summary,
-      table: renderPortfolioTable(portfolio.positions, { compact: true }),
+      account: `Account <strong>${esc(account.label)}</strong> · Capital ৳${fmtNum(account.capital_bdt, 0)}`,
+      investmentSummary: renderPortfolioSummary(investment),
+      investmentTable: renderPortfolioTable(investment?.positions, { compact: true, purpose: 'investment' }),
+      tradingSummary: renderPortfolioSummary(trading),
+      tradingMirrorBanner: renderTradingMirrorBanner(trading?.mirrored_from_investment),
+      tradingTable: renderMomentumPortfolioTable(trading?.positions, {
+        compact: true,
+        purpose: 'trading',
+        showActions: !trading?.mirrored_from_investment,
+      }),
     };
   }
 
@@ -725,7 +1107,7 @@ npm run ingest -- --job retag-news</pre>
     };
 
     if (!items?.length) {
-      return '<p class="muted">No ranked news yet — run <code>npm run ingest -- --job news-market</code> then refresh.</p>';
+      return '<p class="muted">No ranked news yet — run <code>npm run ingest:daily</code> or <code>npm run ingest:news</code>, then refresh.</p>';
     }
 
     const bnHeadline = (text) => /[\u0980-\u09FF]/.test(text ?? '');
@@ -757,12 +1139,9 @@ npm run ingest -- --job retag-news</pre>
   }
 
   function renderHome(data) {
-    const port = renderHomePortfolio(data.portfolio);
     return {
-      briefing: renderBriefing(data.briefing),
+      briefing: renderBriefing(data.briefing, { compact: true }),
       importantNews: renderHomeImportantNews(data.importantNews),
-      portfolioSummary: port.summary,
-      portfolioTable: port.table,
     };
   }
 
@@ -874,7 +1253,7 @@ npm run ingest -- --job retag-news</pre>
       issues.push('Snapshot run time unknown — treat as unverified.');
     } else if (runAge > 72 * 3600000) {
       bump('stale');
-      issues.push(`Analysis run is ${formatAge(createdAt)} (${fmtDate(createdAt)}) — re-run Analyze after refreshing ingest.`);
+      issues.push(`Analysis run is ${formatAge(createdAt)} (${fmtDate(createdAt)}) — run npm run ingest:daily, then Analyze.`);
     } else if (runAge > 24 * 3600000) {
       bump('aging');
       issues.push(`Analysis run is ${formatAge(createdAt)} (${fmtDate(createdAt)}) — may not reflect the latest session.`);
@@ -882,7 +1261,7 @@ npm run ingest -- --job retag-news</pre>
 
     if (!latestBar) {
       bump('stale');
-      issues.push('No price bars in database — ingest OHLCV before trusting scores.');
+      issues.push('No price bars in database — run `npm run ingest:daily`, then full ingest for this ticker if daily reported 0 OHLCV rows.');
     } else {
       const barLag = daysBetween(latestBar, now);
       if (barLag != null && barLag > 4) {
@@ -927,17 +1306,54 @@ npm run ingest -- --job retag-news</pre>
     return { level, label: labels[level] ?? level, issues };
   }
 
+  function renderAnalysisDataBar(meta, analysis, tickerData) {
+    const ohlcv = tickerData?.ohlcv ?? [];
+    const latestBar = ohlcv.length ? ohlcv[ohlcv.length - 1]?.date : null;
+    const fundAsOf = tickerData?.fundamentals?.as_of ?? null;
+    const analysisAsOf = analysis?.as_of ?? meta?.as_of ?? null;
+    const analysisRun = meta?.created_at ?? null;
+    const sym = tickerData?.ticker?.symbol;
+
+    if (!sym && !latestBar && !fundAsOf && !analysisAsOf) {
+      return '<p class="muted analysis-data-empty">Load a ticker to see data dates.</p>';
+    }
+
+    const report = analysis && tickerData ? computeJsonFreshness(meta, analysis, tickerData) : null;
+    const tone = report?.level ?? (latestBar ? 'aging' : 'missing');
+
+    function chip(label, value, sub) {
+      const missing = !value || value === '—';
+      return `<div class="data-date-chip${missing ? ' data-date-missing' : ''}">
+        <span class="data-date-label">${esc(label)}</span>
+        <span class="data-date-val">${missing ? '—' : esc(value)}</span>
+        ${sub ? `<span class="data-date-sub">${esc(sub)}</span>` : ''}
+      </div>`;
+    }
+
+    const runSub = analysisRun ? fmtDateWithAge(analysisRun) : '';
+
+    return `
+      <div class="analysis-data-bar-inner freshness-${tone}">
+        ${chip('Latest price', latestBar ? fmtDate(latestBar, { dateOnly: true }) : null, latestBar ? 'DSE daily bar' : 'Run ingest:daily')}
+        ${chip('Fundamentals', fundAsOf ? fmtDate(fundAsOf, { dateOnly: !hasTimeComponent(String(fundAsOf)) }) : null, fundAsOf && tickerData?.fundamentals?.source ? String(tickerData.fundamentals.source) : '')}
+        ${chip('Analysis', analysisAsOf ? fmtDate(analysisAsOf, { dateOnly: !hasTimeComponent(String(analysisAsOf)) }) : null, analysisRun ? `Snapshot ${runSub}` : (analysis ? '' : 'Run Analyze'))}
+        ${report ? `<span class="data-freshness-pill freshness-${tone}">${esc(report.label)}</span>` : ''}
+      </div>`;
+  }
+
   function renderJsonProvenance(meta, analysis, tickerData) {
     const report = computeJsonFreshness(meta, analysis, tickerData);
     const ohlcv = tickerData?.ohlcv ?? [];
     const latestBar = ohlcv.length ? ohlcv[ohlcv.length - 1]?.date : null;
     const fundAsOf = tickerData?.fundamentals?.as_of ?? null;
     const mode = analysis?.analysis_mode ?? '—';
+    const hasStructure = Boolean(analysis?.risk?.strategies?.structure?.key_metrics);
     const rows = [
       ['Snapshot', meta?.id != null ? `#${meta.id}` : '—'],
       ['Analysis run', meta?.created_at ? fmtDateWithAge(meta.created_at) : '—'],
       ['Data as_of', analysis?.as_of ? fmtDate(analysis.as_of, { dateOnly: !hasTimeComponent(String(analysis.as_of)) }) : '—'],
       ['Analysis mode', mode],
+      ['Structure strategy', hasStructure ? 'Present (risk.strategies.structure)' : 'Missing — re-run Analyze Full'],
       ['Latest price bar', latestBar ? `${fmtDate(latestBar, { dateOnly: true })} (DSE session)` : '—'],
       ['Fundamentals as_of', fundAsOf ? fmtDate(fundAsOf, { dateOnly: !hasTimeComponent(String(fundAsOf)) }) : '—'],
       ['Model version', meta?.model_version ?? '—'],
@@ -956,10 +1372,15 @@ npm run ingest -- --job retag-news</pre>
       ? `<ul class="json-issues">${report.issues.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`
       : '<p class="muted json-issues-none">Snapshot and ingested data look current for dashboard use.</p>';
 
+    const structureNav = hasStructure
+      ? '<p class="muted json-structure-hint">Structure levels: use the <strong>risk.strategies.structure</strong> chip below, or expand <code>risk</code> → <code>strategies</code> → <code>structure</code> in the JSON.</p>'
+      : '<p class="muted json-structure-hint warn">No <code>risk.strategies.structure</code> in this snapshot. Click <strong>Analyze Full</strong> on the Analysis tab to regenerate.</p>';
+
     return `
       <div class="json-provenance-head">
         <span class="json-freshness-badge inline ${report.level}">${esc(report.label)}</span>
         <p class="json-provenance-hint muted">Compare <strong>Analysis run</strong> (when skills ran) vs <strong>Latest price bar</strong> / <strong>Fundamentals as_of</strong> (what was in Postgres). Times are shown in <strong>BDT (Asia/Dhaka)</strong>. Large gaps mean backdated output.</p>
+        ${structureNav}
       </div>
       <div class="json-provenance-grid">
         <dl class="json-kv">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(String(v))}</dd></div>`).join('')}</dl>
@@ -978,10 +1399,20 @@ npm run ingest -- --job retag-news</pre>
 
   function ingestCmd(symbol, job, days) {
     const sym = String(symbol ?? 'LHB').toUpperCase();
-    let cmd = `npm run ingest -- --ticker ${sym} --job ${job}`;
+    let cmd = `npm run ingest:one -- --ticker ${sym} --job ${job}`;
     if (days != null) cmd += ` --days ${days}`;
     return cmd;
   }
+
+  const REPO_ROOT_NOTE =
+    'Run from the repo root (the folder containing package.json), e.g. cd ~/Developer/stock-buddy-skill-mcp/stock-buddy';
+
+  const INGEST_SHORTCUTS_NOTE =
+    'Shortcuts: npm run ingest:daily · ingest:macro · ingest:news · ingest:watchlist. '
+    + 'Per-ticker full ingest: npm run ingest:one -- --ticker SYMBOL --job all --days 365 (compiled node; less likely to trip AV than tsx). '
+    + 'OHLCV order: dsebd.org archive → StockAnalysis → Yahoo. '
+    + 'If ingest:daily reports 0 OHLCV rows for a symbol, run full per-ticker ingest (--job all). '
+    + 'Security software may flag ingest (many HTTP fetches + DSE TLS workaround) — allow/whitelist this repo or run inside Docker.';
 
   function analyzeCurl(symbol, mode) {
     const sym = String(symbol ?? 'LHB').toUpperCase();
@@ -990,6 +1421,12 @@ npm run ingest -- --job retag-news</pre>
   }
 
   const WORKFLOW_COMMANDS = [
+    {
+      id: 'wf-cd',
+      label: '0. Go to repo root',
+      description: REPO_ROOT_NOTE,
+      command: () => 'cd ~/Developer/stock-buddy-skill-mcp/stock-buddy',
+    },
     {
       id: 'wf-postgres',
       label: '1. Start Postgres',
@@ -1009,26 +1446,32 @@ npm run ingest -- --job retag-news</pre>
       command: () => 'npm run db:seed',
     },
     {
+      id: 'wf-daily',
+      label: '4. Daily pre-market refresh',
+      description: 'Macro + market news + OHLCV for portfolio and watchlist (dsebd.org → StockAnalysis → Yahoo). Check output for symbols with 0 rows.',
+      command: () => 'npm run ingest:daily',
+    },
+    {
       id: 'wf-news-market',
-      label: '4. Market news (newspapers + web)',
+      label: '5. Market news (newspapers + web)',
       description: 'TBS, Tribune, Daily Star, Prothom Alo, FE, Google News EN/BN — tags headlines to tickers.',
-      command: () => 'npm run ingest -- --job news-market',
+      command: () => 'npm run ingest:news',
     },
     {
       id: 'wf-watchlist',
-      label: '5. Watchlist full ingest',
+      label: '6. Watchlist full ingest',
       description: 'For each watchlist symbol: OHLCV, fundamentals, shareholding, DSE news, analysis snapshot.',
-      command: () => 'npm run ingest -- --watchlist --days 365',
+      command: () => 'npm run ingest:watchlist',
     },
     {
       id: 'wf-retag',
-      label: '6. Retag Bengali / untagged news',
+      label: '7. Retag Bengali / untagged news',
       description: 'Re-apply ticker matching on news already in DB (no new fetch).',
       command: () => 'npm run ingest -- --job retag-news',
     },
     {
       id: 'wf-dashboard',
-      label: '7. Start dashboard',
+      label: '8. Start dashboard',
       description: 'Web UI on port 3000 — reads Postgres only, does not scrape.',
       command: () => 'npm run dashboard',
     },
@@ -1039,7 +1482,7 @@ npm run ingest -- --job retag-news</pre>
       id: 'ingest-all',
       group: 'Per-ticker pipeline',
       label: 'Full ingest + analyze',
-      description: 'Runs: OHLCV → fundamentals → shareholding → DSE company news → analysis snapshot. Does not include market news (run news-market separately).',
+      description: 'OHLCV → fundamentals → shareholding → DSE news → analysis. Use when ingest:daily shows 0 OHLCV rows for this symbol, or for a new ticker.',
       command: (sym) => ingestCmd(sym, 'all', 365),
       quick: true,
     },
@@ -1047,7 +1490,7 @@ npm run ingest -- --job retag-news</pre>
       id: 'ingest-ohlcv-365',
       group: 'Per-ticker ingest',
       label: 'OHLCV (1 year)',
-      description: 'Fetch daily bars from DSE, Yahoo, StockAnalysis — picks longest clean series → ohlcv_daily.',
+      description: 'Daily bars from dsebd.org archive, StockAnalysis, Yahoo — picks the longest clean series.',
       command: (sym) => ingestCmd(sym, 'ohlcv', 365),
     },
     {
@@ -1085,8 +1528,8 @@ npm run ingest -- --job retag-news</pre>
       id: 'ingest-analysis',
       group: 'Per-ticker analysis',
       label: 'Analysis snapshot (CLI)',
-      description: 'Read Postgres → run skills → save analysis_snapshots (same data as Analyze Full button).',
-      command: (sym) => ingestCmd(sym, 'analysis'),
+      description: 'Read Postgres → run skills → save analysis_snapshots (same as Analyze Full button).',
+      command: (sym) => `npm run ingest:analysis -- --ticker ${String(sym ?? 'LHB').toUpperCase()}`,
       quick: true,
     },
     {
@@ -1122,11 +1565,19 @@ npm run ingest -- --job retag-news</pre>
 
   const GLOBAL_COMMANDS = [
     {
+      id: 'ingest-daily',
+      group: 'Market-wide ingest',
+      label: 'Daily pre-market refresh',
+      description: 'Macro + market news + OHLCV for portfolio and watchlist. Primary command before the Briefing tab. Warns if any symbol gets 0 OHLCV rows.',
+      command: () => 'npm run ingest:daily',
+      quick: true,
+    },
+    {
       id: 'ingest-news-market',
       group: 'Market-wide ingest',
       label: 'Market news (newspapers + web)',
       description: 'Fetch RSS/HTML from TBS, Tribune, Daily Star, Prothom Alo, FE, Google News — tag tickers → news_items.',
-      command: () => 'npm run ingest -- --job news-market',
+      command: () => 'npm run ingest:news',
       quick: true,
     },
     {
@@ -1141,8 +1592,8 @@ npm run ingest -- --job retag-news</pre>
       id: 'ingest-macro',
       group: 'Market-wide ingest',
       label: 'Macro snapshot',
-      description: 'Policy rate, FX, inflation seed data → macro_snapshots.',
-      command: () => 'npm run ingest -- --job macro',
+      description: 'Policy rate, FX, inflation seed data → macro_snapshots (included in ingest:daily).',
+      command: () => 'npm run ingest:macro',
     },
     {
       id: 'ingest-universe',
@@ -1155,8 +1606,8 @@ npm run ingest -- --job retag-news</pre>
       id: 'ingest-watchlist',
       group: 'Market-wide ingest',
       label: 'Watchlist batch (macro + news + all tickers)',
-      description: 'macro → news-market → ingest all for every watchlist symbol.',
-      command: () => 'npm run ingest -- --watchlist --days 365',
+      description: 'Full ingest for every watchlist symbol — fundamentals, shareholding, analysis. Weekly catch-up.',
+      command: () => 'npm run ingest:watchlist',
       quick: true,
     },
     {
@@ -1214,13 +1665,617 @@ npm run ingest -- --job retag-news</pre>
     return esc(text).replace(/"/g, '&quot;');
   }
 
+  const DAILY_COMMAND_SECTIONS = [
+    {
+      id: 'schedule',
+      title: 'What runs automatically',
+      note: 'The ingest-worker runs ingest:daily every 24h while Docker is up. OHLCV is fetched from dsebd.org (not dsebd.com.bd), then StockAnalysis and Yahoo as fallbacks. If your PC is off, cd to the repo root and run npm run ingest:daily when you return.',
+      schedule: [
+        ['Every 24 hours', 'npm run ingest:daily — macro, news, OHLCV for portfolio + watchlist'],
+        ['Every 7 days', 'npm run ingest:watchlist — full fundamentals, shareholding, news, analysis'],
+        ['0 OHLCV rows', 'npm run ingest:one -- --ticker SYMBOL --job all — full ingest for that symbol (use ingest:one if AV blocks tsx)'],
+      ],
+      commands: [],
+    },
+    {
+      id: 'set-once',
+      title: 'Set once — keep services running',
+      note: 'Run from the repo root after install or reboot. Containers use restart: unless-stopped when Docker Desktop starts.',
+      commands: [
+        {
+          id: 'daily-stack',
+          label: 'Start database + automated ingest',
+          description: 'Postgres plus ingest-worker (ingest:daily every 24h + weekly full watchlist). Minimum for hands-off updates.',
+          command: () => 'docker compose up -d postgres ingest-worker',
+          quick: true,
+          badge: 'Once / after reboot',
+        },
+        {
+          id: 'daily-mcp',
+          label: 'Start MCP servers (Claude Code / Cursor)',
+          description: 'Analysis MCP on :8080 and data MCP on :8081 — needed for agent workflows.',
+          command: () => 'docker compose up -d stock-buddy-mcp stock-buddy-data-mcp',
+          badge: 'Once / after reboot',
+        },
+        {
+          id: 'daily-dashboard',
+          label: 'Start dashboard (Docker)',
+          description: 'Web UI on http://localhost:3000 — reads Postgres only.',
+          command: () => 'docker compose up -d dashboard',
+          badge: 'Once / after reboot',
+        },
+        {
+          id: 'daily-dashboard-local',
+          label: 'Start dashboard (local Node)',
+          description: 'Alternative to Docker dashboard — requires DATABASE_URL in .env.',
+          command: () => 'npm run dashboard',
+          badge: 'Dev',
+        },
+        {
+          id: 'daily-logs',
+          label: 'Check ingest worker logs',
+          description: 'Confirm daily OHLCV ran and row counts look sane.',
+          command: () => 'docker compose logs ingest-worker --tail 50',
+          quick: true,
+          badge: 'Verify',
+        },
+        {
+          id: 'daily-ps',
+          label: 'Check container status',
+          description: 'All services should show Up — especially ingest-worker and postgres.',
+          command: () => 'docker compose ps',
+          quick: true,
+          badge: 'Verify',
+        },
+      ],
+    },
+    {
+      id: 'optional-daily',
+      title: 'Optional — same-day freshness',
+      note: `${REPO_ROOT_NOTE}. Not required if ingest-worker is healthy. Use after market close for a fresh Briefing. Dashboard Refresh only reads DB — it does not scrape.`,
+      commands: [
+        {
+          id: 'daily-ingest',
+          label: 'Daily pre-market refresh',
+          description: 'Macro + market news + OHLCV for portfolio and watchlist. End of run lists symbols with 0 rows — use full ingest for those.',
+          command: () => 'npm run ingest:daily',
+          quick: true,
+          badge: 'Pre-market',
+        },
+        {
+          id: 'daily-news',
+          label: 'Market news only',
+          description: 'TBS, Tribune, Daily Star, Prothom Alo, FE, Google News — tags headlines to tickers.',
+          command: () => 'npm run ingest:news',
+          quick: true,
+          badge: 'Optional daily',
+        },
+        {
+          id: 'daily-macro',
+          label: 'Macro snapshot only',
+          description: 'Bangladesh Bank inflation scrape + seed defaults → macro_snapshots.',
+          command: () => 'npm run ingest:macro',
+          badge: 'Optional daily',
+        },
+        {
+          id: 'daily-retag',
+          label: 'Retag untagged news',
+          description: 'Re-apply ticker matching on news already in Postgres (no new fetch).',
+          command: () => 'npm run ingest -- --job retag-news',
+          badge: 'Optional',
+        },
+        {
+          id: 'daily-watchlist-manual',
+          label: 'Full watchlist ingest (manual)',
+          description: 'Same as the weekly scheduler job — use for catch-up after PC was off several days.',
+          command: () => 'npm run ingest:watchlist',
+          quick: true,
+          badge: 'Catch-up',
+        },
+      ],
+    },
+    {
+      id: 'one-time',
+      title: 'One-time setup (new machine)',
+      note: 'Only when installing Stock Buddy for the first time or resetting the database.',
+      commands: [
+        {
+          id: 'setup-build',
+          label: 'Build Docker images',
+          command: () => 'docker compose build',
+        },
+        {
+          id: 'setup-migrate',
+          label: 'Apply database schema',
+          command: () =>
+            'docker compose run --rm -e DATABASE_URL=postgresql://stockbuddy:stockbuddy@postgres:5432/stockbuddy stock-buddy-mcp node packages/db/dist/migrate.js',
+        },
+        {
+          id: 'setup-seed',
+          label: 'Seed tickers, watchlist, portfolio shell',
+          command: () =>
+            'docker compose run --rm -e DATABASE_URL=postgresql://stockbuddy:stockbuddy@postgres:5432/stockbuddy stock-buddy-mcp node packages/db/dist/seed.js',
+        },
+        {
+          id: 'setup-backfill',
+          label: 'Initial watchlist backfill (1 year)',
+          description: 'First load of OHLCV, fundamentals, shareholding, news, and analysis for every watchlist symbol.',
+          command: () => 'npm run ingest:watchlist',
+          quick: true,
+        },
+      ],
+    },
+    {
+      id: 'troubleshooting',
+      title: 'Troubleshooting ingest',
+      note: INGEST_SHORTCUTS_NOTE,
+      commands: [
+        {
+          id: 'fix-zero-ohlcv',
+          label: 'Fix symbol with 0 OHLCV rows',
+          description: 'Use when ingest:daily prints "No OHLCV for: SYMBOL". Verifies symbol on dsebd.org if all sources return empty.',
+          command: (sym) => ingestCmd(sym ?? 'GP', 'all', 365),
+          symbolPlaceholder: true,
+          quick: true,
+          badge: '0 rows',
+        },
+        {
+          id: 'fix-ohlcv-only',
+          label: 'OHLCV only (1 year)',
+          description: 'Retry price bars without fundamentals — tries dsebd.org, StockAnalysis, Yahoo.',
+          command: (sym) => ingestCmd(sym ?? 'GP', 'ohlcv', 365),
+          symbolPlaceholder: true,
+        },
+        {
+          id: 'rebuild-scraper',
+          label: 'Rebuild scraper package',
+          description: 'After pulling code changes to packages/scraper (e.g. DSE host fixes).',
+          command: () => 'npm run build -w @stock-buddy/scraper',
+        },
+      ],
+    },
+    {
+      id: 'new-ticker',
+      title: 'When you add a ticker',
+      note: 'Replace SYMBOL with the new DSE code after adding it to the watchlist in the Watchlist tab.',
+      commands: [
+        {
+          id: 'new-ticker-all',
+          label: 'Full ingest + analysis for one symbol',
+          command: (sym) => ingestCmd(sym ?? 'GP', 'all', 365),
+          symbolPlaceholder: true,
+          quick: true,
+        },
+      ],
+    },
+  ];
+
+  const MACRO_SOURCE_LABELS = {
+    bangladesh_bank: 'Bangladesh Bank',
+    seed: 'Seed defaults',
+    manual: 'Manual',
+  };
+
+  const REGIME_META = {
+    risk_on: { label: 'Risk-on', tone: 'good', hint: 'Macro backdrop supports risk appetite' },
+    neutral: { label: 'Neutral', tone: 'neutral', hint: 'Mixed macro — size positions normally' },
+    cautious: { label: 'Cautious', tone: 'mid', hint: 'Headwinds present — tighten risk budget' },
+    risk_off: { label: 'Risk-off', tone: 'bad', hint: 'Strong macro headwinds — defensive stance' },
+  };
+
+  const QUALITATIVE_FACTORS = {
+    reserves_trend: {
+      label: 'Reserves trend',
+      values: {
+        rising: { label: 'Rising', tone: 'good' },
+        stable: { label: 'Stable', tone: 'neutral' },
+        falling: { label: 'Falling', tone: 'bad' },
+      },
+    },
+    politics: {
+      label: 'Politics',
+      values: {
+        stable: { label: 'Stable', tone: 'good' },
+        tense: { label: 'Tense', tone: 'mid' },
+        crisis: { label: 'Crisis', tone: 'bad' },
+      },
+    },
+    regulatory: {
+      label: 'Regulatory',
+      values: {
+        normal: { label: 'Normal', tone: 'good' },
+        tightening: { label: 'Tightening', tone: 'mid' },
+        floor_prices: { label: 'Floor prices', tone: 'bad' },
+      },
+    },
+  };
+
+  function macroSourceLabel(source) {
+    if (!source) return '—';
+    return MACRO_SOURCE_LABELS[source] ?? String(source).replace(/_/g, ' ');
+  }
+
+  function fmtMacroPct(n) {
+    if (n == null || Number.isNaN(Number(n))) return '—';
+    const v = Number(n);
+    const pct = Math.abs(v) <= 1 ? v * 100 : v;
+    return `${pct.toFixed(1)}%`;
+  }
+
+  function fmtMacroValue(key, value) {
+    if (value == null || value === '') return '—';
+    const n = Number(value);
+    if (Number.isNaN(n)) return esc(String(value));
+    if (key === 'policy_rate' || key === 'inflation') return fmtMacroPct(n);
+    if (key === 'fx_reserves_bn' || key === 'remittances_bn') return `$${fmtNum(n, 1)}B`;
+    if (key === 'bdt_usd') return `৳${fmtNum(n, 2)}`;
+    return fmtNum(n);
+  }
+
+  function assessMacroRegime(macro) {
+    const flags = [];
+    if (!macro || typeof macro !== 'object') {
+      return { error: 'missing macro object' };
+    }
+    const m = macro;
+    let mult = 1.0;
+    const reasoning = [];
+    const drivers = {};
+
+    const rate = m.policy_rate;
+    if (rate == null) {
+      flags.push('stale_macro');
+    } else {
+      const r = Number(rate);
+      let d;
+      if (r >= 0.09) {
+        d = -0.1;
+        reasoning.push(`Policy rate ${fmtMacroPct(r)} — tight money raises cost of capital, risk-off pressure`);
+      } else {
+        d = 0.07;
+        reasoning.push(`Policy rate ${fmtMacroPct(r)} — accommodative stance supports risk appetite`);
+      }
+      mult += d;
+      drivers.policy_rate = Math.round(d * 1000) / 1000;
+    }
+
+    const infl = m.inflation;
+    if (infl == null) {
+      flags.push('stale_macro');
+    } else {
+      const i = Number(infl);
+      let d;
+      if (i > 0.08) {
+        d = -0.1;
+        reasoning.push(`Inflation ${fmtMacroPct(i)} — above 8% erodes real returns and invites tightening, risk-off`);
+      } else {
+        d = 0.05;
+        reasoning.push(`Inflation ${fmtMacroPct(i)} — contained, supportive of equities`);
+      }
+      mult += d;
+      drivers.inflation = Math.round(d * 1000) / 1000;
+    }
+
+    const trend = m.reserves_trend;
+    if (trend == null) {
+      flags.push('stale_macro');
+    } else if (trend === 'falling') {
+      const d = -0.12;
+      reasoning.push('Reserves falling — import-cover stress and BDT pressure, strong risk-off pressure');
+      mult += d;
+      drivers.reserves_trend = Math.round(d * 1000) / 1000;
+    } else if (trend === 'rising') {
+      const d = 0.1;
+      reasoning.push('Reserves rising — easing external pressure, risk-on');
+      mult += d;
+      drivers.reserves_trend = Math.round(d * 1000) / 1000;
+    } else {
+      reasoning.push('Reserves stable — neutral external backdrop');
+      drivers.reserves_trend = 0.0;
+    }
+
+    const pol = m.politics;
+    if (pol == null) {
+      flags.push('stale_macro');
+    } else if (pol === 'crisis') {
+      const d = -0.2;
+      reasoning.push('Political crisis — heightened uncertainty, sharp risk-off');
+      mult += d;
+      drivers.politics = Math.round(d * 1000) / 1000;
+    } else if (pol === 'tense') {
+      const d = -0.1;
+      reasoning.push('Political tension — elevated headline risk, risk-off pressure');
+      mult += d;
+      drivers.politics = Math.round(d * 1000) / 1000;
+    } else {
+      const d = 0.05;
+      reasoning.push('Politics stable — supportive backdrop');
+      mult += d;
+      drivers.politics = Math.round(d * 1000) / 1000;
+    }
+
+    const reg = m.regulatory;
+    if (reg == null) {
+      flags.push('stale_macro');
+      reasoning.push('Regulatory stance unknown — assuming neutral');
+    } else if (reg === 'floor_prices') {
+      const d = -0.15;
+      reasoning.push('Floor prices in force — broken price discovery and trapped liquidity, risk-off');
+      mult += d;
+      drivers.regulatory = Math.round(d * 1000) / 1000;
+    } else if (reg === 'tightening') {
+      const d = -0.08;
+      reasoning.push('Regulatory tightening — added market friction, mild risk-off');
+      mult += d;
+      drivers.regulatory = Math.round(d * 1000) / 1000;
+    } else {
+      reasoning.push('Regulatory regime normal — no policy drag');
+      drivers.regulatory = 0.0;
+    }
+
+    mult = Math.max(0.5, Math.min(1.2, mult));
+
+    let regime;
+    if (mult >= 1.05) regime = 'risk_on';
+    else if (mult >= 0.85) regime = 'neutral';
+    else if (mult >= 0.7) regime = 'cautious';
+    else regime = 'risk_off';
+
+    const score = Math.max(-1, Math.min(1, (mult - 1.0) / 0.2));
+    const stale = flags.includes('stale_macro');
+    let confidence = Math.max(0.2, Math.min(0.9, 0.85 - 0.12 * flags.filter((f) => f === 'stale_macro').length));
+    if (stale) confidence = Math.max(0.2, Math.min(0.6, confidence));
+
+    return {
+      rating: regime,
+      score: Math.round(score * 1000) / 1000,
+      confidence: Math.round(confidence * 100) / 100,
+      key_metrics: { risk_multiplier: Math.round(mult * 1000) / 1000, drivers },
+      reasoning,
+      flags,
+    };
+  }
+
+  function renderMacroDriverBars(drivers) {
+    const entries = Object.entries(drivers ?? {});
+    if (!entries.length) return '';
+    const maxAbs = Math.max(0.2, ...entries.map(([, v]) => Math.abs(Number(v))));
+    const rows = entries.map(([key, val]) => {
+      const n = Number(val);
+      const pct = Math.min(100, (Math.abs(n) / maxAbs) * 100);
+      const sign = n >= 0 ? '+' : '';
+      const tone = n > 0 ? 'good' : n < 0 ? 'bad' : 'neutral';
+      return `
+        <div class="macro-driver">
+          <div class="macro-driver-head">
+            <span>${esc(key.replace(/_/g, ' '))}</span>
+            <span class="macro-driver-val ${tone}">${sign}${n.toFixed(3)}</span>
+          </div>
+          <div class="progress-track macro-driver-track">
+            <div class="progress-fill ${tone}" style="width:${pct}%"></div>
+          </div>
+        </div>`;
+    }).join('');
+    return `<div class="macro-drivers">${rows}</div>`;
+  }
+
+  function renderMacroPanel(macroSnap) {
+    if (!macroSnap?.payload) {
+      return `
+        <div class="macro-empty">
+          <p><strong>No macro snapshot in the database.</strong></p>
+          <p class="muted">Run the macro ingest job to populate policy rate, inflation, FX reserves, and regime inputs.</p>
+          <code class="macro-cmd">npm run ingest:macro</code>
+          <span class="muted"> or <code>npm run ingest:daily</code> for full pre-market refresh</span>
+        </div>`;
+    }
+
+    const payload = macroSnap.payload;
+    const regime = assessMacroRegime(payload);
+    const meta = REGIME_META[regime.rating] ?? { label: regime.rating ?? '—', tone: 'neutral', hint: '' };
+    const mult = regime.key_metrics?.risk_multiplier ?? 1;
+    const multPct = ((mult - 0.5) / 0.7) * 100;
+
+    const numericCards = [
+      { key: 'policy_rate', label: 'Policy rate', hint: 'Bangladesh Bank policy rate' },
+      { key: 'inflation', label: 'Inflation (CPI)', hint: 'Point-to-point CPI', sub: payload.inflation_month },
+      { key: 'fx_reserves_bn', label: 'FX reserves', hint: 'Official reserves (USD bn)' },
+      { key: 'bdt_usd', label: 'BDT / USD', hint: 'Interbank reference' },
+      { key: 'remittances_bn', label: 'Remittances', hint: 'Monthly inflow (USD bn)' },
+    ].map(({ key, label, hint, sub }) => `
+      <div class="card macro-metric-card">
+        <div class="label">${esc(label)}</div>
+        <div class="value">${fmtMacroValue(key, payload[key])}</div>
+        ${sub ? `<div class="macro-metric-sub muted">${esc(sub)}</div>` : ''}
+        <div class="macro-metric-hint muted">${esc(hint)}</div>
+      </div>`).join('');
+
+    const qualCards = Object.entries(QUALITATIVE_FACTORS).map(([key, def]) => {
+      const raw = payload[key];
+      const info = raw != null ? def.values[String(raw)] : null;
+      const tone = info?.tone ?? 'neutral';
+      const label = info?.label ?? (raw != null ? esc(String(raw)) : '—');
+      return `
+        <div class="macro-qual-card tone-${tone}">
+          <div class="label">${esc(def.label)}</div>
+          <div class="macro-qual-value">${label}</div>
+        </div>`;
+    }).join('');
+
+    const flags = (regime.flags ?? []).filter((f) => f === 'stale_macro');
+    const staleNote = flags.length
+      ? `<p class="macro-stale-warn">Some macro fields are missing — confidence capped. Re-run ingest to refresh.</p>`
+      : '';
+
+    return `
+      <div class="macro-wrap">
+        <div class="macro-hero tone-${meta.tone}">
+          <div class="macro-hero-main">
+            <p class="macro-hero-kicker">Bangladesh macro regime</p>
+            <div class="macro-hero-regime">
+              <span class="grade-badge lg macro-regime-badge">${esc(meta.label)}</span>
+              <span class="score-pill">score ${fmtNum(regime.score, 2)}</span>
+              ${confidenceBadge(regime.confidence)}
+            </div>
+            <p class="macro-hero-hint">${esc(meta.hint)}</p>
+          </div>
+          <div class="macro-mult-panel">
+            <div class="label">Risk multiplier</div>
+            <div class="macro-mult-value">${fmtNum(mult, 3)}</div>
+            <div class="macro-mult-range muted">0.5 (risk-off) — 1.2 (risk-on)</div>
+            <div class="progress-track macro-mult-track">
+              <div class="macro-mult-marker" style="left:${Math.max(0, Math.min(100, multPct))}%"></div>
+            </div>
+            <p class="muted macro-mult-note">Used by signal-synthesizer and risk-manager to scale position sizing.</p>
+          </div>
+        </div>
+
+        ${staleNote}
+
+        <h3 class="macro-section-title">Key indicators</h3>
+        <div class="cards macro-metrics">${numericCards}</div>
+
+        <h3 class="macro-section-title">Qualitative factors</h3>
+        <div class="macro-qual-grid">${qualCards}</div>
+
+        <div class="macro-two-col">
+          <section class="macro-panel-block">
+            <h3 class="macro-section-title">Factor drivers</h3>
+            <p class="muted macro-section-note">Contribution to risk multiplier from each input (starts at 1.0).</p>
+            ${renderMacroDriverBars(regime.key_metrics?.drivers)}
+          </section>
+          <section class="macro-panel-block">
+            <h3 class="macro-section-title">Reasoning</h3>
+            <ul class="reasoning-list macro-reasoning">${(regime.reasoning ?? []).map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+          </section>
+        </div>
+
+        <details class="glass-box macro-raw">
+          <summary>Raw snapshot JSON</summary>
+          <pre class="json-block">${esc(JSON.stringify(payload, null, 2))}</pre>
+        </details>
+      </div>`;
+  }
+
+  function renderDailyCommands(symbol) {
+    const sym = symbol ? String(symbol).toUpperCase() : 'GP';
+    const quick = DAILY_COMMAND_SECTIONS.flatMap((s) => s.commands ?? []).filter((c) => c.quick);
+    const quickHtml = quick.length
+      ? `
+      <div class="daily-quick-block">
+        <div class="cmd-quick-head">
+          <span class="cmd-quick-title">Quick copy</span>
+          <span class="muted cmd-quick-hint">Most common upkeep commands — click to copy</span>
+        </div>
+        <div class="cmd-quick-row">
+          ${quick
+            .map((c) => {
+              const cmd = c.symbolPlaceholder ? c.command(sym) : c.command();
+              const badge = c.badge ? ` <span class="daily-badge">${esc(c.badge)}</span>` : '';
+              return `<button type="button" class="cmd-quick-chip" data-copy-cmd="${cmdAttr(cmd)}" title="${cmdAttr(cmd)}">${esc(c.label)}${badge}</button>`;
+            })
+            .join('')}
+        </div>
+      </div>`
+      : '';
+
+    const sectionsHtml = DAILY_COMMAND_SECTIONS.map((section) => {
+      if (section.schedule?.length) {
+        const rows = section.schedule
+          .map(
+            ([when, what]) =>
+              `<tr><td><strong>${esc(when)}</strong></td><td>${esc(what)}</td></tr>`,
+          )
+          .join('');
+        return `
+        <section class="cmd-group daily-schedule-group">
+          <h4>${esc(section.title)}</h4>
+          ${section.note ? `<p class="muted cmd-group-note">${esc(section.note)}</p>` : ''}
+          <div class="table-wrap">
+            <table class="daily-schedule-table">
+              <thead><tr><th>Schedule</th><th>Action</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <p class="muted daily-pc-note"><strong>PC off?</strong> Data stays in Postgres, but ingest pauses. When you return: <code>docker compose up -d postgres ingest-worker</code>, then <code>npm run ingest:daily</code> (or <code>npm run ingest:watchlist</code> for full catch-up).</p>
+        </section>`;
+      }
+
+      const items = (section.commands ?? []).map((c) => {
+        const cmd = c.symbolPlaceholder ? c.command(sym) : c.command();
+        const badge = c.badge
+          ? `<span class="daily-badge daily-badge-inline">${esc(c.badge)}</span>`
+          : '';
+        return `
+        <div class="cmd-row">
+          <div class="cmd-row-head">
+            <strong>${esc(c.label)}${badge}</strong>
+            <button type="button" class="btn-sm cmd-copy" data-copy-cmd="${cmdAttr(cmd)}">Copy</button>
+          </div>
+          ${c.description ? `<p class="muted cmd-row-desc">${esc(c.description)}</p>` : ''}
+          <code class="cmd-text">${esc(cmd)}</code>
+        </div>`;
+      }).join('');
+
+      return `
+        <section class="cmd-group">
+          <h4>${esc(section.title)}</h4>
+          ${section.note ? `<p class="muted cmd-group-note">${esc(section.note)}</p>` : ''}
+          ${items}
+        </section>`;
+    }).join('');
+
+    return `
+      <div class="daily-wrap">
+        <div class="daily-header">
+          <h2 class="daily-title">Daily upkeep</h2>
+          <p class="muted daily-intro">Commands to keep Stock Buddy data fresh. Run from the <strong>repo root</strong>. Ingest writes to PostgreSQL; dashboard and Analyze buttons only read from the database.</p>
+        </div>
+        <div id="daily-status-banner" class="daily-status-banner muted">Loading recent ingest status…</div>
+        ${quickHtml}
+        <div class="cmd-full-wrap">${sectionsHtml}</div>
+        <p class="muted daily-footer">Ingest history and freshness tables → <button type="button" class="btn-sm linkish" data-panel="ops">Ops tab</button>. Per-ticker CLI reference → <button type="button" class="btn-sm linkish" data-panel="ticker-detail" data-daily-analysis-tab>Analysis → Commands</button>.</p>
+      </div>`;
+  }
+
+  function renderDailyStatusBanner(recentRuns) {
+    const runs = recentRuns ?? [];
+    if (!runs.length) {
+      return '<p id="daily-status-banner" class="daily-status-banner muted">No ingest runs recorded yet — complete one-time setup, then start ingest-worker.</p>';
+    }
+    const latest = runs[0];
+    const sym = latest.symbol ? ` · ${latest.symbol}` : '';
+    const when = latest.startedAt ? fmtDateWithAge(latest.startedAt) : '—';
+    const ok = latest.status === 'ok';
+    const macroRun = runs.find((r) => r.jobName === 'ingest_macro' || r.jobName === 'ingest_daily');
+    const ohlcvRun = runs.find((r) => r.jobName === 'ingest_ohlcv' || r.jobName === 'ingest_daily');
+    const dailyRun = runs.find((r) => r.jobName === 'ingest_daily');
+    const parts = [
+      `Last ingest: <strong>${esc(latest.jobName ?? '—')}</strong>${esc(sym)} — <span class="badge ${ok ? 'ok' : 'fail'}">${esc(latest.status ?? '?')}</span> (${when})`,
+    ];
+    if (dailyRun?.startedAt) {
+      parts.push(`Daily: ${fmtDateWithAge(dailyRun.startedAt)}`);
+    } else {
+      if (macroRun?.startedAt) {
+        parts.push(`Macro: ${fmtDateWithAge(macroRun.startedAt)}`);
+      }
+      if (ohlcvRun?.startedAt) {
+        parts.push(`OHLCV: ${fmtDateWithAge(ohlcvRun.startedAt)}`);
+      }
+    }
+    return `<p id="daily-status-banner" class="daily-status-banner">${parts.join(' · ')}</p>`;
+  }
+
   function renderTickerCommandsQuick(symbol) {
     if (!symbol) return '<p class="muted">Select a ticker to see commands.</p>';
     const sym = String(symbol).toUpperCase();
     const quick = TICKER_COMMANDS.filter((c) => c.quick);
     const globalQuick = GLOBAL_COMMANDS.filter((c) => c.quick);
     const wfQuick = WORKFLOW_COMMANDS.filter((c) =>
-      ['wf-news-market', 'wf-watchlist', 'wf-retag'].includes(c.id),
+      ['wf-daily', 'wf-news-market', 'wf-watchlist'].includes(c.id),
+    );
+    const troubleshootQuick = (DAILY_COMMAND_SECTIONS.find((s) => s.id === 'troubleshooting')?.commands ?? []).filter(
+      (c) => c.quick,
     );
     return `
       <div class="cmd-quick-head">
@@ -1239,6 +2294,10 @@ npm run ingest -- --job retag-news</pre>
         ${wfQuick.map((c) => {
           const cmd = c.command();
           return `<button type="button" class="cmd-quick-chip cmd-quick-global" data-copy-cmd="${cmdAttr(cmd)}" title="${cmdAttr(cmd)}">${esc(c.label.replace(/^\d+\.\s*/, ''))}</button>`;
+        }).join('')}
+        ${troubleshootQuick.map((c) => {
+          const cmd = c.symbolPlaceholder ? c.command(sym) : c.command();
+          return `<button type="button" class="cmd-quick-chip cmd-quick-warn" data-copy-cmd="${cmdAttr(cmd)}" title="${cmdAttr(cmd)}">${esc(c.label)}</button>`;
         }).join('')}
         <button type="button" class="cmd-quick-chip cmd-quick-more" data-sub-jump="commands">All commands →</button>
       </div>`;
@@ -1266,7 +2325,7 @@ npm run ingest -- --job retag-news</pre>
     const workflowSection = `
       <section class="cmd-group cmd-group-workflow">
         <h4>Recommended workflow (first time / daily)</h4>
-        <p class="muted cmd-group-note">Run from repo root. Ingest writes to PostgreSQL; dashboard and Analyze only read from DB.</p>
+        <p class="muted cmd-group-note">${REPO_ROOT_NOTE}. Ingest writes to PostgreSQL; dashboard and Analyze only read from DB.</p>
         ${WORKFLOW_COMMANDS.map((c) => renderCommandRow(c, null)).join('')}
       </section>`;
 
@@ -1274,7 +2333,7 @@ npm run ingest -- --job retag-news</pre>
       const items = TICKER_COMMANDS.filter((c) => c.group === g);
       const note =
         g === 'Per-ticker pipeline'
-          ? '<p class="muted cmd-group-note">Replace SYMBOL with the ticker above. <code>--job all</code> does not fetch market news — run news-market first.</p>'
+          ? `<p class="muted cmd-group-note">Use <strong>Full ingest + analyze</strong> when ingest:daily reports 0 OHLCV rows for this symbol. Market news: npm run ingest:news first.</p>`
           : g === 'Per-ticker ingest'
             ? `<p class="muted cmd-group-note">Individual jobs for <strong>${esc(sym)}</strong> — each maps to <code>packages/ingest/src/jobs.ts</code>.</p>`
             : '';
@@ -1290,7 +2349,7 @@ npm run ingest -- --job retag-news</pre>
       const items = GLOBAL_COMMANDS.filter((c) => c.group === g);
       const note =
         g === 'Market-wide ingest'
-          ? '<p class="muted cmd-group-note">No <code>--ticker</code> needed. Controlled by INGEST_NEWS_SOURCES / INGEST_FUNDAMENTALS_SOURCES in .env.</p>'
+          ? `<p class="muted cmd-group-note">${INGEST_SHORTCUTS_NOTE} Controlled by INGEST_OHLCV_SOURCES / INGEST_NEWS_SOURCES in .env.</p>`
           : g === 'Database & setup'
             ? '<p class="muted cmd-group-note">One-time or after schema changes. Requires DATABASE_URL in .env.</p>'
             : '';
@@ -1309,15 +2368,53 @@ npm run ingest -- --job retag-news</pre>
     return ingestCmd(symbol, 'all', 365);
   }
 
+  function findJsonLine(jsonText, key, minLine = 0) {
+    const lines = jsonText.split('\n');
+    for (let i = minLine; i < lines.length; i++) {
+      if (new RegExp(`^\\s*"${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}":`).test(lines[i])) {
+        return i;
+      }
+    }
+    return null;
+  }
+
   function buildJsonKeyIndex(jsonText) {
     if (!jsonText) return [];
     const lines = jsonText.split('\n');
     const keys = [];
+    const seen = new Set();
+    const add = (key, line) => {
+      if (line == null || seen.has(key)) return;
+      seen.add(key);
+      keys.push({ key, line });
+    };
+
     for (let i = 0; i < lines.length; i++) {
       const m = lines[i].match(/^  "([^"]+)":/);
-      if (m) keys.push({ key: m[1], line: i });
+      if (m) add(m[1], i);
     }
-    return keys;
+
+    try {
+      const obj = JSON.parse(jsonText);
+      const riskLine = findJsonLine(jsonText, 'risk');
+      if (obj.risk) add('risk', riskLine);
+      if (obj.risk?.strategies) {
+        const strategiesLine = findJsonLine(jsonText, 'strategies', riskLine ?? 0);
+        add('risk.strategies', strategiesLine);
+      }
+      if (obj.risk?.strategies?.atr) {
+        const atrLine = findJsonLine(jsonText, 'atr', findJsonLine(jsonText, 'strategies', riskLine ?? 0) ?? 0);
+        add('risk.strategies.atr', atrLine);
+      }
+      if (obj.risk?.strategies?.structure) {
+        const structLine = findJsonLine(jsonText, 'structure', findJsonLine(jsonText, 'strategies', riskLine ?? 0) ?? 0);
+        add('risk.strategies.structure', structLine);
+      }
+    } catch {
+      // keep line-based keys only
+    }
+
+    return keys.sort((a, b) => a.line - b.line);
   }
 
   function renderJsonKeyNav(keys, activeKey) {
@@ -1346,8 +2443,13 @@ npm run ingest -- --job retag-news</pre>
     renderGlossary,
     renderLearnPanel,
     renderBriefing,
+    renderAnalysisDataBar,
     renderHome,
     renderPortfolioTable,
+    renderPortfolioSummary,
+    renderTradingMirrorBanner,
+    renderMomentumPortfolioTable,
+    renderWatchlistTable,
     renderDiscoverResults,
     renderAnalytics,
     isStale,
@@ -1357,6 +2459,10 @@ npm run ingest -- --job retag-news</pre>
     getFullIngestCommand,
     renderTickerCommandsQuick,
     renderTickerCommandsFull,
+    renderDailyCommands,
+    renderDailyStatusBanner,
+    renderMacroPanel,
+    macroSourceLabel,
     buildJsonKeyIndex,
     renderJsonKeyNav,
   };

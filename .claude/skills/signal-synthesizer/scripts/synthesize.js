@@ -58,7 +58,8 @@ function parseCliArgs(argv) {
 }
 
 // src/signal-synthesizer/synthesize.ts
-var DISCLAIMER = "Educational analysis only. Not financial advice.";
+import { getDisclaimer } from "@stock-buddy/core";
+var DISCLAIMER = getDisclaimer();
 var SKILL = "signal-synthesizer";
 var AGENT_KEYS = ["technical", "fundamental", "smart_money", "sentiment", "macro", "volume_flow"];
 var INVESTMENT_WEIGHTS = {
@@ -287,7 +288,7 @@ function synthesize(data) {
     confidence: momConf,
     contributions: momContrib,
     entry_trigger: entryTrigger(finalMomRating),
-    stop_note: "Place stop below the breakout base / recent swing low (see risk-manager for ATR-based levels).",
+    stop_note: "Place stop below the breakout base / recent swing low (see risk-manager ATR and structure strategies).",
     reasoning: momReason
   };
   return {

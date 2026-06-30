@@ -1,7 +1,10 @@
 import type { Db } from '@stock-buddy/db';
 import {
   ensureTicker,
+  getDefaultAccount,
   getOhlcv,
+  getPortfolioPositions,
+  getWatchlistSymbols,
   recordIngestRun,
   recordPredictionOutcome,
   retagUntaggedNews,
@@ -46,6 +49,26 @@ function makeNewsTagger(refs: TickerRef[]) {
   return (headline: string, url?: string | null) => tagTickerInHeadline(headline, refs, url);
 }
 
+function minOhlcvBarsForWindow(days: number): number {
+  if (days <= 60) return 1;
+  return 30;
+}
+
+function dailyOhlcvDays(): number {
+  const n = parseInt(process.env.INGEST_DAILY_OHLCV_DAYS ?? '90', 10);
+  return Number.isFinite(n) && n > 0 ? n : 90;
+}
+
+async function portfolioAndWatchlistSymbols(db: Db): Promise<string[]> {
+  const symbols = new Set(await getWatchlistSymbols(db));
+  const account = await getDefaultAccount(db);
+  if (account) {
+    const positions = await getPortfolioPositions(db, account.id);
+    for (const p of positions) symbols.add(p.symbol);
+  }
+  return [...symbols];
+}
+
 export async function ingestOhlcv(db: Db, symbol: string, days = 365): Promise<number> {
   const started = new Date();
   const ticker = await ensureTicker(db, symbol);
@@ -88,12 +111,13 @@ export async function ingestOhlcv(db: Db, symbol: string, days = 365): Promise<n
     return 0;
   }
 
-  if (rows.length < 30) {
+  const minBars = minOhlcvBarsForWindow(days);
+  if (rows.length < minBars) {
     await recordIngestRun(db, {
       jobName: 'ingest_ohlcv',
       tickerId: ticker.id,
       status: 'failed',
-      errorMessage: `Only ${rows.length} plausible bars after sanitization (source=${source})`,
+      errorMessage: `Only ${rows.length} plausible bars after sanitization (need ${minBars}, source=${source}, days=${days})`,
       startedAt: started,
     });
     await updateFreshness(db, 'ohlcv', ticker.id, false, 24);
@@ -232,12 +256,28 @@ export async function ingestShareholding(db: Db, symbol: string): Promise<number
 export async function ingestMacro(db: Db): Promise<void> {
   const started = new Date();
   const asOf = new Date().toISOString().slice(0, 10);
-  await upsertMacro(db, asOf, DEFAULT_MACRO, 'seed');
+
+  let payload: Record<string, unknown> = { ...DEFAULT_MACRO };
+  let source = 'seed';
+
+  try {
+    const { fetchBangladeshBankMacro } = await import('@stock-buddy/scraper');
+    const bb = await fetchBangladeshBankMacro();
+    if (bb.inflation != null) {
+      payload.inflation = bb.inflation;
+      source = 'bangladesh_bank';
+      if (bb.inflation_month) payload.inflation_as_of = bb.inflation_month;
+    }
+  } catch (err) {
+    console.warn('[ingest] Bangladesh Bank macro fetch failed:', err);
+  }
+
+  await upsertMacro(db, asOf, payload, source);
   await recordIngestRun(db, {
     jobName: 'ingest_macro',
     status: 'ok',
     rowsUpserted: 1,
-    source: 'seed',
+    source,
     startedAt: started,
   });
   await updateFreshness(db, 'macro', null, true, 168);
@@ -350,13 +390,54 @@ export async function ingestAll(db: Db, symbol: string, days = 365): Promise<voi
 }
 
 export async function ingestWatchlist(db: Db, days = 365): Promise<void> {
-  const { getWatchlistSymbols } = await import('@stock-buddy/db');
   const symbols = await getWatchlistSymbols(db);
   await ingestMacro(db);
   await ingestNewsMarket(db);
   for (const symbol of symbols) {
     await ingestAll(db, symbol, days);
   }
+}
+
+/** Pre-market refresh: macro, market news, OHLCV for portfolio + watchlist symbols. */
+export async function ingestDaily(db: Db): Promise<{
+  news_rows: number;
+  retagged_news: number;
+  ohlcv: Record<string, number>;
+  symbols: string[];
+}> {
+  const started = new Date();
+  const days = dailyOhlcvDays();
+  const symbols = await portfolioAndWatchlistSymbols(db);
+
+  await ingestMacro(db);
+  const newsRows = await ingestNewsMarket(db);
+  let retagged = 0;
+  try {
+    retagged = await ingestRetagNews(db);
+  } catch (err) {
+    console.warn('[ingest:daily] retag-news skipped:', err);
+  }
+
+  const ohlcv: Record<string, number> = {};
+  for (const symbol of symbols) {
+    try {
+      ohlcv[symbol] = await ingestOhlcv(db, symbol, days);
+    } catch (err) {
+      console.warn(`[ingest:daily] OHLCV failed for ${symbol}:`, err);
+      ohlcv[symbol] = 0;
+    }
+  }
+
+  const ohlcvTotal = Object.values(ohlcv).reduce((s, n) => s + n, 0);
+  await recordIngestRun(db, {
+    jobName: 'ingest_daily',
+    status: 'ok',
+    rowsUpserted: newsRows + ohlcvTotal,
+    source: 'multi',
+    startedAt: started,
+  });
+
+  return { news_rows: newsRows, retagged_news: retagged, ohlcv, symbols };
 }
 
 /** REQ-012: record snapshot outcomes when future prices are available. */

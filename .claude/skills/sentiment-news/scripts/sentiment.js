@@ -128,7 +128,7 @@ var NEGATIVE = /* @__PURE__ */ new Set([
   "cuts",
   "slump"
 ]);
-var RUMOUR_SOURCES = /* @__PURE__ */ new Set(["social", "unconfirmed", "forum", "rumour", "rumor"]);
+var RUMOUR_SOURCES = /* @__PURE__ */ new Set(["social", "unconfirmed", "forum", "rumour", "rumor", "telegram"]);
 var RUMOUR_TERMS = /* @__PURE__ */ new Set(["rumour", "rumor", "unconfirmed", "speculation", "speculative", "alleged"]);
 var FUNDAMENTAL_CATEGORIES = /* @__PURE__ */ new Set(["earnings", "regulatory", "corporate_action", "macro"]);
 var RUMOUR_WEIGHT = 0.3;
@@ -151,7 +151,8 @@ function isRumour(item) {
   const src = String(item.source ?? "").toLowerCase();
   const cat = String(item.category ?? "").toLowerCase();
   const head = String(item.headline ?? "").toLowerCase();
-  if (RUMOUR_SOURCES.has(src) || RUMOUR_TERMS.has(cat)) return true;
+  if (RUMOUR_SOURCES.has(src) || src.includes("telegram") || RUMOUR_TERMS.has(cat)) return true;
+  if (cat === "rumour" || cat === "rumor") return true;
   for (const t of RUMOUR_TERMS) {
     if (head.includes(t)) return true;
   }

@@ -1,5 +1,17 @@
 import * as cheerio from 'cheerio';
-import { fetchText, type OhlcvRow, yahooChartToOhlcv } from './utils.js';
+import {
+  fetchText,
+  formatDate,
+  normalizeDate,
+  parseHistoricalCsv,
+  type OhlcvRow,
+  yahooChartToOhlcv,
+} from './utils.js';
+
+const DSE_ARCHIVE_BASES = [
+  'https://www.dsebd.org/',
+  'https://dsebd.org/',
+] as const;
 
 export interface FundamentalsPayload {
   price?: number;
@@ -16,16 +28,71 @@ export interface FundamentalsPayload {
   [key: string]: unknown;
 }
 
-export async function fetchYahooOhlcv(ticker: string, exchange = 'DHA', range = '1y'): Promise<OhlcvRow[]> {
+export function yahooRangeForDays(days: number): string {
+  if (days <= 35) return '3mo';
+  if (days <= 95) return '6mo';
+  if (days <= 190) return '1y';
+  return '2y';
+}
+
+export async function fetchYahooOhlcv(
+  ticker: string,
+  exchange = 'DHA',
+  range = '1y',
+): Promise<OhlcvRow[]> {
   const yahooTicker = `${ticker}.${exchange}`;
   const params = new URLSearchParams({ interval: '1d', range });
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?${params.toString()}`;
-  const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  if (!response.ok) return [];
-  const data = (await response.json()) as Record<string, unknown>;
-  const chart = data.chart as Record<string, unknown> | undefined;
-  if (chart?.error) return [];
-  return yahooChartToOhlcv(data);
+  const headers = {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  };
+
+  for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'] as const) {
+    try {
+      const url = `https://${host}/v8/finance/chart/${yahooTicker}?${params.toString()}`;
+      const response = await fetch(url, { headers });
+      if (!response.ok) continue;
+      const data = (await response.json()) as Record<string, unknown>;
+      const chart = data.chart as Record<string, unknown> | undefined;
+      if (chart?.error) continue;
+      const rows = yahooChartToOhlcv(data);
+      if (rows.length > 0) return rows;
+    } catch {
+      continue;
+    }
+  }
+
+  return [];
+}
+
+/** DSE day_end_archive.php with primary + alternate host fallbacks (bdshare-style). */
+export async function fetchDseArchiveOhlcv(ticker: string, days = 365): Promise<OhlcvRow[]> {
+  const symbol = ticker.toUpperCase();
+  const endDate = new Date();
+  const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000);
+  const params = new URLSearchParams({
+    startDate: formatDate(startDate),
+    endDate: formatDate(endDate),
+    inst: symbol,
+    archive: 'data',
+  });
+
+  for (let i = 0; i < DSE_ARCHIVE_BASES.length; i++) {
+    const base = DSE_ARCHIVE_BASES[i]!;
+    const url = `${base}day_end_archive.php?${params.toString()}`;
+    const responseText = await fetchText(url, undefined, { quiet: i > 0 });
+    if (!responseText) continue;
+
+    let historical = parseHistoricalCsv(responseText);
+    if (historical.length === 0) {
+      historical = parseDseArchiveHtml(responseText, symbol);
+    }
+    if (historical.length > 0) {
+      return historical;
+    }
+  }
+
+  return [];
 }
 
 /** Parse DSE day_end_archive.php HTML table (archive=data returns HTML, not CSV). */
@@ -78,7 +145,10 @@ export async function fetchStockAnalysisOhlcv(ticker: string): Promise<OhlcvRow[
   const url = `https://stockanalysis.com/quote/dse/${ticker}/history/`;
   const html = await fetchText(url);
   if (!html) return [];
+  return parseStockAnalysisOhlcvHtml(html);
+}
 
+export function parseStockAnalysisOhlcvHtml(html: string): OhlcvRow[] {
   const $ = cheerio.load(html);
   const rows: OhlcvRow[] = [];
 
@@ -93,15 +163,20 @@ export async function fetchStockAnalysisOhlcv(ticker: string): Promise<OhlcvRow[
         const cells = $(tr).find('td');
         if (cells.length < 5) return;
 
-        const date = $(cells[0]).text().trim();
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        const date = normalizeDate($(cells[0]).text().trim());
+        if (!date) return;
 
         const parseNum = (s: string) => parseFloat(s.replace(/[$,]/g, ''));
         const open = parseNum($(cells[1]).text());
         const high = parseNum($(cells[2]).text());
         const low = parseNum($(cells[3]).text());
         const close = parseNum($(cells[4]).text());
-        const volCell = cells.length > 6 ? $(cells[6]).text() : $(cells[5]).text();
+        const volCell =
+          cells.length >= 8
+            ? $(cells[7]).text()
+            : cells.length > 6
+              ? $(cells[6]).text()
+              : $(cells[5]).text();
         const volume = parseInt(volCell.replace(/,/g, ''), 10);
 
         if ([open, high, low, close].some((n) => Number.isNaN(n) || n <= 0)) return;

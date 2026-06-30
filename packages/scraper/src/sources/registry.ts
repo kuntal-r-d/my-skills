@@ -6,7 +6,9 @@ import {
   fetchStockAnalysisFundamentals,
   fetchStockAnalysisOhlcv,
   fetchStockAnalysisStatistics,
+  fetchDseArchiveOhlcv,
   fetchYahooOhlcv,
+  yahooRangeForDays,
 } from '../sources.js';
 import { fetchAmarStockFundamentals } from '../amarstock.js';
 import { fetchLankabdFundamentals } from '../lankabd.js';
@@ -41,7 +43,7 @@ export function ingestRateMs(): number {
 }
 
 const DEFAULT_FUNDAMENTALS = ['dse', 'stockanalysis', 'stockanalysis_statistics', 'lankabd', 'amarstock'];
-const DEFAULT_OHLCV = ['dse', 'yahoo', 'stockanalysis'];
+const DEFAULT_OHLCV = ['dse', 'stockanalysis', 'yahoo'];
 
 let scraperSingleton: DSEScraper | null = null;
 
@@ -105,17 +107,18 @@ export function createOhlcvRegistry(): OhlcvSource[] {
     {
       id: 'dse',
       priority: 1,
-      fetch: async (symbol, days = 365) => getScraper().getHistoricalData(symbol, days),
-    },
-    {
-      id: 'yahoo',
-      priority: 2,
-      fetch: async (symbol, days = 365) => fetchYahooOhlcv(symbol, 'DHA', days > 365 ? '2y' : '1y'),
+      fetch: async (symbol, days = 365) => fetchDseArchiveOhlcv(symbol, days),
     },
     {
       id: 'stockanalysis',
+      priority: 2,
+      fetch: async (symbol) => fetchStockAnalysisOhlcv(symbol),
+    },
+    {
+      id: 'yahoo',
       priority: 3,
-      fetch: fetchStockAnalysisOhlcv,
+      fetch: async (symbol, days = 365) =>
+        fetchYahooOhlcv(symbol, 'DHA', yahooRangeForDays(days)),
     },
   ];
 

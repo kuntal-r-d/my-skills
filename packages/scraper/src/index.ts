@@ -28,6 +28,7 @@ export {
   sleep,
   formatDate,
   fetchText,
+  fetchPostText,
   parseHistoricalCsv,
   yahooChartToOhlcv,
   normalizeDate,
@@ -37,6 +38,8 @@ export {
 
 export {
   fetchYahooOhlcv,
+  fetchDseArchiveOhlcv,
+  yahooRangeForDays,
   fetchDseCompanyHtml,
   fetchStockAnalysisFundamentals,
   fetchStockAnalysisStatistics,
@@ -46,6 +49,7 @@ export {
   parseDseArchiveHtml,
   parseDseNewsHtml,
   parseStockAnalysisStatisticsHtml,
+  parseStockAnalysisOhlcvHtml,
   DEFAULT_MACRO,
   type FundamentalsPayload,
   type ShareholdingRow,
@@ -69,6 +73,20 @@ export {
 } from './lankabd.js';
 
 export { fetchAmarStockFundamentals } from './amarstock.js';
+
+export {
+  fetchDsePriceSensitiveNews,
+  fetchDseCorporateNews,
+  fetchDseNewsArchive,
+  parseDseNewsArchiveHtml,
+  type DseNewsCriteria,
+} from './dse-news.js';
+
+export {
+  fetchBangladeshBankMacro,
+  parseBangladeshBankInflationHtml,
+  type BangladeshMacroSnapshot,
+} from './macro-bb.js';
 
 export {
   DEFAULT_NEWS_SOURCES,

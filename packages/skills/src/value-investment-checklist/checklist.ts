@@ -18,8 +18,15 @@ interface Criterion {
   passed: boolean | null;
   value: unknown;
   explanation: string;
+  missing_fields?: string[];
   levels?: ReturnType<typeof buildCriterionEducation>;
 }
+
+type CriterionResult = {
+  passed: boolean | null;
+  value: unknown;
+  missing?: string[];
+};
 
 function gradeAndGpa(score: number): [string, number] {
   const table: [number, string, number][] = [
@@ -44,28 +51,31 @@ export function checklist(data: Record<string, unknown>): Record<string, unknown
   const flags: string[] = [];
   const crit: Criterion[] = [];
 
-  function add(
+  function missing(...fields: string[]): Pick<CriterionResult, 'passed' | 'missing'> {
+    for (const f of fields) flags.push(`missing:${f}`);
+    return { passed: null, missing: fields };
+  }
+
+  function addCriterion(
     id: number,
     bucket: string,
     label: string,
-    passed: boolean | null,
-    value: unknown,
+    result: CriterionResult,
     expl: string,
   ): void {
     crit.push({
       id,
       bucket,
       label,
-      passed,
-      value,
+      passed: result.passed,
+      value: result.value,
       explanation: expl,
-      levels: buildCriterionEducation(label, expl, value, 'investment'),
+      missing_fields: result.missing,
+      levels: buildCriterionEducation(label, expl, result.value, 'investment', {
+        passed: result.passed,
+        missingFields: result.missing,
+      }),
     });
-  }
-
-  function need(field: string): null {
-    flags.push(`missing:${field}`);
-    return null;
   }
 
   const g = (key: string) => fund[key];
@@ -77,131 +87,167 @@ export function checklist(data: Record<string, unknown>): Record<string, unknown
   const pm = g('profit_margin') as number | undefined;
   const fcf = g('free_cash_flow') as number | undefined;
 
-  add(1, 'buffett', 'Economic moat present', moat != null ? Boolean(moat) : need('moat'), moat,
+  addCriterion(1, 'buffett', 'Economic moat present',
+    moat != null ? { passed: Boolean(moat), value: moat } : { ...missing('moat'), value: moat },
     'A durable competitive advantage protects long-term profits.');
-  add(2, 'buffett', 'ROE > 15%', roe != null ? roe > 0.15 : need('roe'), roe,
+  addCriterion(2, 'buffett', 'ROE > 15%',
+    roe != null ? { passed: roe > 0.15, value: roe } : { ...missing('roe'), value: roe },
     'High return on equity means the company compounds shareholder money well.');
-  add(3, 'buffett', 'Debt/Equity < 0.5', de != null ? de < 0.5 : need('debt_to_equity'), de,
+  addCriterion(3, 'buffett', 'Debt/Equity < 0.5',
+    de != null ? { passed: de < 0.5, value: de } : { ...missing('debt_to_equity'), value: de },
     'Low debt makes the business resilient in downturns.');
-  add(4, 'buffett', 'Profit margin > 20%', pm != null ? pm > 0.20 : need('profit_margin'), pm,
+  addCriterion(4, 'buffett', 'Profit margin > 20%',
+    pm != null ? { passed: pm > 0.20, value: pm } : { ...missing('profit_margin'), value: pm },
     'Fat margins signal pricing power and efficiency.');
-  add(5, 'buffett', 'Free cash flow positive', fcf != null ? fcf > 0 : need('free_cash_flow'), fcf,
+  addCriterion(5, 'buffett', 'Free cash flow positive',
+    fcf != null ? { passed: fcf > 0, value: fcf } : { ...missing('free_cash_flow'), value: fcf },
     'Real cash left after spending is the lifeblood of intrinsic value.');
 
-  let mgmt: boolean | null = null;
-  if (roe != null && pm != null) mgmt = roe > 0.15 && pm > 0.15;
-  add(6, 'buffett', 'Quality management (proxy: ROE>15% & margin>15%)',
-    mgmt ?? need('roe/profit_margin'), { roe, profit_margin: pm },
+  let mgmt: CriterionResult;
+  if (roe != null && pm != null) mgmt = { passed: roe > 0.15 && pm > 0.15, value: { roe, profit_margin: pm } };
+  else mgmt = { ...missing('roe', 'profit_margin'), value: { roe, profit_margin: pm } };
+  addCriterion(6, 'buffett', 'Quality management (proxy: ROE>15% & margin>15%)', mgmt,
     'Consistently high returns and margins point to capable management.');
 
-  let predictable: boolean | null = null;
-  if (epsHist.length) predictable = epsHist.every((e) => e > 0);
-  add(7, 'buffett', 'Predictable earnings (all EPS history positive)',
-    predictable ?? need('eps_history'), epsHist,
+  let predictable: CriterionResult;
+  if (epsHist.length) predictable = { passed: epsHist.every((e) => e > 0), value: epsHist };
+  else predictable = { ...missing('eps_history'), value: epsHist };
+  addCriterion(7, 'buffett', 'Predictable earnings (all EPS history positive)', predictable,
     'Steady, never-negative earnings are easier to value with confidence.');
 
   const iv = g('intrinsic_value') as number | undefined;
-  let belowIv: boolean | null = null;
-  if (iv != null && price != null && iv) belowIv = (price as number) <= 0.75 * iv;
-  else if (iv == null) belowIv = need('intrinsic_value');
-  else if (price == null) belowIv = need('price');
-  add(8, 'buffett', 'Trading >= 25% below intrinsic value', belowIv,
-    { price, intrinsic_value: iv },
+  let belowIv: CriterionResult;
+  if (iv != null && price != null && iv) {
+    belowIv = { passed: (price as number) <= 0.75 * iv, value: { price, intrinsic_value: iv } };
+  } else if (iv == null) {
+    belowIv = { ...missing('intrinsic_value'), value: { price, intrinsic_value: iv } };
+  } else {
+    belowIv = { ...missing('price'), value: { price, intrinsic_value: iv } };
+  }
+  addCriterion(8, 'buffett', 'Trading >= 25% below intrinsic value', belowIv,
     'A margin of safety means buying a dollar of value for 75 cents or less.');
-  add(9, 'buffett', 'Business understandable', true, true,
+  addCriterion(9, 'buffett', 'Business understandable', { passed: true, value: true },
     'Assumed true unless flagged — Buffett only buys what he can explain.');
-  add(10, 'buffett', 'Sustainable competitive advantage',
-    moat != null ? Boolean(moat) : need('moat'), moat,
+  addCriterion(10, 'buffett', 'Sustainable competitive advantage',
+    moat != null ? { passed: Boolean(moat), value: moat } : { ...missing('moat'), value: moat },
     'The moat must persist for years, not just this quarter.');
 
   const peg = g('peg') as number | undefined;
   const eg = g('earnings_growth') as number | undefined;
   const rg = g('revenue_growth') as number | undefined;
   const pe = g('pe') as number | undefined;
-  add(11, 'lynch', 'PEG < 1.0', peg != null ? peg < 1.0 : need('peg'), peg,
+  addCriterion(11, 'lynch', 'PEG < 1.0',
+    peg != null ? { passed: peg < 1.0, value: peg } : { ...missing('peg'), value: peg },
     'Paying less than 1x growth for earnings is the GARP sweet spot.');
-  add(12, 'lynch', 'Earnings growth 15-30%', eg != null ? eg >= 0.15 && eg <= 0.30 : need('earnings_growth'), eg,
+  addCriterion(12, 'lynch', 'Earnings growth 15-30%',
+    eg != null ? { passed: eg >= 0.15 && eg <= 0.30, value: eg } : { ...missing('earnings_growth'), value: eg },
     'Fast but sustainable growth — not so hot it cannot last.');
 
-  let revConsistent: boolean | null = null;
-  if (eg != null && rg != null) revConsistent = Math.abs(rg - eg) <= 0.10;
-  add(13, 'lynch', 'Revenue growth consistent with earnings (within 10pp)',
-    revConsistent ?? need('revenue_growth/earnings_growth'),
-    { revenue_growth: rg, earnings_growth: eg },
+  let revConsistent: CriterionResult;
+  if (eg != null && rg != null) {
+    revConsistent = { passed: Math.abs(rg - eg) <= 0.10, value: { revenue_growth: rg, earnings_growth: eg } };
+  } else {
+    revConsistent = { ...missing('revenue_growth', 'earnings_growth'), value: { revenue_growth: rg, earnings_growth: eg } };
+  }
+  addCriterion(13, 'lynch', 'Revenue growth consistent with earnings (within 10pp)', revConsistent,
     'Earnings growth backed by sales is real, not just cost-cutting.');
 
   const inv = g('inventory_turnover') as number | undefined;
   const invPrev = g('inventory_turnover_prev') as number | undefined;
-  let invPass: boolean | null;
-  if (inv == null || invPrev == null) invPass = need('inventory_turnover');
-  else invPass = inv > invPrev;
-  add(14, 'lynch', 'Inventory turnover improving', invPass,
-    { current: inv, previous: invPrev },
+  let invPass: CriterionResult;
+  if (inv == null || invPrev == null) {
+    invPass = { ...missing('inventory_turnover'), value: { current: inv, previous: invPrev } };
+  } else {
+    invPass = { passed: inv > invPrev, value: { current: inv, previous: invPrev } };
+  }
+  addCriterion(14, 'lynch', 'Inventory turnover improving', invPass,
     'Faster inventory turns mean products sell briskly and cash is not stuck.');
 
   const insider = g('insider_buying');
-  add(15, 'lynch', 'Insider buying', insider != null ? Boolean(insider) : need('insider_buying'), insider,
+  addCriterion(15, 'lynch', 'Insider buying',
+    insider != null ? { passed: Boolean(insider), value: insider } : { ...missing('insider_buying'), value: insider },
     'Insiders buying their own stock signals genuine confidence.');
   const inst = g('institution_ownership') as number | undefined;
-  add(16, 'lynch', 'Institutional ownership < 60%', inst != null ? inst < 0.6 : need('institution_ownership'), inst,
+  addCriterion(16, 'lynch', 'Institutional ownership < 60%',
+    inst != null ? { passed: inst < 0.6, value: inst } : { ...missing('institution_ownership'), value: inst },
     'Low institutional ownership leaves room for the crowd to discover it.');
   const buyback = g('buyback');
-  add(17, 'lynch', 'Share buyback in place', buyback != null ? Boolean(buyback) : need('buyback'), buyback,
+  addCriterion(17, 'lynch', 'Share buyback in place',
+    buyback != null ? { passed: Boolean(buyback), value: buyback } : { ...missing('buyback'), value: buyback },
     'Buybacks return cash and lift per-share value.');
 
-  let peLtGrowth: boolean | null = null;
-  if (pe != null && eg != null) peLtGrowth = pe < eg * 100;
-  add(18, 'lynch', 'P/E < earnings-growth rate', peLtGrowth ?? need('pe/earnings_growth'),
-    { pe, growth_pct: eg != null ? eg * 100 : null },
+  let peLtGrowth: CriterionResult;
+  if (pe != null && eg != null) {
+    peLtGrowth = { passed: pe < eg * 100, value: { pe, growth_pct: eg * 100 } };
+  } else {
+    peLtGrowth = { ...missing('pe', 'earnings_growth'), value: { pe, growth_pct: eg != null ? eg * 100 : null } };
+  }
+  addCriterion(18, 'lynch', 'P/E < earnings-growth rate', peLtGrowth,
     "Lynch's rule: a fair P/E should be below the growth percentage.");
 
   const pb = g('pb') as number | undefined;
   const cr = g('current_ratio') as number | undefined;
   const dy = g('dividend_yield') as number | undefined;
-  add(19, 'graham', 'P/E < 15', pe != null ? pe < 15 : need('pe'), pe,
+  addCriterion(19, 'graham', 'P/E < 15',
+    pe != null ? { passed: pe < 15, value: pe } : { ...missing('pe'), value: pe },
     'A low P/E limits what you overpay for earnings.');
-  add(20, 'graham', 'P/B < 1.5', pb != null ? pb < 1.5 : need('pb'), pb,
+  addCriterion(20, 'graham', 'P/B < 1.5',
+    pb != null ? { passed: pb < 1.5, value: pb } : { ...missing('pb'), value: pb },
     'Buying near book value gives an asset cushion.');
 
-  let grahamNum: boolean | null = null;
-  if (pe != null && pb != null) grahamNum = pe * pb < 22.5;
-  add(21, 'graham', 'P/E x P/B < 22.5 (Graham number)', grahamNum ?? need('pe/pb'),
-    { pe, pb, product: pe != null && pb != null ? pe * pb : null },
+  let grahamNum: CriterionResult;
+  if (pe != null && pb != null) {
+    grahamNum = { passed: pe * pb < 22.5, value: { pe, pb, product: pe * pb } };
+  } else {
+    grahamNum = { ...missing('pe', 'pb'), value: { pe, pb, product: pe != null && pb != null ? pe * pb : null } };
+  }
+  addCriterion(21, 'graham', 'P/E x P/B < 22.5 (Graham number)', grahamNum,
     "Graham's combined cheapness test for earnings and assets.");
-  add(22, 'graham', 'Current ratio > 2', cr != null ? cr > 2 : need('current_ratio'), cr,
+  addCriterion(22, 'graham', 'Current ratio > 2',
+    cr != null ? { passed: cr > 2, value: cr } : { ...missing('current_ratio'), value: cr },
     'Twice the short-term assets vs liabilities means strong liquidity.');
-  add(23, 'graham', 'Pays a dividend', dy != null ? dy > 0 : need('dividend_yield'), dy,
+  addCriterion(23, 'graham', 'Pays a dividend',
+    dy != null ? { passed: dy > 0, value: dy } : { ...missing('dividend_yield'), value: dy },
     'A dividend record shows real, distributable profits.');
 
-  let tenY: boolean | null = null;
-  if (epsHist.length >= 2) tenY = epsHist[0]! < epsHist[epsHist.length - 1]!;
-  add(24, 'graham', 'Long-run earnings growth (first EPS < last)', tenY ?? need('eps_history'), epsHist,
+  let tenY: CriterionResult;
+  if (epsHist.length >= 2) tenY = { passed: epsHist[0]! < epsHist[epsHist.length - 1]!, value: epsHist };
+  else tenY = { ...missing('eps_history'), value: epsHist };
+  addCriterion(24, 'graham', 'Long-run earnings growth (first EPS < last)', tenY,
     'Earnings should be meaningfully higher than a decade ago.');
 
   const ncav = g('ncav_per_share') as number | undefined;
-  let belowNcav: boolean | null = null;
-  if (ncav != null && price != null) belowNcav = (price as number) < 0.67 * ncav;
-  else if (ncav == null) belowNcav = need('ncav_per_share');
-  else if (price == null) belowNcav = need('price');
-  add(25, 'graham', 'Price < 67% of NCAV', belowNcav, { price, ncav_per_share: ncav },
+  let belowNcav: CriterionResult;
+  if (ncav != null && price != null) {
+    belowNcav = { passed: (price as number) < 0.67 * ncav, value: { price, ncav_per_share: ncav } };
+  } else if (ncav == null) {
+    belowNcav = { ...missing('ncav_per_share'), value: { price, ncav_per_share: ncav } };
+  } else {
+    belowNcav = { ...missing('price'), value: { price, ncav_per_share: ncav } };
+  }
+  addCriterion(25, 'graham', 'Price < 67% of NCAV', belowNcav,
     "Buying below liquidation value is Graham's deepest margin of safety.");
 
-  let stability: boolean | null = null;
-  if (epsHist.length) stability = epsHist.every((e) => e >= 0);
-  add(26, 'graham', 'Earnings stability (no negative EPS year)', stability ?? need('eps_history'), epsHist,
+  let stability: CriterionResult;
+  if (epsHist.length) stability = { passed: epsHist.every((e) => e >= 0), value: epsHist };
+  else stability = { ...missing('eps_history'), value: epsHist };
+  addCriterion(26, 'graham', 'Earnings stability (no negative EPS year)', stability,
     'No loss years means dependable, defensive earnings.');
 
-  add(27, 'quality', 'Revenue growth > inflation', rg != null ? rg > inflation : need('revenue_growth'),
-    { revenue_growth: rg, inflation },
+  addCriterion(27, 'quality', 'Revenue growth > inflation',
+    rg != null ? { passed: rg > inflation, value: { revenue_growth: rg, inflation } } : { ...missing('revenue_growth'), value: { revenue_growth: rg, inflation } },
     'Sales must outpace inflation to grow in real terms.');
   const om = g('operating_margin') as number | undefined;
-  add(28, 'quality', 'Operating margin healthy (>10%)', om != null ? om > 0.10 : need('operating_margin'), om,
+  addCriterion(28, 'quality', 'Operating margin healthy (>10%)',
+    om != null ? { passed: om > 0.10, value: om } : { ...missing('operating_margin'), value: om },
     'A solid operating margin shows the core business is profitable.');
   const roa = g('return_on_assets') as number | undefined;
-  add(29, 'quality', 'Return on assets > 5%', roa != null ? roa > 0.05 : need('return_on_assets'), roa,
+  addCriterion(29, 'quality', 'Return on assets > 5%',
+    roa != null ? { passed: roa > 0.05, value: roa } : { ...missing('return_on_assets'), value: roa },
     'Good ROA means assets are deployed efficiently.');
   const ic = g('interest_coverage') as number | undefined;
-  add(30, 'quality', 'Interest coverage > 3', ic != null ? ic > 3 : need('interest_coverage'), ic,
+  addCriterion(30, 'quality', 'Interest coverage > 3',
+    ic != null ? { passed: ic > 3, value: ic } : { ...missing('interest_coverage'), value: ic },
     'Earnings comfortably cover interest — low default risk.');
 
   const buckets = ['buffett', 'lynch', 'graham', 'quality'] as const;

@@ -1,11 +1,30 @@
 import { fetchText, sleep } from '../utils.js';
 import { parseEnabledSources, ingestRateMs } from '../sources/registry.js';
+import { fetchDseNewsArchive } from '../dse-news.js';
 import { parseRssXml, isStockRelatedHeadline } from './rss.js';
 import { parseFeStockHtml, parseFeBanglaStockHtml } from './parsers.js';
 import type { NewsRow, NewsSourceDef } from './types.js';
 
 /** Curated DSE-relevant news sources (newspapers + web; social via env). */
 export const DEFAULT_NEWS_SOURCES: NewsSourceDef[] = [
+  {
+    id: 'dse_psn',
+    label: 'DSE — Price Sensitive Information',
+    kind: 'dse_archive',
+    url: 'https://www.dsebd.org/old_news.php',
+    category: 'price_sensitive',
+    channel: 'dse',
+    dseCriteria: 1,
+  },
+  {
+    id: 'dse_corporate',
+    label: 'DSE — Corporate Announcements',
+    kind: 'dse_archive',
+    url: 'https://www.dsebd.org/old_news.php',
+    category: 'corporate',
+    channel: 'dse',
+    dseCriteria: 2,
+  },
   {
     id: 'tbs_stocks',
     label: 'The Business Standard — Stocks',
@@ -146,6 +165,10 @@ export function createNewsRegistry(): NewsSourceDef[] {
 }
 
 async function fetchSource(def: NewsSourceDef): Promise<NewsRow[]> {
+  if (def.kind === 'dse_archive') {
+    return fetchDseNewsArchive({ criteria: def.dseCriteria ?? 3 });
+  }
+
   const raw = await fetchText(def.url);
   if (!raw) return [];
 

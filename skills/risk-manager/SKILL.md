@@ -1,6 +1,6 @@
 ---
 name: risk-manager
-description: Converts a raw DSE trade signal plus OHLCV price data into a risk-checked recommendation with concrete BDT numbers — ATR-based buy zone, stop-loss, target, risk:reward, Kelly/percent position sizing, and pass/fail risk gates (liquidity, sector concentration, portfolio heat, circuit-breaker suppression). Use when the user asks "how many shares should I buy", "where's my stop", "what's the position size", "is this trade safe", "set my risk", or needs the risk gatekeeper for a Dhaka Stock Exchange ticker.
+description: Converts a raw DSE trade signal plus OHLCV price data into risk-checked recommendations with concrete BDT numbers — dual ATR and structure (support/resistance) strategies for buy zone, stop-loss, target, risk:reward, Kelly/percent position sizing, and pass/fail risk gates (liquidity, sector concentration, portfolio heat, circuit-breaker suppression). Use when the user asks "how many shares should I buy", "where's my stop", "what's the position size", "is this trade safe", "set my risk", or needs the risk gatekeeper for a Dhaka Stock Exchange ticker.
 license: Apache-2.0
 compatibility: Prompt-first Agent Skill. Usable with the script absent. Script is Python 3.8+ stdlib-only, no network.
 metadata:
@@ -26,19 +26,25 @@ trade safe?", "set my risk". Run last in the pipeline, after `signal-synthesizer
 
 ## Inputs you need
 Gather via `dse-data-acquisition`:
-- **`ohlcv`** — daily bars, **≥15** (for ATR(14)).
+- **`ohlcv`** — daily bars, **≥60** (for structure support/resistance and ATR(14)).
 - **`account`** — `capital_bdt` (>0), `risk_per_trade_pct` (default 1.0).
 - *(optional)* **`signal`** — `entry`, `mode`; default entry = last close.
 - *(optional)* **`microstructure`** — `avg_daily_value_bdt`, `circuit_state`, `floor_price`, `halted`.
 - *(optional)* **`fundamentals.sector`**, **`portfolio`** (`total_value_bdt`, `positions[]`).
 
 ## Method (follow in order)
+Run **both** strategies. Top-level `key_metrics` = ATR strategy (default). Also emit
+`strategies.structure` for support/resistance-based levels. See [references/RISK.md](references/RISK.md).
+
 Let ATR = ATR(14), entry = signal.entry or last close.
 
-**1. Levels** — buy zone = `entry − 0.25·ATR … entry`; stop = `entry − 2·ATR`;
-target = `entry + 3·ATR`; risk/share = 2·ATR; reward/share = 3·ATR; **R:R = 3:2 = 1.5**.
+**1a. ATR levels** — buy zone = `entry − 0.25·ATR … entry`; stop = `entry − 2·ATR`;
+target = `entry + 3·ATR`; **R:R = 1.5**.
 
-**2. Position size** — risk_amount = `capital × risk_pct/100`; raw_shares = risk_amount /
+**1b. Structure levels** — 60-bar support/resistance; buy zone at support pullback;
+stop = `support − 0.5·ATR`; target = resistance or min 1.5:1 R:R.
+
+**2. Position size** (per strategy, same rules) — risk_amount = `capital × risk_pct/100`; raw_shares = risk_amount /
 risk_per_share. Cap by `min(Kelly 25% of capital, 5% per-position)` ÷ entry. If
 ATR/price > 6%, **halve** the size (flag `high_volatility_size_halved`). Round down to whole
 shares; if it rounds to 0, flag `size_rounds_to_zero`.
@@ -62,11 +68,13 @@ Rating precedence: **rejected** (liquidity) > **suppressed** (circuit, momentum)
 ```json
 { "skill": "risk-manager", "ticker": "..", "mode": "..", "as_of": "..",
   "score": 0.0, "confidence": 0.0, "rating": "approved|reduced|suppressed|rejected",
-  "key_metrics": { "atr": 0, "entry": 0, "buy_zone_low": 0, "buy_zone_high": 0,
-    "stop_loss": 0, "target": 0, "risk_reward": 1.5, "suggested_shares": 0,
-    "position_value_bdt": 0, "pct_of_capital": 0, "trade_risk_pct": 0,
-    "risk_amount_bdt": 0, "risk_pct_of_capital": 0 },
+  "active_strategy": "atr",
+  "key_metrics": { "...": "ATR strategy — same shape as before" },
   "gates": { "liquidity": {"pass": true, "detail": ".."}, "sector": {}, "heat": {}, "circuit": {} },
+  "strategies": {
+    "atr": { "strategy": "atr", "rating": "..", "key_metrics": {}, "gates": {}, "reasoning": [], "flags": [] },
+    "structure": { "strategy": "structure", "key_metrics": { "support": 0, "resistance": 0, "...": "..." }, "...": "..." }
+  },
   "reasoning": ["..."], "flags": ["..."],
   "disclaimer": "Educational analysis only. Not financial advice." }
 ```

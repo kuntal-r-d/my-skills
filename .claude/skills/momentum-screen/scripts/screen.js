@@ -59,6 +59,7 @@ function parseCliArgs(argv) {
 
 // src/momentum-screen/screen.ts
 import * as ind from "@stock-buddy/core";
+import { buildCriterionEducation } from "@stock-buddy/core";
 var DISCLAIMER = "Educational analysis only. Not financial advice.";
 var CATEGORY_WEIGHTS = {
   trend: 0.25,
@@ -134,43 +135,62 @@ function screen(data) {
     if (prev) mktRoc = (mc[mc.length - 1] - prev) / prev * 100;
   }
   const crit = [];
-  function add(id, cat, label, passed2, expl) {
-    crit.push({ id, category: cat, label, passed: passed2, explanation: expl });
+  function add(id, cat, label, passed2, expl, value, missing) {
+    crit.push({
+      id,
+      category: cat,
+      label,
+      passed: passed2,
+      explanation: expl,
+      value,
+      missing_fields: missing,
+      levels: buildCriterionEducation(label, expl, value, "momentum", { passed: passed2, missingFields: missing })
+    });
   }
   add(
     1,
     "trend",
     "Close > 50-day MA",
     m50 != null ? px > m50 : null,
-    "Price trading above its 50-day average shows recent strength."
+    "Price trading above its 50-day average shows recent strength.",
+    { close: px, ma50: m50 },
+    m50 == null ? ["ohlcv"] : void 0
   );
   add(
     2,
     "trend",
     "Close > 150-day MA",
     m150 != null ? px > m150 : null,
-    "Above the 150-day average confirms the medium-term uptrend."
+    "Above the 150-day average confirms the medium-term uptrend.",
+    { close: px, ma150: m150 },
+    m150 == null ? ["ohlcv"] : void 0
   );
   add(
     3,
     "trend",
     "Close > 200-day MA",
     m200 != null ? px > m200 : null,
-    "Above the 200-day average marks a long-term uptrend."
+    "Above the 200-day average marks a long-term uptrend.",
+    { close: px, ma200: m200 },
+    m200 == null ? ["ohlcv"] : void 0
   );
   add(
     4,
     "trend",
     "50-day MA > 150-day MA",
     m50 != null && m150 != null ? m50 > m150 : null,
-    "Short average over the medium one means momentum is improving."
+    "Short average over the medium one means momentum is improving.",
+    { ma50: m50, ma150: m150 },
+    m50 == null || m150 == null ? ["ohlcv"] : void 0
   );
   add(
     5,
     "trend",
     "150-day MA > 200-day MA",
     m150 != null && m200 != null ? m150 > m200 : null,
-    "Medium average over the long one confirms the stack is aligned up."
+    "Medium average over the long one confirms the stack is aligned up.",
+    { ma150: m150, ma200: m200 },
+    m150 == null || m200 == null ? ["ohlcv"] : void 0
   );
   const rising200 = slopeRising(s200, 21);
   add(
@@ -178,35 +198,43 @@ function screen(data) {
     "trend",
     "200-day MA rising (~1 month)",
     rising200,
-    "A rising long-term average means the trend is still building."
+    "A rising long-term average means the trend is still building.",
+    { ma200: m200, rising: rising200 },
+    rising200 == null ? ["ohlcv"] : void 0
   );
   add(
     7,
     "trend",
     "Within 25% of 52-week high",
     px >= 0.75 * hi52,
-    "Leaders trade near their highs, not deep in a hole."
+    "Leaders trade near their highs, not deep in a hole.",
+    { close: px, high_52w: hi52, pct_of_high: hi52 ? px / hi52 : null }
   );
   add(
     8,
     "trend",
     ">= 30% above 52-week low",
     lo52 > 0 && px >= 1.3 * lo52,
-    "A big rise off the lows shows real recovery, not a falling knife."
+    "A big rise off the lows shows real recovery, not a falling knife.",
+    { close: px, low_52w: lo52, pct_above_low: lo52 ? px / lo52 : null }
   );
   add(
     9,
     "momentum_power",
     "RSI between 40 and 70",
     rsiV != null ? rsiV >= 40 && rsiV <= 70 : null,
-    "RSI 40-70 is the 'strong but not exhausted' momentum zone."
+    "RSI 40-70 is the 'strong but not exhausted' momentum zone.",
+    { rsi: rsiV },
+    rsiV == null ? ["ohlcv"] : void 0
   );
   add(
     10,
     "momentum_power",
     "MACD above signal line",
     macdLine != null && macdSig != null ? macdLine > macdSig : null,
-    "MACD over its signal line is a classic bullish trigger."
+    "MACD over its signal line is a classic bullish trigger.",
+    { macd: macdLine, signal: macdSig },
+    macdLine == null || macdSig == null ? ["ohlcv"] : void 0
   );
   const rocRising = slopeRising(rocSeries, 5);
   add(
@@ -214,28 +242,36 @@ function screen(data) {
     "momentum_power",
     "ROC positive and rising",
     rocV != null ? rocV > 0 && Boolean(rocRising) : null,
-    "Positive and accelerating rate-of-change means momentum is speeding up."
+    "Positive and accelerating rate-of-change means momentum is speeding up.",
+    { roc: rocV, rising: rocRising },
+    rocV == null ? ["ohlcv"] : void 0
   );
   add(
     12,
     "momentum_power",
     "ADX > 25",
     adxV != null ? adxV > 25 : null,
-    "ADX above 25 confirms a genuine trend rather than chop."
+    "ADX above 25 confirms a genuine trend rather than chop.",
+    { adx: adxV },
+    adxV == null ? ["ohlcv"] : void 0
   );
   add(
     13,
     "momentum_power",
     "MFI between 20 and 80",
     mfiV != null ? mfiV >= 20 && mfiV <= 80 : null,
-    "Money Flow Index 20-80 shows healthy buying without blow-off."
+    "Money Flow Index 20-80 shows healthy buying without blow-off.",
+    { mfi: mfiV },
+    mfiV == null ? ["ohlcv"] : void 0
   );
   add(
     14,
     "momentum_power",
     "Bollinger %B favourable (0.5-1.0)",
     pctb != null ? pctb >= 0.5 && pctb <= 1 : null,
-    "Price in the upper half of the bands (but not bursting out) signals strength."
+    "Price in the upper half of the bands (but not bursting out) signals strength.",
+    { pct_b: pctb },
+    pctb == null ? ["ohlcv"] : void 0
   );
   const obvUp = slopeRising(obvSeries, 10);
   add(
@@ -243,14 +279,17 @@ function screen(data) {
     "volume",
     "OBV trending up",
     obvUp != null ? Boolean(obvUp) : null,
-    "Rising On-Balance Volume means volume backs the advance."
+    "Rising On-Balance Volume means volume backs the advance.",
+    { obv_trending_up: obvUp },
+    obvUp == null ? ["ohlcv"] : void 0
   );
   add(
     16,
     "volume",
     "Volume > 20-day average",
     avg20Vol > 0 ? v[v.length - 1] > avg20Vol : null,
-    "Above-average volume shows real participation behind the move."
+    "Above-average volume shows real participation behind the move.",
+    { volume: v[v.length - 1], avg_volume_20: avg20Vol }
   );
   const adUp = slopeRising(adSeries, 10);
   add(
@@ -258,14 +297,18 @@ function screen(data) {
     "volume",
     "Accumulation/Distribution rising",
     adUp != null ? Boolean(adUp) : null,
-    "A rising A/D line means buyers control the day's range."
+    "A rising A/D line means buyers control the day's range.",
+    { ad_trending_up: adUp },
+    adUp == null ? ["ohlcv"] : void 0
   );
   add(
     18,
     "volume",
     "Volume ROC positive",
     vrocV != null ? vrocV > 0 : null,
-    "Growing volume vs a month ago signals fresh interest."
+    "Growing volume vs a month ago signals fresh interest.",
+    { volume_roc: vrocV },
+    vrocV == null ? ["ohlcv"] : void 0
   );
   const epsHist = fundamentals.eps_history ?? [];
   let earnAccel = null;
@@ -279,12 +322,16 @@ function screen(data) {
     "relative_performance",
     "Earnings acceleration",
     earnAccel,
-    "Each year's earnings growth beating the last is the Driehaus signature."
+    "Each year's earnings growth beating the last is the Driehaus signature.",
+    { eps_history: epsHist },
+    earnAccel == null ? ["eps_history"] : void 0
   );
   const surprise = fundamentals.earnings_surprise;
   let surprisePass;
+  let surpriseMissing;
   if (surprise == null) {
     surprisePass = null;
+    surpriseMissing = ["earnings_surprise"];
     flags.push("missing:earnings_surprise");
   } else {
     surprisePass = Number(surprise) > 0;
@@ -294,24 +341,33 @@ function screen(data) {
     "relative_performance",
     "Positive recent earnings surprise",
     surprisePass,
-    "Beating analyst estimates often sparks the next leg up."
+    "Beating analyst estimates often sparks the next leg up.",
+    { earnings_surprise: surprise },
+    surpriseMissing
   );
   add(
     21,
     "relative_performance",
     "Institutional accumulation (rel. volume > 1.2)",
     relVol > 1.2,
-    "Volume well above normal hints big institutions are buying."
+    "Volume well above normal hints big institutions are buying.",
+    { relative_volume: relVol }
   );
   let relStrength = null;
+  let relMissing;
   if (rocV != null && mktRoc != null) relStrength = rocV > mktRoc;
-  else if (rocV != null && mktRoc == null) flags.push("missing:market_index");
+  else if (rocV != null && mktRoc == null) {
+    flags.push("missing:market_index");
+    relMissing = ["market_index"];
+  }
   add(
     22,
     "relative_performance",
     "Relative strength vs market positive",
     relStrength,
-    "Outperforming the index means money is rotating into this name."
+    "Outperforming the index means money is rotating into this name.",
+    { stock_roc: rocV, market_roc: mktRoc },
+    relMissing
   );
   const atrRatio = px ? atrV / px : null;
   add(
@@ -319,7 +375,9 @@ function screen(data) {
     "risk",
     "ATR within acceptable range (ATR/price < 6%)",
     atrRatio != null ? atrRatio < 0.06 : null,
-    "Lower volatility means tighter, safer stops."
+    "Lower volatility means tighter, safer stops.",
+    { atr_ratio: atrRatio, atr: atrV, close: px },
+    atrRatio == null ? ["ohlcv"] : void 0
   );
   const distSupport = px ? (px - support) / px * 100 : null;
   add(
@@ -327,7 +385,9 @@ function screen(data) {
     "risk",
     "Distance from support < 8%",
     distSupport != null ? distSupport < 8 : null,
-    "Close to support gives a low-risk entry with a nearby stop."
+    "Close to support gives a low-risk entry with a nearby stop.",
+    { distance_from_support_pct: distSupport, support, close: px },
+    distSupport == null ? ["ohlcv"] : void 0
   );
   const distResist = px ? (resistance - px) / px * 100 : null;
   add(
@@ -335,7 +395,9 @@ function screen(data) {
     "risk",
     "No major resistance within 10%",
     distResist != null ? distResist >= 10 : null,
-    "Clear overhead room lets the stock run without hitting a ceiling."
+    "Clear overhead room lets the stock run without hitting a ceiling.",
+    { distance_to_resistance_pct: distResist, resistance, close: px },
+    distResist == null ? ["ohlcv"] : void 0
   );
   const counted = crit.filter((x) => x.passed != null);
   const passed = counted.filter((x) => x.passed);
@@ -374,8 +436,20 @@ function screen(data) {
       overall_count: overallCount,
       criteria_passed: passed.length,
       criteria_evaluated: counted.length,
-      categories: keyMetrics
+      categories: keyMetrics,
+      formulas: {
+        rsi_14: rsiV,
+        macd: macdLine,
+        macd_signal: macdSig,
+        roc_12: rocV,
+        adx_14: adxV,
+        mfi_14: mfiV,
+        obv_trend: obvUp,
+        rel_volume: Math.round(relVol * 100) / 100,
+        atr: atrV
+      }
     },
+    criteria: crit,
     reasoning,
     flags,
     disclaimer: DISCLAIMER

@@ -8,6 +8,7 @@ import {
 import { analyzeTicker, screenMarket, runSkill } from '@stock-buddy/mcp-server/composites';
 import { buildTickerContract, stripMeta } from './contract-builder.js';
 import { computeMomentumRotation } from './rotation.js';
+import { enrichRiskInAnalysis } from './risk-enrich.js';
 
 const MCP_VERSION = '2.0.0';
 
@@ -78,6 +79,8 @@ export async function runTickerAnalysis(
     analysis.stages = stages;
     analysis.analysis_mode = mode;
   }
+
+  analysis = enrichRiskInAnalysis(analysis, payload);
 
   let snapshotId: number | undefined;
   if (opts.persist ?? true) {

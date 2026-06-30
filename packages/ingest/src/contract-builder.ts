@@ -10,7 +10,7 @@ import {
   getShareholding,
   getTickerBySymbol,
 } from '@stock-buddy/db';
-import { SkillInputSchema } from '@stock-buddy/core';
+import { SkillInputSchema, buildClientResearchInstructions } from '@stock-buddy/core';
 
 export interface ContractMeta {
   sources: string[];
@@ -142,13 +142,35 @@ export async function buildTickerContract(
     }
   }
 
+  if (!contract.account) {
+    contract.account = {
+      capital_bdt: 1_000_000,
+      risk_per_trade_pct: 1.0,
+    };
+    sources.push('derived:account_defaults');
+  }
+
   const freshnessRows = await getFreshness(db, ticker.id);
   const freshness: Record<string, string | null> = {};
   for (const f of freshnessRows) {
     freshness[f.entityType] = f.lastSuccessAt?.toISOString() ?? null;
   }
 
-  contract._meta = { sources, missing, freshness } satisfies ContractMeta;
+  contract._meta = {
+    sources,
+    missing,
+    freshness,
+    ...(missing.length
+      ? {
+          research_instructions: buildClientResearchInstructions({
+            ticker: ticker.symbol,
+            missingFields: missing,
+            reason: 'incomplete_contract',
+            partialContract: stripMeta(contract),
+          }),
+        }
+      : {}),
+  } satisfies ContractMeta & { research_instructions?: unknown };
 
   return contract;
 }

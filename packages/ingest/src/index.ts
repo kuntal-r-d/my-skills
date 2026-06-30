@@ -2,6 +2,7 @@ export { buildTickerContract, stripMeta, validateContract } from './contract-bui
 export type { BuildContractOptions, ContractMeta } from './contract-builder.js';
 export { runTickerAnalysis, ingestAnalysis, screenMarket } from './analysis.js';
 export type { RunAnalysisOptions, AnalysisMode } from './analysis.js';
+export { enrichRiskInAnalysis, hasStructureStrategy } from './risk-enrich.js';
 export { runDailyBriefing } from './briefing.js';
 export { buildUniverse } from './discover.js';
 export { computeMomentumRotation } from './rotation.js';
@@ -14,5 +15,6 @@ export {
   ingestNewsMarket,
   ingestAll,
   ingestWatchlist,
+  ingestDaily,
   ingestFundamentalsUniverse,
 } from './jobs.js';
