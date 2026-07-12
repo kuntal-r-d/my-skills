@@ -1,4 +1,5 @@
-import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { CANONICAL_SECTORS, normalizeSector, sectorSlug } from '@stock-buddy/core';
 import type { Db } from './client.js';
 import {
   analysisSnapshots,
@@ -9,9 +10,12 @@ import {
   newsItems,
   ohlcvDaily,
   portfolioAccounts,
+  portfolioLots,
   portfolioPositions,
   researchMemos,
   researchSources,
+  sectorSnapshots,
+  sectors,
   skillOverrides,
   shareholdingMonthly,
   tickers,
@@ -19,6 +23,16 @@ import {
   predictionOutcomes,
 } from './schema.js';
 import { findUniqueNearMatch, isStubTicker } from './symbols.js';
+
+export async function getTickerBySymbolExact(db: Db, symbol: string) {
+  const upper = symbol.toUpperCase();
+  const rows = await db
+    .select()
+    .from(tickers)
+    .where(and(eq(tickers.symbol, upper), eq(tickers.isActive, true)))
+    .limit(1);
+  return rows[0] ?? null;
+}
 
 export async function getTickerBySymbol(db: Db, symbol: string) {
   const upper = symbol.toUpperCase();
@@ -51,14 +65,25 @@ export async function ensureTicker(
   symbol: string,
   meta?: { name?: string; sector?: string },
 ) {
-  const existing = await getTickerBySymbol(db, symbol);
+  const upper = symbol.toUpperCase();
+  const existing = await getTickerBySymbolExact(db, upper);
   if (existing) return existing;
 
-  const upper = symbol.toUpperCase();
-  const active = await listTickers(db);
-  const neighbor = findUniqueNearMatch(upper, active.map((t) => t.symbol));
-  if (neighbor) {
-    return active.find((t) => t.symbol === neighbor)!;
+  // A deactivated row (e.g. a merged typo stub) may still own the symbol.
+  const [inactive] = await db
+    .select()
+    .from(tickers)
+    .where(eq(tickers.symbol, upper))
+    .limit(1);
+  if (inactive) {
+    const canonical = await getTickerBySymbol(db, upper);
+    if (canonical) return canonical;
+    const [revived] = await db
+      .update(tickers)
+      .set({ isActive: true, updatedAt: new Date() })
+      .where(eq(tickers.id, inactive.id))
+      .returning();
+    return revived!;
   }
 
   const [row] = await db
@@ -67,6 +92,10 @@ export async function ensureTicker(
       symbol: upper,
       name: meta?.name,
       sector: meta?.sector,
+    })
+    .onConflictDoUpdate({
+      target: tickers.symbol,
+      set: { isActive: true, updatedAt: new Date() },
     })
     .returning();
   return row!;
@@ -144,6 +173,17 @@ export async function mergeStubTicker(db: Db, stubSymbol: string, canonicalSymbo
         .set({ tickerId: canonId })
         .where(eq(portfolioPositions.id, p.id));
     }
+  }
+
+  const stubLots = await db
+    .select()
+    .from(portfolioLots)
+    .where(eq(portfolioLots.tickerId, stubId));
+  for (const lot of stubLots) {
+    await db
+      .update(portfolioLots)
+      .set({ tickerId: canonId })
+      .where(eq(portfolioLots.id, lot.id));
   }
 
   await db.update(tickers).set({ isActive: false }).where(eq(tickers.id, stubId));
@@ -306,6 +346,7 @@ export async function upsertNews(
     headline: string;
     source?: string;
     category?: string;
+    sectorTag?: string;
     url?: string;
   }>,
 ): Promise<{ inserted: number; skipped: number }> {
@@ -346,6 +387,7 @@ export async function upsertNews(
       headline: i.headline,
       source: i.source,
       category: i.category,
+      sectorTag: i.sectorTag,
       url: i.url,
     })),
   );
@@ -405,6 +447,7 @@ export async function getDefaultAccount(db: Db) {
 }
 
 export type PortfolioPurpose = 'investment' | 'trading';
+export type PositionUpsertMode = 'add' | 'replace';
 
 export async function getPortfolioPositions(
   db: Db,
@@ -436,31 +479,336 @@ export async function upsertPosition(
     targetLevel?: number;
     purpose?: PortfolioPurpose;
   },
+  mode: PositionUpsertMode = 'add',
 ) {
   const purpose = data.purpose ?? 'investment';
+  const values = {
+    accountId,
+    tickerId,
+    purpose,
+    qty: data.qty,
+    avgCost: data.avgCost,
+    sector: data.sector,
+    stopLevel: data.stopLevel,
+    targetLevel: data.targetLevel,
+  };
+
+  if (mode === 'replace') {
+    await db
+      .insert(portfolioPositions)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [portfolioPositions.accountId, portfolioPositions.tickerId, portfolioPositions.purpose],
+        set: {
+          qty: data.qty,
+          avgCost: data.avgCost,
+          sector: data.sector,
+          stopLevel: data.stopLevel,
+          targetLevel: data.targetLevel,
+          updatedAt: new Date(),
+        },
+      });
+    return;
+  }
+
   await db
     .insert(portfolioPositions)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [portfolioPositions.accountId, portfolioPositions.tickerId, portfolioPositions.purpose],
+      set: {
+        qty: sql`${portfolioPositions.qty} + excluded.qty`,
+        avgCost: sql`((${portfolioPositions.qty} * ${portfolioPositions.avgCost}) + (excluded.qty * excluded.avg_cost)) / (${portfolioPositions.qty} + excluded.qty)`,
+        sector: sql`COALESCE(excluded.sector, ${portfolioPositions.sector})`,
+        stopLevel: sql`COALESCE(excluded.stop_level, ${portfolioPositions.stopLevel})`,
+        targetLevel: sql`COALESCE(excluded.target_level, ${portfolioPositions.targetLevel})`,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+function todayDateStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export async function deletePortfolioLots(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  purpose: PortfolioPurpose,
+) {
+  await db
+    .delete(portfolioLots)
+    .where(
+      and(
+        eq(portfolioLots.accountId, accountId),
+        eq(portfolioLots.tickerId, tickerId),
+        eq(portfolioLots.purpose, purpose),
+      ),
+    );
+}
+
+export async function addPortfolioFill(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  data: {
+    qty: number;
+    price: number;
+    tradeDate?: string;
+    purpose?: PortfolioPurpose;
+    sector?: string;
+    stopLevel?: number;
+    targetLevel?: number;
+    notes?: string;
+  },
+) {
+  const purpose = data.purpose ?? 'investment';
+  const tradeDate = data.tradeDate ?? todayDateStr();
+
+  await upsertPosition(
+    db,
+    accountId,
+    tickerId,
+    {
+      qty: data.qty,
+      avgCost: data.price,
+      sector: data.sector,
+      stopLevel: data.stopLevel,
+      targetLevel: data.targetLevel,
+      purpose,
+    },
+    'add',
+  );
+
+  const [lot] = await db
+    .insert(portfolioLots)
     .values({
       accountId,
       tickerId,
       purpose,
+      tradeDate,
       qty: data.qty,
-      avgCost: data.avgCost,
+      price: data.price,
+      notes: data.notes,
+    })
+    .returning();
+  return lot!;
+}
+
+export async function replacePortfolioPositionWithFill(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  data: {
+    qty: number;
+    price: number;
+    tradeDate?: string;
+    purpose?: PortfolioPurpose;
+    sector?: string;
+    stopLevel?: number;
+    targetLevel?: number;
+    notes?: string;
+  },
+) {
+  const purpose = data.purpose ?? 'investment';
+  const tradeDate = data.tradeDate ?? todayDateStr();
+
+  await upsertPosition(
+    db,
+    accountId,
+    tickerId,
+    {
+      qty: data.qty,
+      avgCost: data.price,
       sector: data.sector,
       stopLevel: data.stopLevel,
       targetLevel: data.targetLevel,
+      purpose,
+    },
+    'replace',
+  );
+  await deletePortfolioLots(db, accountId, tickerId, purpose);
+  const [lot] = await db
+    .insert(portfolioLots)
+    .values({
+      accountId,
+      tickerId,
+      purpose,
+      tradeDate,
+      qty: data.qty,
+      price: data.price,
+      notes: data.notes ?? 'Imported from position total',
     })
-    .onConflictDoUpdate({
-      target: [portfolioPositions.accountId, portfolioPositions.tickerId, portfolioPositions.purpose],
-      set: {
-        qty: data.qty,
-        avgCost: data.avgCost,
-        sector: data.sector,
-        stopLevel: data.stopLevel,
-        targetLevel: data.targetLevel,
-        updatedAt: new Date(),
-      },
-    });
+    .returning();
+  return lot!;
+}
+
+export async function getPortfolioLots(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  purpose: PortfolioPurpose,
+) {
+  return db
+    .select()
+    .from(portfolioLots)
+    .where(
+      and(
+        eq(portfolioLots.accountId, accountId),
+        eq(portfolioLots.tickerId, tickerId),
+        eq(portfolioLots.purpose, purpose),
+      ),
+    )
+    .orderBy(desc(portfolioLots.tradeDate), desc(portfolioLots.createdAt));
+}
+
+/** Oldest lots first — used for FIFO partial transfers between books. */
+export async function getPortfolioLotsFifo(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  purpose: PortfolioPurpose,
+) {
+  return db
+    .select()
+    .from(portfolioLots)
+    .where(
+      and(
+        eq(portfolioLots.accountId, accountId),
+        eq(portfolioLots.tickerId, tickerId),
+        eq(portfolioLots.purpose, purpose),
+      ),
+    )
+    .orderBy(asc(portfolioLots.tradeDate), asc(portfolioLots.createdAt));
+}
+
+export async function countPortfolioLotsByTicker(
+  db: Db,
+  accountId: number,
+  purpose: PortfolioPurpose,
+): Promise<Map<number, number>> {
+  const rows = await db
+    .select({
+      tickerId: portfolioLots.tickerId,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(portfolioLots)
+    .where(and(eq(portfolioLots.accountId, accountId), eq(portfolioLots.purpose, purpose)))
+    .groupBy(portfolioLots.tickerId);
+
+  return new Map(rows.map((r) => [r.tickerId, r.n]));
+}
+
+export async function copyPortfolioLots(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  from: PortfolioPurpose,
+  to: PortfolioPurpose,
+) {
+  const source = await getPortfolioLots(db, accountId, tickerId, from);
+  if (!source.length) return;
+
+  await db.insert(portfolioLots).values(
+    source.map((lot) => ({
+      accountId,
+      tickerId,
+      purpose: to,
+      tradeDate: lot.tradeDate,
+      qty: lot.qty,
+      price: lot.price,
+      notes: lot.notes ? `${lot.notes} (copied from ${from})` : `Copied from ${from}`,
+    })),
+  );
+  await recomputePortfolioPositionFromLots(db, accountId, tickerId, to);
+}
+
+export async function recomputePortfolioPositionFromLots(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  purpose: PortfolioPurpose,
+) {
+  const lots = await getPortfolioLots(db, accountId, tickerId, purpose);
+  if (!lots.length) {
+    await removePosition(db, accountId, tickerId, purpose);
+    return null;
+  }
+  let totalQty = 0;
+  let totalCost = 0;
+  for (const lot of lots) {
+    totalQty += lot.qty;
+    totalCost += lot.qty * lot.price;
+  }
+  const avgCost = totalCost / totalQty;
+  const positionRows = await getPortfolioPositions(db, accountId, purpose);
+  const existing = positionRows.find((r) => r.position.tickerId === tickerId);
+  await upsertPosition(
+    db,
+    accountId,
+    tickerId,
+    {
+      qty: totalQty,
+      avgCost,
+      sector: existing?.position.sector ?? undefined,
+      stopLevel: existing?.position.stopLevel ?? undefined,
+      targetLevel: existing?.position.targetLevel ?? undefined,
+      purpose,
+    },
+    'replace',
+  );
+  return {
+    qty: totalQty,
+    avg_cost: avgCost,
+    cost_basis: totalCost,
+  };
+}
+
+export async function getPortfolioLotById(db: Db, accountId: number, lotId: number) {
+  const [lot] = await db
+    .select()
+    .from(portfolioLots)
+    .where(and(eq(portfolioLots.id, lotId), eq(portfolioLots.accountId, accountId)));
+  return lot ?? null;
+}
+
+export async function updatePortfolioLot(
+  db: Db,
+  accountId: number,
+  lotId: number,
+  data: {
+    qty?: number;
+    price?: number;
+    tradeDate?: string;
+    notes?: string | null;
+  },
+) {
+  const lot = await getPortfolioLotById(db, accountId, lotId);
+  if (!lot) return null;
+
+  const [updated] = await db
+    .update(portfolioLots)
+    .set({
+      ...(data.qty !== undefined ? { qty: data.qty } : {}),
+      ...(data.price !== undefined ? { price: data.price } : {}),
+      ...(data.tradeDate !== undefined ? { tradeDate: data.tradeDate } : {}),
+      ...(data.notes !== undefined ? { notes: data.notes } : {}),
+    })
+    .where(eq(portfolioLots.id, lotId))
+    .returning();
+
+  const position = await recomputePortfolioPositionFromLots(db, accountId, lot.tickerId, lot.purpose as PortfolioPurpose);
+  return { lot: updated!, tickerId: lot.tickerId, purpose: lot.purpose as PortfolioPurpose, position };
+}
+
+export async function deletePortfolioLot(db: Db, accountId: number, lotId: number) {
+  const lot = await getPortfolioLotById(db, accountId, lotId);
+  if (!lot) return null;
+
+  await db.delete(portfolioLots).where(eq(portfolioLots.id, lotId));
+  const position = await recomputePortfolioPositionFromLots(db, accountId, lot.tickerId, lot.purpose as PortfolioPurpose);
+  return { tickerId: lot.tickerId, purpose: lot.purpose as PortfolioPurpose, position };
 }
 
 export async function removePosition(
@@ -469,6 +817,7 @@ export async function removePosition(
   tickerId: number,
   purpose: PortfolioPurpose = 'investment',
 ) {
+  await deletePortfolioLots(db, accountId, tickerId, purpose);
   await db
     .delete(portfolioPositions)
     .where(
@@ -480,10 +829,303 @@ export async function removePosition(
     );
 }
 
+export async function splitPortfolioLot(
+  db: Db,
+  accountId: number,
+  lotId: number,
+  splitQty: number,
+  splitPrice?: number,
+) {
+  const lot = await getPortfolioLotById(db, accountId, lotId);
+  if (!lot) return null;
+  if (!splitQty || splitQty <= 0 || splitQty >= lot.qty) {
+    throw new Error('split_qty must be greater than 0 and less than the lot qty');
+  }
+
+  const purpose = lot.purpose as PortfolioPurpose;
+  const remainQty = lot.qty - splitQty;
+  const totalCost = lot.qty * lot.price;
+  const effSplitPrice = splitPrice ?? lot.price;
+  if (!effSplitPrice || effSplitPrice <= 0) {
+    throw new Error('split_price must be positive');
+  }
+
+  const splitCost = splitQty * effSplitPrice;
+  const remainCost = totalCost - splitCost;
+  if (remainCost <= 0) {
+    throw new Error('split price too high — remaining lot cost would be zero or negative');
+  }
+  const remainPrice = remainCost / remainQty;
+
+  await db
+    .update(portfolioLots)
+    .set({ qty: remainQty, price: remainPrice })
+    .where(eq(portfolioLots.id, lotId));
+  const [splitLot] = await db
+    .insert(portfolioLots)
+    .values({
+      accountId,
+      tickerId: lot.tickerId,
+      purpose,
+      tradeDate: lot.tradeDate,
+      qty: splitQty,
+      price: effSplitPrice,
+      notes: lot.notes ? `${lot.notes} (split)` : 'Split from lot',
+    })
+    .returning();
+
+  const position = await recomputePortfolioPositionFromLots(db, accountId, lot.tickerId, purpose);
+  return {
+    lot: splitLot!,
+    remain_qty: remainQty,
+    remain_price: remainPrice,
+    remain_cost: remainCost,
+    tickerId: lot.tickerId,
+    purpose,
+    position,
+  };
+}
+
+export type MovePortfolioLotResult = {
+  lot_id: number;
+  ticker_id: number;
+  symbol?: string;
+  from: PortfolioPurpose;
+  to: PortfolioPurpose;
+  moved_qty: number;
+  moved_price: number;
+  from_position: { qty: number; avg_cost: number; cost_basis: number } | null;
+  to_position: { qty: number; avg_cost: number; cost_basis: number } | null;
+};
+
+/** Move one buy-history lot to the other book; both positions recompute from remaining fills. */
+export async function movePortfolioLot(
+  db: Db,
+  accountId: number,
+  lotId: number,
+  to: PortfolioPurpose,
+): Promise<MovePortfolioLotResult | null> {
+  const lot = await getPortfolioLotById(db, accountId, lotId);
+  if (!lot) return null;
+
+  const from = lot.purpose as PortfolioPurpose;
+  if (from === to) throw new Error('fill is already in that portfolio');
+
+  const sourceRows = await getPortfolioPositions(db, accountId, from);
+  const source = sourceRows.find((r) => r.position.tickerId === lot.tickerId);
+  const destRows = await getPortfolioPositions(db, accountId, to);
+  const hadDest = destRows.some((r) => r.position.tickerId === lot.tickerId);
+
+  await db.update(portfolioLots).set({ purpose: to }).where(eq(portfolioLots.id, lotId));
+
+  const fromPosition = await recomputePortfolioPositionFromLots(db, accountId, lot.tickerId, from);
+  const toPosition = await recomputePortfolioPositionFromLots(db, accountId, lot.tickerId, to);
+
+  if (toPosition && source) {
+    await applyMoveDestinationMetadata(db, accountId, lot.tickerId, to, hadDest, source.position);
+  }
+
+  return {
+    lot_id: lotId,
+    ticker_id: lot.tickerId,
+    from,
+    to,
+    moved_qty: lot.qty,
+    moved_price: lot.price,
+    from_position: fromPosition,
+    to_position: toPosition,
+  };
+}
+
+async function ensurePortfolioLotsForPosition(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  purpose: PortfolioPurpose,
+  position: { qty: number; avgCost: number },
+) {
+  const lots = await getPortfolioLots(db, accountId, tickerId, purpose);
+  if (lots.length || position.qty <= 0) return lots;
+  await db.insert(portfolioLots).values({
+    accountId,
+    tickerId,
+    purpose,
+    tradeDate: todayDateStr(),
+    qty: position.qty,
+    price: position.avgCost,
+    notes: 'Backfill from position (pre-lots)',
+  });
+  return getPortfolioLotsFifo(db, accountId, tickerId, purpose);
+}
+
+async function transferPortfolioLotsFifo(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  from: PortfolioPurpose,
+  to: PortfolioPurpose,
+  moveQty: number,
+) {
+  const lots = await getPortfolioLotsFifo(db, accountId, tickerId, from);
+  let remaining = moveQty;
+  let transferred = 0;
+
+  for (const lot of lots) {
+    if (remaining <= 0) break;
+    const take = Math.min(lot.qty, remaining);
+    if (take <= 0) continue;
+
+    if (take >= lot.qty) {
+      await db.update(portfolioLots).set({ purpose: to }).where(eq(portfolioLots.id, lot.id));
+    } else {
+      await db.update(portfolioLots).set({ qty: lot.qty - take }).where(eq(portfolioLots.id, lot.id));
+      await db.insert(portfolioLots).values({
+        accountId,
+        tickerId,
+        purpose: to,
+        tradeDate: lot.tradeDate,
+        qty: take,
+        price: lot.price,
+        notes: lot.notes,
+      });
+    }
+    remaining -= take;
+    transferred += take;
+  }
+
+  return transferred;
+}
+
+async function applyMoveDestinationMetadata(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  to: PortfolioPurpose,
+  hadDest: boolean,
+  srcPos: {
+    sector?: string | null;
+    stopLevel?: number | null;
+    targetLevel?: number | null;
+  },
+) {
+  if (!hadDest && to === 'trading') {
+    await db
+      .update(portfolioPositions)
+      .set({
+        sector: srcPos.sector ?? null,
+        stopLevel: srcPos.stopLevel ?? null,
+        targetLevel: srcPos.targetLevel ?? null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(portfolioPositions.accountId, accountId),
+          eq(portfolioPositions.tickerId, tickerId),
+          eq(portfolioPositions.purpose, to),
+        ),
+      );
+    return;
+  }
+
+  if (!hadDest && to === 'investment') {
+    await db
+      .update(portfolioPositions)
+      .set({
+        sector: srcPos.sector ?? null,
+        stopLevel: null,
+        targetLevel: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(portfolioPositions.accountId, accountId),
+          eq(portfolioPositions.tickerId, tickerId),
+          eq(portfolioPositions.purpose, to),
+        ),
+      );
+    return;
+  }
+
+  if (hadDest && to === 'investment') {
+    await db
+      .update(portfolioPositions)
+      .set({
+        stopLevel: null,
+        targetLevel: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(portfolioPositions.accountId, accountId),
+          eq(portfolioPositions.tickerId, tickerId),
+          eq(portfolioPositions.purpose, to),
+        ),
+      );
+  }
+}
+
+export type MovePortfolioResult = {
+  moved_qty: number;
+  from_qty: number;
+  to_qty: number;
+  partial: boolean;
+};
+
+export async function movePortfolioPosition(
+  db: Db,
+  accountId: number,
+  tickerId: number,
+  from: PortfolioPurpose,
+  to: PortfolioPurpose,
+  options?: { qty?: number },
+): Promise<MovePortfolioResult | false> {
+  if (from === to) throw new Error('from and to must differ');
+
+  const sourceRows = await getPortfolioPositions(db, accountId, from);
+  const source = sourceRows.find((r) => r.position.tickerId === tickerId);
+  if (!source) return false;
+
+  const destRows = await getPortfolioPositions(db, accountId, to);
+  const hadDest = destRows.some((r) => r.position.tickerId === tickerId);
+  const { position: srcPos } = source;
+
+  const requestedQty = options?.qty;
+  const qtyToMove =
+    requestedQty == null || requestedQty >= srcPos.qty ? srcPos.qty : requestedQty;
+  if (qtyToMove <= 0) throw new Error('qty must be positive');
+  if (qtyToMove > srcPos.qty) throw new Error('qty exceeds available shares');
+
+  await ensurePortfolioLotsForPosition(db, accountId, tickerId, from, srcPos);
+
+  const transferred = await transferPortfolioLotsFifo(db, accountId, tickerId, from, to, qtyToMove);
+  if (transferred !== qtyToMove) {
+    throw new Error('Could not transfer requested qty — lot history may be out of sync');
+  }
+
+  await recomputePortfolioPositionFromLots(db, accountId, tickerId, from);
+  const destPosition = await recomputePortfolioPositionFromLots(db, accountId, tickerId, to);
+
+  if (destPosition) {
+    await applyMoveDestinationMetadata(db, accountId, tickerId, to, hadDest, srcPos);
+  }
+
+  const fromAfter = await getPortfolioPositions(db, accountId, from);
+  const toAfter = await getPortfolioPositions(db, accountId, to);
+  const fromRow = fromAfter.find((r) => r.position.tickerId === tickerId);
+  const toRow = toAfter.find((r) => r.position.tickerId === tickerId);
+
+  return {
+    moved_qty: qtyToMove,
+    from_qty: fromRow?.position.qty ?? 0,
+    to_qty: toRow?.position.qty ?? qtyToMove,
+    partial: qtyToMove < srcPos.qty,
+  };
+}
+
 export async function setAccount(
   db: Db,
   accountId: number,
-  data: { capitalBdt?: number; riskPerTradePct?: number; label?: string },
+  data: { capitalBdt?: number; riskPerTradePct?: number; label?: string; loanBalanceBdt?: number | null; purchasingPowerBdt?: number | null },
 ) {
   await db
     .update(portfolioAccounts)
@@ -491,6 +1133,8 @@ export async function setAccount(
       ...(data.capitalBdt !== undefined ? { capitalBdt: data.capitalBdt } : {}),
       ...(data.riskPerTradePct !== undefined ? { riskPerTradePct: data.riskPerTradePct } : {}),
       ...(data.label !== undefined ? { label: data.label } : {}),
+      ...(data.loanBalanceBdt !== undefined ? { loanBalanceBdt: data.loanBalanceBdt } : {}),
+      ...(data.purchasingPowerBdt !== undefined ? { purchasingPowerBdt: data.purchasingPowerBdt } : {}),
       updatedAt: new Date(),
     })
     .where(eq(portfolioAccounts.id, accountId));
@@ -573,7 +1217,8 @@ export async function getWatchlistSymbols(db: Db): Promise<string[]> {
   const rows = await db
     .select({ symbol: tickers.symbol })
     .from(watchlistTickers)
-    .innerJoin(tickers, eq(watchlistTickers.tickerId, tickers.id));
+    .innerJoin(tickers, eq(watchlistTickers.tickerId, tickers.id))
+    .where(eq(tickers.isActive, true));
   return rows.map((r) => r.symbol);
 }
 
@@ -782,6 +1427,23 @@ export function extractAnalysisScores(payload: Record<string, unknown> | undefin
     investment_rating: inv?.rating as string | undefined,
     momentum_rating: mom?.rating as string | undefined,
     risk_rating: risk?.rating as string | undefined,
+  };
+}
+
+export function extractExtendedAnalysisFields(payload: Record<string, unknown> | undefined) {
+  const scores = extractAnalysisScores(payload);
+  const vc = payload?.value_investment_checklist as Record<string, unknown> | undefined;
+  const km = vc?.key_metrics as Record<string, unknown> | undefined;
+  const mt = payload?.momentum_trading as Record<string, unknown> | undefined;
+  const summary = mt?.summary as Record<string, unknown> | undefined;
+  const ms = payload?.momentum_screen as Record<string, unknown> | undefined;
+  const msk = ms?.key_metrics as Record<string, unknown> | undefined;
+  return {
+    ...scores,
+    value_grade: vc?.rating as string | undefined,
+    gpa: km?.gpa as number | undefined,
+    momentum_grade: (summary?.rating ?? summary?.consensus_grade ?? ms?.rating) as string | undefined,
+    momentum_count: (summary?.overall_count ?? msk?.overall_count) as string | undefined,
   };
 }
 
@@ -1176,7 +1838,14 @@ export async function getResearchMemo(
 
 export async function listResearchMemos(
   db: Db,
-  opts?: { tickerId?: number; limit?: number; includeBody?: boolean },
+  opts?: {
+    tickerId?: number;
+    sector?: string;
+    scope?: string;
+    insightType?: string;
+    limit?: number;
+    includeBody?: boolean;
+  },
 ) {
   const limit = opts?.limit ?? 20;
   const conditions = [];
@@ -1187,12 +1856,39 @@ export async function listResearchMemos(
     .from(researchMemos)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(researchMemos.createdAt))
-    .limit(limit);
+    .limit(limit * 3);
+
+  let filtered = rows;
+  if (opts?.sector) {
+    const target = opts.sector.toLowerCase();
+    filtered = filtered.filter((r) => {
+      const sj = r.summaryJson as Record<string, unknown> | null;
+      const sec = String(sj?.sector ?? '').toLowerCase();
+      const slug = String(sj?.sector_slug ?? '').toLowerCase();
+      return sec === target || slug === target || sectorSlug(sec) === target;
+    });
+  }
+  if (opts?.scope) {
+    const target = opts.scope.toLowerCase();
+    filtered = filtered.filter((r) => {
+      const sj = r.summaryJson as Record<string, unknown> | null;
+      return String(sj?.scope ?? '').toLowerCase() === target;
+    });
+  }
+  if (opts?.insightType) {
+    const target = opts.insightType.toLowerCase();
+    filtered = filtered.filter((r) => {
+      const sj = r.summaryJson as Record<string, unknown> | null;
+      return String(sj?.insight_type ?? '').toLowerCase() === target;
+    });
+  }
+
+  const sliced = filtered.slice(0, limit);
 
   if (opts?.includeBody === false) {
-    return rows.map(({ bodyMd, ...rest }) => ({ ...rest, body_md_length: bodyMd.length }));
+    return sliced.map(({ bodyMd, ...rest }) => ({ ...rest, body_md_length: bodyMd.length }));
   }
-  return rows;
+  return sliced;
 }
 
 export async function listSkillOverrides(db: Db) {
@@ -1265,4 +1961,269 @@ export async function deleteSkillOverride(db: Db, slug: string): Promise<boolean
     .where(eq(skillOverrides.slug, slug))
     .returning({ id: skillOverrides.id });
   return deleted.length > 0;
+}
+
+// --- Sector taxonomy & snapshots ---
+
+export async function seedCanonicalSectors(db: Db): Promise<number> {
+  let upserted = 0;
+  for (const s of CANONICAL_SECTORS) {
+    const existing = await db.select().from(sectors).where(eq(sectors.slug, s.slug)).limit(1);
+    if (existing[0]) {
+      await db
+        .update(sectors)
+        .set({
+          displayName: s.displayName,
+          dseGroup: s.dseGroup ?? s.displayName,
+          aliases: s.aliases,
+        })
+        .where(eq(sectors.slug, s.slug));
+    } else {
+      await db.insert(sectors).values({
+        slug: s.slug,
+        displayName: s.displayName,
+        dseGroup: s.dseGroup ?? s.displayName,
+        aliases: s.aliases,
+      });
+    }
+    upserted++;
+  }
+  return upserted;
+}
+
+export async function listCanonicalSectors(db: Db) {
+  const rows = await db.select().from(sectors).orderBy(sectors.displayName);
+  if (rows.length > 0) return rows;
+  return CANONICAL_SECTORS.map((s) => ({
+    id: 0,
+    slug: s.slug,
+    displayName: s.displayName,
+    dseGroup: s.dseGroup ?? s.displayName,
+    aliases: s.aliases,
+    createdAt: new Date(),
+  }));
+}
+
+export type SectorMetricsRow = {
+  sector_slug: string;
+  sector_display: string;
+  ticker_count: number;
+  median_roc_1m_pct: number | null;
+  median_roc_3m_pct: number | null;
+  avg_pe: number | null;
+  top_performer: string | null;
+  top_roc_1m_pct: number | null;
+  bottom_performer: string | null;
+  bottom_roc_1m_pct: number | null;
+};
+
+export async function aggregateSectorMetrics(db: Db, lookback1m = 21, lookback3m = 63): Promise<SectorMetricsRow[]> {
+  const rows = await db.execute(sql`
+    WITH ticker_returns AS (
+      SELECT t.id, t.symbol, t.sector,
+        ROUND(((last.close - past1.close) / NULLIF(past1.close, 0) * 100)::numeric, 2) AS roc_1m,
+        ROUND(((last.close - past3.close) / NULLIF(past3.close, 0) * 100)::numeric, 2) AS roc_3m,
+        last.close AS last_close
+      FROM tickers t
+      JOIN LATERAL (
+        SELECT close FROM ohlcv_daily WHERE ticker_id = t.id ORDER BY trade_date DESC LIMIT 1
+      ) last ON true
+      JOIN LATERAL (
+        SELECT close FROM ohlcv_daily WHERE ticker_id = t.id ORDER BY trade_date DESC OFFSET ${lookback1m} LIMIT 1
+      ) past1 ON true
+      JOIN LATERAL (
+        SELECT close FROM ohlcv_daily WHERE ticker_id = t.id ORDER BY trade_date DESC OFFSET ${lookback3m} LIMIT 1
+      ) past3 ON true
+      WHERE t.is_active = true AND t.sector IS NOT NULL AND past1.close > 0 AND past3.close > 0
+    ),
+    latest_fund AS (
+      SELECT DISTINCT ON (f.ticker_id) f.ticker_id,
+        (f.payload->>'pe_ratio')::float AS pe_ratio
+      FROM fundamentals_snapshots f
+      ORDER BY f.ticker_id, f.as_of DESC
+    )
+    SELECT
+      COALESCE(t.sector, 'Unknown') AS sector_display,
+      COUNT(*)::int AS ticker_count,
+      ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.roc_1m))::numeric, 2) AS median_roc_1m_pct,
+      ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.roc_3m))::numeric, 2) AS median_roc_3m_pct,
+      ROUND(AVG(lf.pe_ratio)::numeric, 2) AS avg_pe,
+      (ARRAY_AGG(t.symbol ORDER BY t.roc_1m DESC NULLS LAST))[1] AS top_performer,
+      MAX(t.roc_1m) AS top_roc_1m_pct,
+      (ARRAY_AGG(t.symbol ORDER BY t.roc_1m ASC NULLS LAST))[1] AS bottom_performer,
+      MIN(t.roc_1m) AS bottom_roc_1m_pct
+    FROM ticker_returns t
+    LEFT JOIN latest_fund lf ON lf.ticker_id = t.id
+    GROUP BY t.sector
+    ORDER BY median_roc_1m_pct DESC NULLS LAST
+  `);
+
+  return (rows as unknown as Array<Record<string, unknown>>).map((r) => {
+    const display = String(r.sector_display ?? 'Unknown');
+    return {
+      sector_slug: sectorSlug(display) ?? display.toLowerCase().replace(/\s+/g, '-'),
+      sector_display: normalizeSector(display) ?? display,
+      ticker_count: Number(r.ticker_count ?? 0),
+      median_roc_1m_pct: r.median_roc_1m_pct != null ? Number(r.median_roc_1m_pct) : null,
+      median_roc_3m_pct: r.median_roc_3m_pct != null ? Number(r.median_roc_3m_pct) : null,
+      avg_pe: r.avg_pe != null ? Number(r.avg_pe) : null,
+      top_performer: r.top_performer != null ? String(r.top_performer) : null,
+      top_roc_1m_pct: r.top_roc_1m_pct != null ? Number(r.top_roc_1m_pct) : null,
+      bottom_performer: r.bottom_performer != null ? String(r.bottom_performer) : null,
+      bottom_roc_1m_pct: r.bottom_roc_1m_pct != null ? Number(r.bottom_roc_1m_pct) : null,
+    };
+  });
+}
+
+export async function upsertSectorSnapshot(
+  db: Db,
+  sectorSlug: string,
+  asOf: string,
+  metricsJson: Record<string, unknown>,
+  newsSummaryJson: Record<string, unknown> | null,
+  source: string,
+) {
+  const existing = await db
+    .select()
+    .from(sectorSnapshots)
+    .where(and(eq(sectorSnapshots.sectorSlug, sectorSlug), eq(sectorSnapshots.asOf, asOf)))
+    .limit(1);
+
+  if (existing[0]) {
+    await db
+      .update(sectorSnapshots)
+      .set({ metricsJson, newsSummaryJson, source, ingestedAt: new Date() })
+      .where(eq(sectorSnapshots.id, existing[0].id));
+    return existing[0].id;
+  }
+
+  const [row] = await db
+    .insert(sectorSnapshots)
+    .values({ sectorSlug, asOf, metricsJson, newsSummaryJson, source })
+    .returning({ id: sectorSnapshots.id });
+  return row?.id;
+}
+
+export async function getLatestSectorSnapshots(db: Db, asOf?: string) {
+  if (asOf) {
+    return db
+      .select()
+      .from(sectorSnapshots)
+      .where(eq(sectorSnapshots.asOf, asOf))
+      .orderBy(sectorSnapshots.sectorSlug);
+  }
+
+  const latest = await db
+    .select({ asOf: sectorSnapshots.asOf })
+    .from(sectorSnapshots)
+    .orderBy(desc(sectorSnapshots.asOf))
+    .limit(1);
+  const latestDate = latest[0]?.asOf;
+  if (!latestDate) return [];
+
+  return db
+    .select()
+    .from(sectorSnapshots)
+    .where(eq(sectorSnapshots.asOf, latestDate))
+    .orderBy(sectorSnapshots.sectorSlug);
+}
+
+export async function getSectorSnapshot(db: Db, sectorSlug: string) {
+  const rows = await db
+    .select()
+    .from(sectorSnapshots)
+    .where(eq(sectorSnapshots.sectorSlug, sectorSlug))
+    .orderBy(desc(sectorSnapshots.asOf))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function retagSectorNews(db: Db, limit = 2000): Promise<number> {
+  const { detectSectorFromHeadline } = await import('@stock-buddy/core');
+  const rows = await db
+    .select({ id: newsItems.id, headline: newsItems.headline, sectorTag: newsItems.sectorTag })
+    .from(newsItems)
+    .where(isNull(newsItems.sectorTag))
+    .orderBy(desc(newsItems.publishedDate))
+    .limit(limit);
+
+  let updated = 0;
+  for (const row of rows) {
+    const slug = detectSectorFromHeadline(row.headline);
+    if (!slug) continue;
+    const hit = await db
+      .update(newsItems)
+      .set({ sectorTag: slug })
+      .where(eq(newsItems.id, row.id))
+      .returning({ id: newsItems.id });
+    updated += hit.length;
+  }
+  return updated;
+}
+
+export async function getSectorNews(db: Db, sectorDisplay: string, days = 7, limit = 30) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  const slug = sectorSlug(sectorDisplay);
+  const normalized = normalizeSector(sectorDisplay);
+
+  const sectorTickers = await db
+    .select({ id: tickers.id, sector: tickers.sector })
+    .from(tickers)
+    .where(eq(tickers.isActive, true));
+
+  const tickerIds = sectorTickers
+    .filter((t) => normalizeSector(t.sector) === normalized || t.sector === sectorDisplay)
+    .map((t) => t.id);
+
+  const byTicker =
+    tickerIds.length > 0
+      ? await db
+          .select({
+            id: newsItems.id,
+            headline: newsItems.headline,
+            publishedDate: newsItems.publishedDate,
+            source: newsItems.source,
+            category: newsItems.category,
+            url: newsItems.url,
+            tickerId: newsItems.tickerId,
+          })
+          .from(newsItems)
+          .where(and(inArray(newsItems.tickerId, tickerIds), gte(newsItems.publishedDate, cutoffStr)))
+          .orderBy(desc(newsItems.publishedDate))
+          .limit(limit)
+      : [];
+
+  const byTag = slug
+    ? await db
+        .select({
+          id: newsItems.id,
+          headline: newsItems.headline,
+          publishedDate: newsItems.publishedDate,
+          source: newsItems.source,
+          category: newsItems.category,
+          url: newsItems.url,
+          tickerId: newsItems.tickerId,
+        })
+        .from(newsItems)
+        .where(and(eq(newsItems.sectorTag, slug), gte(newsItems.publishedDate, cutoffStr)))
+        .orderBy(desc(newsItems.publishedDate))
+        .limit(limit)
+    : [];
+
+  const seen = new Set<number>();
+  const merged = [...byTicker, ...byTag].filter((n) => {
+    if (seen.has(n.id)) return false;
+    seen.add(n.id);
+    return true;
+  });
+  merged.sort((a, b) => String(b.publishedDate).localeCompare(String(a.publishedDate)));
+  return merged.slice(0, limit);
+}
+
+export async function countSectorNews(db: Db, sectorDisplay: string, days = 7): Promise<number> {
+  const rows = await getSectorNews(db, sectorDisplay, days, 500);
+  return rows.length;
 }

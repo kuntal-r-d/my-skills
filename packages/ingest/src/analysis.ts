@@ -6,9 +6,11 @@ import {
   type Db,
 } from '@stock-buddy/db';
 import { analyzeTicker, screenMarket, runSkill } from '@stock-buddy/mcp-server/composites';
+import { injectIntrinsicValue } from '@stock-buddy/core';
 import { buildTickerContract, stripMeta } from './contract-builder.js';
 import { computeMomentumRotation } from './rotation.js';
 import { enrichRiskInAnalysis } from './risk-enrich.js';
+import { enrichMomentumTrading } from './momentum-trading.js';
 
 const MCP_VERSION = '2.0.0';
 
@@ -42,9 +44,13 @@ export async function runTickerAnalysis(
   snapshotId?: number;
 }> {
   const mode = opts.mode ?? 'full';
+  const ohlcvDays =
+    opts.ohlcvDays ??
+    (mode === 'momentum' || mode === 'full' ? 520 : 260);
   const contract = await buildTickerContract(db, symbol, {
     includePortfolio: opts.includePortfolio ?? true,
-    ohlcvDays: opts.ohlcvDays ?? 260,
+    ohlcvDays,
+    mode: mode === 'investment' ? 'investment' : 'momentum',
   });
   const payload = stripMeta(contract);
   payload.mode = mode === 'investment' ? 'investment' : mode === 'momentum' ? 'momentum' : payload.mode;
@@ -58,14 +64,19 @@ export async function runTickerAnalysis(
     const stages = { ...(analysis.stages as Record<string, string> ?? {}) };
 
     if (mode === 'full' || mode === 'momentum') {
-      const mom = runSkillSafe('momentum_screen', payload);
-      if (mom) {
-        analysis.momentum_screen = mom;
-        stages.momentum_screen = 'ok';
-      } else stages.momentum_screen = 'skipped';
+      analysis = await enrichMomentumTrading(analysis, payload);
+      Object.assign(stages, (analysis.stages as Record<string, string>) ?? {});
     }
 
     if (mode === 'full' || mode === 'investment') {
+      const cards = analysis.agent_cards as Record<string, unknown> | undefined;
+      const fundCard = cards?.fundamental as Record<string, unknown> | undefined;
+      const enrichedFundamentals = injectIntrinsicValue(
+        (payload.fundamentals as Record<string, unknown>) ?? {},
+        fundCard,
+      );
+      payload.fundamentals = enrichedFundamentals;
+
       const val = runSkillSafe('value_investment_checklist', payload);
       if (val) {
         analysis.value_investment_checklist = val;
@@ -74,7 +85,9 @@ export async function runTickerAnalysis(
     }
 
     const ohlcv = (payload.ohlcv as import('@stock-buddy/core').OhlcvBar[]) ?? [];
-    analysis.momentum_rotation = computeMomentumRotation(ohlcv);
+    if (!analysis.momentum_rotation) {
+      analysis.momentum_rotation = computeMomentumRotation(ohlcv);
+    }
 
     analysis.stages = stages;
     analysis.analysis_mode = mode;

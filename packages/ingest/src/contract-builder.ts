@@ -10,7 +10,7 @@ import {
   getShareholding,
   getTickerBySymbol,
 } from '@stock-buddy/db';
-import { SkillInputSchema, buildClientResearchInstructions } from '@stock-buddy/core';
+import { SkillInputSchema, buildClientResearchInstructions, enrichFundamentals, resampleOhlcvTimeframes } from '@stock-buddy/core';
 
 export interface ContractMeta {
   sources: string[];
@@ -22,6 +22,27 @@ export interface BuildContractOptions {
   mode?: 'momentum' | 'investment';
   ohlcvDays?: number;
   includePortfolio?: boolean;
+}
+
+const SECONDARY_INDEX_SYMBOLS = ['DS30', 'DSES'] as const;
+
+async function loadIndexOhlcv(
+  db: Db,
+  symbol: string,
+  limit: number,
+): Promise<{ date: string; open: number; high: number; low: number; close: number; volume: number }[] | null> {
+  const idx = await getTickerBySymbol(db, symbol);
+  if (!idx) return null;
+  const rows = await getOhlcv(db, idx.id, { limit });
+  if (!rows.length) return null;
+  return rows.map((r) => ({
+    date: r.tradeDate,
+    open: r.open,
+    high: r.high,
+    low: r.low,
+    close: r.close,
+    volume: r.volume,
+  }));
 }
 
 export async function buildTickerContract(
@@ -51,14 +72,33 @@ export async function buildTickerContract(
   if (ohlcv.length > 0) sources.push('db:ohlcv');
   else missing.push('ohlcv');
 
-  let fundamentals: Record<string, unknown> | undefined;
-  const fundSnap = await getLatestFundamentals(db, ticker.id);
-  if (fundSnap) {
-    fundamentals = fundSnap.payload as Record<string, unknown>;
-    sources.push(`db:fundamentals:${fundSnap.source}`);
-  } else {
-    missing.push('fundamentals');
+  let ohlcv_weekly: ReturnType<typeof resampleOhlcvTimeframes>['ohlcv_weekly'] | undefined;
+  let ohlcv_monthly: ReturnType<typeof resampleOhlcvTimeframes>['ohlcv_monthly'] | undefined;
+  if (ohlcv.length >= 30) {
+    const resampled = resampleOhlcvTimeframes(ohlcv);
+    ohlcv_weekly = resampled.ohlcv_weekly;
+    ohlcv_monthly = resampled.ohlcv_monthly;
+    sources.push('derived:ohlcv_timeframes');
   }
+
+  const indexLimit = Math.max(ohlcvDays, 520);
+  const market_index = await loadIndexOhlcv(db, 'DSEX', indexLimit);
+  if (market_index?.length) {
+    sources.push('db:market_index:DSEX');
+  } else {
+    missing.push('market_index');
+  }
+
+  let market_index_secondary: Awaited<ReturnType<typeof loadIndexOhlcv>> | undefined;
+  for (const sym of SECONDARY_INDEX_SYMBOLS) {
+    const sec = await loadIndexOhlcv(db, sym, indexLimit);
+    if (sec?.length) {
+      market_index_secondary = sec;
+      sources.push(`db:market_index_secondary:${sym}`);
+      break;
+    }
+  }
+  if (!market_index_secondary?.length) missing.push('market_index_secondary');
 
   const shareRows = await getShareholding(db, ticker.id, 4);
   const shareholding =
@@ -74,6 +114,20 @@ export async function buildTickerContract(
       : undefined;
   if (!shareholding?.length) missing.push('shareholding');
   else sources.push('db:shareholding');
+
+  let fundamentals: Record<string, unknown> | undefined;
+  const fundSnap = await getLatestFundamentals(db, ticker.id);
+  if (fundSnap) {
+    fundamentals = enrichFundamentals({
+      fundamentals: fundSnap.payload as Record<string, unknown>,
+      shareholding,
+      ohlcv,
+    });
+    sources.push(`db:fundamentals:${fundSnap.source}`);
+    sources.push('derived:fundamentals_enrich');
+  } else {
+    missing.push('fundamentals');
+  }
 
   const macroSnap = await getLatestMacro(db);
   const macro = macroSnap ? (macroSnap.payload as Record<string, unknown>) : undefined;
@@ -111,6 +165,10 @@ export async function buildTickerContract(
     as_of: asOf,
     mode: opts.mode ?? 'investment',
     ohlcv,
+    ...(ohlcv_weekly ? { ohlcv_weekly } : {}),
+    ...(ohlcv_monthly ? { ohlcv_monthly } : {}),
+    ...(market_index ? { market_index } : {}),
+    ...(market_index_secondary ? { market_index_secondary } : {}),
     ...(fundamentals ? { fundamentals } : {}),
     ...(shareholding ? { shareholding } : {}),
     ...(macro ? { macro } : {}),

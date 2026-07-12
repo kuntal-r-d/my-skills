@@ -10,6 +10,10 @@ const _DEFAULT_SKILLS_DIR = path.resolve(__dirname, '../../../skills');
 export const SKILL_TOOL_NAMES: Record<string, string> = {
   'technical-analysis': 'technical_analysis',
   'momentum-screen': 'momentum_screen',
+  'minervini-sepa': 'minervini_sepa',
+  'can-slim': 'can_slim',
+  'darvas-box': 'darvas_box',
+  'livermore-pivot': 'livermore_pivot',
   'fundamental-analysis': 'fundamental_analysis',
   'value-investment-checklist': 'value_investment_checklist',
   'smart-money-flow': 'smart_money_flow',
@@ -22,6 +26,7 @@ export const SKILL_TOOL_NAMES: Record<string, string> = {
   'daily-briefing': 'daily_briefing',
   'ticker-dossier': 'ticker_dossier',
   'financial-terms-educator': 'financial_terms_educator',
+  'sector-macro-insights': 'sector_macro_insights',
   'dse-data-acquisition': 'dse_data_acquisition',
 };
 

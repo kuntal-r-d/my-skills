@@ -56,8 +56,9 @@ Confidence rises with timeframe agreement and ADX; cut it on divergence or <50 b
 - A reversal signal without volume/structure confirmation is weak — flag, don't over-call.
 
 ## Optional precision helper
-No bundled script — this is a pure-prompt skill. For exact ADX/MA values, use the
-`technical-analysis` script, which computes the same indicators.
+No bundled script — this is a pure-prompt skill. For exact MTF values, use the
+`multi_timeframe` skill (deterministic daily/weekly/monthly confluence in momentum mode),
+or `technical-analysis` for ADX/MA values.
 
 ## Worked example
 Price above a rising 50>150>200 stack, ADX 30 (+DI leading), HH/HL structure, daily+weekly up,

@@ -3,7 +3,11 @@ export type { BuildContractOptions, ContractMeta } from './contract-builder.js';
 export { runTickerAnalysis, ingestAnalysis, screenMarket } from './analysis.js';
 export type { RunAnalysisOptions, AnalysisMode } from './analysis.js';
 export { enrichRiskInAnalysis, hasStructureStrategy } from './risk-enrich.js';
+export { enrichMomentumTrading, buildMomentumTrading, hasMomentumTrading } from './momentum-trading.js';
+export { enrichMomentumInAnalysis } from './momentum-enrich.js';
+export { enrichValueChecklistInAnalysis } from './value-enrich.js';
 export { runDailyBriefing } from './briefing.js';
+export { buildMacroLandscape, buildSectorMacroDetail, listMacroInsights } from './macro-landscape.js';
 export { buildUniverse } from './discover.js';
 export { computeMomentumRotation } from './rotation.js';
 export {
@@ -11,6 +15,7 @@ export {
   ingestFundamentals,
   ingestShareholding,
   ingestMacro,
+  ingestSectorSnapshots,
   ingestNews,
   ingestNewsMarket,
   ingestAll,
@@ -18,3 +23,4 @@ export {
   ingestDaily,
   ingestFundamentalsUniverse,
 } from './jobs.js';
+export { refreshSectorInsights, maybeRefreshSectorInsightsOnDaily } from './sector-insights-llm.js';

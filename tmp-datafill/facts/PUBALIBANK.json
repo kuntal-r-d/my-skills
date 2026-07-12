@@ -1,0 +1,9 @@
+{
+  "moat": true,
+  "_moat_source": "Qualitative: oldest private bank (est. 1959), largest private-bank branch network (~504 branches across all 64 districts) with largest centralized online banking network - durable distribution/deposit-franchise advantage (pubalibangla.com, Wikipedia)",
+  "debt_to_equity": 1.36,
+  "_debt_to_equity_source": "stockanalysis.com balance sheet TTM: total debt (borrowings) 101,949M / shareholders equity 75,183M. Bank: deposits excluded",
+  "buyback": false,
+  "_buyback_source": "No share count reduction at 1,497M; no DSE buyback framework",
+  "_bank_na_fields": "inventory_turnover, current_ratio, ncav_per_share, interest_coverage not meaningful for banks, left unfilled"
+}

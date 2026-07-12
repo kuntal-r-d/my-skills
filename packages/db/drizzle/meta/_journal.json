@@ -50,6 +50,34 @@
       "when": 1782258000000,
       "tag": "0007_backfill_trading_portfolio",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782259000000,
+      "tag": "0008_sectors",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782260000000,
+      "tag": "0009_news_sector_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782261000000,
+      "tag": "0010_portfolio_lots",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1782262000000,
+      "tag": "0011_portfolio_broker_fields",
+      "breakpoints": true
     }
   ]
 }

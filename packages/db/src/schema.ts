@@ -87,6 +87,38 @@ export const macroSnapshots = pgTable('macro_snapshots', {
   ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Canonical DSE sector taxonomy with alias mapping. */
+export const sectors = pgTable(
+  'sectors',
+  {
+    id: serial('id').primaryKey(),
+    slug: text('slug').notNull(),
+    displayName: text('display_name').notNull(),
+    dseGroup: text('dse_group'),
+    aliases: jsonb('aliases').notNull().$type<string[]>().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('sectors_slug_idx').on(table.slug)],
+);
+
+/** Daily deterministic sector aggregates (returns, PE, news counts). */
+export const sectorSnapshots = pgTable(
+  'sector_snapshots',
+  {
+    id: serial('id').primaryKey(),
+    sectorSlug: text('sector_slug').notNull(),
+    asOf: date('as_of').notNull(),
+    metricsJson: jsonb('metrics_json').notNull().$type<Record<string, unknown>>(),
+    newsSummaryJson: jsonb('news_summary_json').$type<Record<string, unknown>>(),
+    source: text('source').notNull(),
+    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('sector_snapshots_sector_asof_idx').on(table.sectorSlug, table.asOf),
+    index('sector_snapshots_asof_idx').on(table.asOf),
+  ],
+);
+
 export const newsItems = pgTable(
   'news_items',
   {
@@ -96,6 +128,7 @@ export const newsItems = pgTable(
     headline: text('headline').notNull(),
     source: text('source'),
     category: text('category'),
+    sectorTag: text('sector_tag'),
     url: text('url'),
     ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -107,6 +140,8 @@ export const portfolioAccounts = pgTable('portfolio_accounts', {
   label: text('label').notNull().default('default'),
   capitalBdt: doublePrecision('capital_bdt').notNull().default(1_000_000),
   riskPerTradePct: doublePrecision('risk_per_trade_pct').notNull().default(1.0),
+  loanBalanceBdt: doublePrecision('loan_balance_bdt'),
+  purchasingPowerBdt: doublePrecision('purchasing_power_bdt'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -129,6 +164,27 @@ export const portfolioPositions = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique('portfolio_account_ticker_purpose').on(table.accountId, table.tickerId, table.purpose)],
+);
+
+/** Individual buy fills that roll up into portfolio_positions totals. */
+export const portfolioLots = pgTable(
+  'portfolio_lots',
+  {
+    id: serial('id').primaryKey(),
+    accountId: integer('account_id')
+      .notNull()
+      .references(() => portfolioAccounts.id, { onDelete: 'cascade' }),
+    tickerId: integer('ticker_id')
+      .notNull()
+      .references(() => tickers.id, { onDelete: 'cascade' }),
+    purpose: text('purpose').notNull().default('investment'),
+    tradeDate: date('trade_date').notNull(),
+    qty: doublePrecision('qty').notNull(),
+    price: doublePrecision('price').notNull(),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('portfolio_lots_lookup_idx').on(table.accountId, table.tickerId, table.purpose)],
 );
 
 export const ingestRuns = pgTable('ingest_runs', {

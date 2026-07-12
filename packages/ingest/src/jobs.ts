@@ -2,21 +2,28 @@ import type { Db } from '@stock-buddy/db';
 import {
   ensureTicker,
   getDefaultAccount,
+  getLatestFundamentals,
   getOhlcv,
+  getShareholding,
   getPortfolioPositions,
   getWatchlistSymbols,
   recordIngestRun,
   recordPredictionOutcome,
   retagUntaggedNews,
+  retagSectorNews,
   updateFreshness,
   upsertFundamentals,
   upsertMacro,
   upsertNews,
   upsertOhlcvBatch,
   upsertShareholding,
+  aggregateSectorMetrics,
+  seedCanonicalSectors,
+  upsertSectorSnapshot,
+  countSectorNews,
   SEED_TICKERS,
 } from '@stock-buddy/db';
-import { mergeFundamentals, sanitizeOhlcv } from '@stock-buddy/core';
+import { mergeFundamentals, sanitizeOhlcv, sectorPeBenchmark, detectSectorFromHeadline, enrichFundamentals } from '@stock-buddy/core';
 import {
   DEFAULT_MACRO,
   parseDseNewsHtml,
@@ -167,7 +174,26 @@ export async function ingestFundamentals(db: Db, symbol: string): Promise<void> 
     return;
   }
 
-  await upsertFundamentals(db, ticker.id, asOf, payload, compositeSource);
+  const priorSnap = await getLatestFundamentals(db, ticker.id);
+  const priorInv = priorSnap?.payload?.inventory_turnover;
+  if (priorInv != null && payload.inventory_turnover != null) {
+    payload.inventory_turnover_prev = priorInv;
+  }
+
+  const shareRows = await getShareholding(db, ticker.id, 4);
+  const shareholding = shareRows.map((r) => ({
+    month: String(r.month).slice(0, 7),
+    sponsor: r.sponsor ?? undefined,
+    institution: r.institution ?? undefined,
+  }));
+  const ohlcvRows = await getOhlcv(db, ticker.id, { limit: 5 });
+  const enriched = enrichFundamentals({
+    fundamentals: payload,
+    shareholding,
+    ohlcv: ohlcvRows.map((r) => ({ close: r.close })),
+  });
+
+  await upsertFundamentals(db, ticker.id, asOf, enriched, compositeSource);
   await recordIngestRun(db, {
     jobName: 'ingest_fundamentals',
     tickerId: ticker.id,
@@ -283,6 +309,56 @@ export async function ingestMacro(db: Db): Promise<void> {
   await updateFreshness(db, 'macro', null, true, 168);
 }
 
+export async function ingestSectorSnapshots(db: Db): Promise<number> {
+  const started = new Date();
+  const asOf = new Date().toISOString().slice(0, 10);
+
+  try {
+    await seedCanonicalSectors(db);
+  } catch (err) {
+    console.warn('[ingest] sector seed skipped:', err);
+  }
+
+  const aggregates = await aggregateSectorMetrics(db);
+  let upserted = 0;
+
+  for (const row of aggregates) {
+    const newsCount = await countSectorNews(db, row.sector_display, 7);
+    const peBenchmark = sectorPeBenchmark(row.sector_display);
+    const metricsJson: Record<string, unknown> = {
+      sector_display: row.sector_display,
+      ticker_count: row.ticker_count,
+      median_roc_1m_pct: row.median_roc_1m_pct,
+      median_roc_3m_pct: row.median_roc_3m_pct,
+      avg_pe: row.avg_pe,
+      sector_pe_benchmark: peBenchmark,
+      pe_vs_benchmark:
+        row.avg_pe != null && peBenchmark > 0
+          ? Math.round(((row.avg_pe - peBenchmark) / peBenchmark) * 100)
+          : null,
+      top_performer: row.top_performer,
+      top_roc_1m_pct: row.top_roc_1m_pct,
+      bottom_performer: row.bottom_performer,
+      bottom_roc_1m_pct: row.bottom_roc_1m_pct,
+    };
+    const newsSummaryJson = { news_count_7d: newsCount };
+
+    await upsertSectorSnapshot(db, row.sector_slug, asOf, metricsJson, newsSummaryJson, 'aggregate');
+    upserted++;
+  }
+
+  await recordIngestRun(db, {
+    jobName: 'ingest_sector_snapshots',
+    status: upserted > 0 ? 'ok' : 'failed',
+    rowsUpserted: upserted,
+    source: 'aggregate',
+    errorMessage: upserted > 0 ? undefined : 'No sector aggregates computed',
+    startedAt: started,
+  });
+  await updateFreshness(db, 'sector_snapshots', null, upserted > 0, 24);
+  return upserted;
+}
+
 export async function ingestNewsMarket(db: Db): Promise<number> {
   const started = new Date();
   const { listTickers } = await import('@stock-buddy/db');
@@ -304,6 +380,7 @@ export async function ingestNewsMarket(db: Db): Promise<number> {
     source: i.source,
     category: i.category,
     url: i.url,
+    sectorTag: detectSectorFromHeadline(i.headline) ?? undefined,
   }));
 
   const { inserted } = await upsertNews(db, payload);
@@ -326,7 +403,9 @@ export async function ingestRetagNews(db: Db): Promise<number> {
   const { listTickers } = await import('@stock-buddy/db');
   const refs = enrichTickerRefs(await listTickers(db));
   const tag = makeNewsTagger(refs);
-  const updated = await retagUntaggedNews(db, tag, 2000);
+  const tickerTagged = await retagUntaggedNews(db, tag, 2000);
+  const sectorTagged = await retagSectorNews(db, 2000);
+  const updated = tickerTagged + sectorTagged;
   await recordIngestRun(db, {
     jobName: 'ingest_retag_news',
     status: updated > 0 ? 'ok' : 'failed',
@@ -411,6 +490,11 @@ export async function ingestDaily(db: Db): Promise<{
 
   await ingestMacro(db);
   const newsRows = await ingestNewsMarket(db);
+  try {
+    await ingestSectorSnapshots(db);
+  } catch (err) {
+    console.warn('[ingest:daily] sector snapshots skipped:', err);
+  }
   let retagged = 0;
   try {
     retagged = await ingestRetagNews(db);
@@ -429,6 +513,12 @@ export async function ingestDaily(db: Db): Promise<{
   }
 
   const ohlcvTotal = Object.values(ohlcv).reduce((s, n) => s + n, 0);
+  try {
+    const { maybeRefreshSectorInsightsOnDaily } = await import('./sector-insights-llm.js');
+    await maybeRefreshSectorInsightsOnDaily(db);
+  } catch (err) {
+    console.warn('[ingest:daily] sector LLM insights skipped:', err);
+  }
   await recordIngestRun(db, {
     jobName: 'ingest_daily',
     status: 'ok',

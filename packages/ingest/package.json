@@ -16,10 +16,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@stock-buddy/agents": "file:../agents",
     "@stock-buddy/core": "file:../core",
     "@stock-buddy/db": "file:../db",
     "@stock-buddy/mcp-server": "file:../mcp-server",
-    "@stock-buddy/scraper": "file:../scraper"
+    "@stock-buddy/scraper": "file:../scraper",
+    "@stock-buddy/skills": "file:../skills"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

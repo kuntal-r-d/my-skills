@@ -1,0 +1,8 @@
+{
+  "ncav_per_share": 0.11,
+  "_ncav_per_share_source": "stockanalysis.com balance sheet TTM Mar-2026: (current assets 19,511M - total liabilities 19,379M) / 1,161M shares",
+  "interest_coverage": 528.7,
+  "_interest_coverage_source": "stockanalysis.com income statement TTM: operating income 6,006M / interest expense 11.36M",
+  "buyback": false,
+  "_buyback_source": "Share count flat at ~1,161M FY2021-TTM (StockAnalysis); no DSE buyback framework"
+}

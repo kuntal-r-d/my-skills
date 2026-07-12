@@ -1,0 +1,9 @@
+{
+  "moat": true,
+  "_moat_source": "Qualitative: #1 SME lender (43% of gross loans, 446 SME offices; Moodys Dec-2025), majority owner of bKash — dominant MFS platform, 62% of non-interest income 9M-2025",
+  "buyback": false,
+  "_buyback_source": "Share count flat at 2,290M (StockAnalysis); no DSE buyback framework",
+  "debt_to_equity": 1.09,
+  "_debt_to_equity_source": "stockanalysis.com balance sheet TTM: total debt (borrowings) 152,707M / shareholders equity 139,687M. Bank: deposits excluded",
+  "_bank_na_fields": "inventory_turnover, current_ratio, ncav_per_share, interest_coverage are not meaningful for banks and left unfilled"
+}

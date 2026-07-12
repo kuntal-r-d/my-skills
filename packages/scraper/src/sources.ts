@@ -239,9 +239,9 @@ export function parseDseCompanyHtml(html: string): FundamentalsPayload {
     }
   });
 
-  // Latest annual EPS + NAV from multi-year financial table (more reliable than stray "Basic" rows).
+  // Multi-year EPS + NAV table (oldest → newest in eps_history).
   let navCol = -1;
-  let latestYear = 0;
+  const epsByYear: { year: number; eps: number; nav?: number }[] = [];
   $('table tr').each((_, row) => {
     const cells = $(row).find('th, td');
     const texts = cells.map((__, c) => $(c).text().trim().replace(/\s+/g, ' ')).get();
@@ -251,18 +251,23 @@ export function parseDseCompanyHtml(html: string): FundamentalsPayload {
     }
     const ym = texts[0]?.match(/^(20\d{2})$/);
     if (!ym || navCol < 0) return;
-    const year = parseInt(ym[1]!, 10);
-    if (year < latestYear) return;
 
+    const year = parseInt(ym[1]!, 10);
     const navRaw = texts[navCol];
     const navAlt = texts.length > navCol + 4 ? texts[navCol + 4] : undefined;
     const nav = parseFloat((navAlt ?? navRaw ?? '').replace(/,/g, ''));
     const eps = parseFloat((texts[4] ?? '').replace(/,/g, ''));
 
-    if (Number.isFinite(nav) && nav !== 0) payload.book_value_per_share = nav;
-    if (Number.isFinite(eps)) payload.eps_ttm = eps;
-    latestYear = year;
+    if (Number.isFinite(eps)) epsByYear.push({ year, eps, nav: Number.isFinite(nav) ? nav : undefined });
   });
+
+  if (epsByYear.length) {
+    epsByYear.sort((a, b) => a.year - b.year);
+    payload.eps_history = epsByYear.map((r) => r.eps);
+    payload.eps_ttm = epsByYear[epsByYear.length - 1]!.eps;
+    const latestNav = [...epsByYear].reverse().find((r) => r.nav != null && r.nav !== 0)?.nav;
+    if (latestNav != null) payload.book_value_per_share = latestNav;
+  }
 
   if (payload.price && payload.eps_ttm && payload.pe == null && payload.eps_ttm > 0) {
     payload.pe = payload.price / payload.eps_ttm;
@@ -395,8 +400,9 @@ export async function fetchStockAnalysisFundamentals(ticker: string): Promise<Fu
   const html = await fetchText(url);
   if (!html) return {};
 
+  const embedded = parseStockAnalysisQuoteEmbedded(html);
   const $ = cheerio.load(html);
-  const payload: FundamentalsPayload = {};
+  const payload: FundamentalsPayload = { ...embedded };
 
   $('table tr').each((_, row) => {
     const cells = $(row).find('td, th');
@@ -431,6 +437,110 @@ export async function fetchStockAnalysisFundamentals(ticker: string): Promise<Fu
     payload.pe = payload.price / payload.eps_ttm;
   }
 
+  return payload;
+}
+
+/** Parse embedded SvelteKit statistics JSON (id/value pairs) from StockAnalysis /statistics/. */
+export function parseStockAnalysisStatisticsEmbedded(html: string): FundamentalsPayload {
+  const payload: FundamentalsPayload = {};
+
+  const pct = (raw: string): number | undefined => {
+    const m = raw.match(/(-?[\d.]+)\s*%/);
+    if (!m) return undefined;
+    const n = parseFloat(m[1]!);
+    return Number.isFinite(n) ? n / 100 : undefined;
+  };
+
+  const num = (raw: string): number | undefined => {
+    const v = raw.trim();
+    if (!v || /^n\/a$/i.test(v)) return undefined;
+    const compact = parseCompactNumber(v);
+    if (compact != null) return compact;
+    const n = parseFloat(v.replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? n : undefined;
+  };
+
+  const apply = (id: string, raw: string): void => {
+    if (!raw || /^n\/a$/i.test(raw)) return;
+    switch (id) {
+      case 'currentRatio':
+        payload.current_ratio = num(raw);
+        break;
+      case 'interestCoverage':
+        payload.interest_coverage = num(raw);
+        break;
+      case 'roa':
+        payload.return_on_assets = pct(raw) ?? num(raw);
+        break;
+      case 'roe':
+        payload.roe = pct(raw) ?? num(raw);
+        break;
+      case 'debtEquity':
+        payload.debt_to_equity = num(raw);
+        break;
+      case 'pb':
+        payload.pb = num(raw);
+        break;
+      case 'pe':
+        payload.pe = num(raw);
+        break;
+      case 'pegRatio':
+        payload.peg = num(raw);
+        break;
+      case 'profitMargin':
+        payload.profit_margin = pct(raw) ?? num(raw);
+        break;
+      case 'operatingMargin':
+        payload.operating_margin = pct(raw) ?? num(raw);
+        break;
+      case 'inventoryturnover':
+        payload.inventory_turnover = num(raw);
+        break;
+      case 'fcf':
+        payload.free_cash_flow = num(raw);
+        break;
+      case 'fcfps':
+        payload.free_cash_flow_per_share = num(raw);
+        break;
+      case 'bvps':
+        payload.book_value_per_share = num(raw);
+        break;
+      case 'sharesInstitutions': {
+        const inst = pct(raw);
+        if (inst != null) payload.institution_ownership = inst;
+        break;
+      }
+      case 'sharesgrowthyoy': {
+        const g = pct(raw);
+        if (g != null && g < 0) payload.buyback = true;
+        break;
+      }
+      default:
+        break;
+    }
+  };
+
+  const re = /\{id:"([^"]+)",title:"[^"]*",value:"([^"]*)"/g;
+  for (const m of html.matchAll(re)) {
+    apply(m[1]!, m[2]!);
+  }
+
+  return payload;
+}
+
+/** Parse TTM growth fields embedded on StockAnalysis quote pages. */
+export function parseStockAnalysisQuoteEmbedded(html: string): FundamentalsPayload {
+  const payload: FundamentalsPayload = {};
+  const rev = html.match(/revenueGrowth:(-?[\d.]+)/);
+  const eg = html.match(/epsGrowth:(-?[\d.]+)/);
+  if (rev) {
+    const n = parseFloat(rev[1]!);
+    if (Number.isFinite(n)) payload.revenue_growth = n / 100;
+  }
+  if (eg) {
+    const n = parseFloat(eg[1]!);
+    if (Number.isFinite(n)) payload.earnings_growth = n / 100;
+  }
   return payload;
 }
 
@@ -484,7 +594,10 @@ export async function fetchStockAnalysisStatistics(ticker: string): Promise<Fund
   const url = `https://stockanalysis.com/quote/dse/${ticker}/statistics/`;
   const html = await fetchText(url);
   if (!html) return {};
-  return parseStockAnalysisStatisticsHtml(html);
+  return {
+    ...parseStockAnalysisStatisticsHtml(html),
+    ...parseStockAnalysisStatisticsEmbedded(html),
+  };
 }
 
 export interface NewsRow {
@@ -506,4 +619,12 @@ export const DEFAULT_MACRO: Record<string, unknown> = {
   remittances_bn: 2.1,
   reserves_trend: 'stable',
   politics: 'stable',
+  global: {
+    fed_funds: 0.0525,
+    usd_index: 104.2,
+    brent_usd: 82.0,
+    em_risk: 'neutral',
+    china_pmi: 50.2,
+    us_10y: 0.043,
+  },
 };

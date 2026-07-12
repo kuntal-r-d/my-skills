@@ -1,0 +1,6 @@
+{
+  "ncav_per_share": 112.58,
+  "_ncav_per_share_source": "stockanalysis.com balance sheet TTM: (current assets 72,693M - total liabilities 35,180M) / 333.22M shares",
+  "buyback": false,
+  "_buyback_source": "Share count +0.18% YoY at 333.22M (StockAnalysis); no buyback, no DSE buyback framework"
+}

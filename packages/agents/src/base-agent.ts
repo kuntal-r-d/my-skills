@@ -7,6 +7,14 @@ type SkillHandler = (data: SkillData) => SkillResult;
 
 const SKILL_HANDLERS: Record<string, SkillHandler> = {
   'momentum-screen': (data) => skills['momentum-screen'].screen(data),
+  'minervini-sepa': (data) => skills['minervini-sepa'].screen(data),
+  'can-slim': (data) => skills['can-slim'].screen(data),
+  'darvas-box': (data) => skills['darvas-box'].screen(data),
+  'livermore-pivot': (data) => skills['livermore-pivot'].screen(data),
+  'stage-analysis': (data) => skills['stage-analysis'].screen(data),
+  'dow-theory': (data) => skills['dow-theory'].screen(data),
+  launchpad: (data) => skills.launchpad.screen(data),
+  'multi-timeframe': (data) => skills['multi-timeframe'].analyze(data),
   'value-investment-checklist': (data) => skills['value-investment-checklist'].checklist(data),
   'fundamental-analysis': (data) => skills['fundamental-analysis'].analyze(data),
   'technical-analysis': (data) => skills['technical-analysis'].analyze(data),

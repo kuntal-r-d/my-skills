@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const jsonPath = process.argv[2] ?? join(repoRoot, 'scripts/portfolio-kuntal.json');
 
-const { loadEnv, createDb, closeDb, getDefaultAccount, ensureTicker, upsertPosition, setAccount } =
+const { loadEnv, createDb, closeDb, getDefaultAccount, ensureTicker, replacePortfolioPositionWithFill, setAccount } =
   await import('@stock-buddy/db');
 
 loadEnv();
@@ -29,6 +29,8 @@ try {
       capitalBdt: data.account.capital_bdt,
       riskPerTradePct: data.account.risk_per_trade_pct,
       label: data.account.label,
+      loanBalanceBdt: data.account.loan_balance_bdt,
+      purchasingPowerBdt: data.account.purchasing_power_bdt,
     });
     console.log(`Account updated: capital_bdt=${data.account.capital_bdt}`);
   }
@@ -36,13 +38,15 @@ try {
   for (const p of data.positions) {
     const t = await ensureTicker(db, p.ticker, { sector: p.sector });
     const purpose = p.purpose === 'trading' ? 'trading' : 'investment';
-    await upsertPosition(db, account.id, t.id, {
+    await replacePortfolioPositionWithFill(db, account.id, t.id, {
       qty: p.qty,
-      avgCost: p.avg_cost,
+      price: p.avg_cost,
       sector: p.sector ?? t.sector ?? undefined,
       stopLevel: p.stop_level,
       targetLevel: p.target_level,
       purpose,
+      tradeDate: p.trade_date,
+      notes: p.notes ?? 'Imported from portfolio JSON',
     });
     console.log(`  ${p.ticker} [${purpose}]: ${p.qty} @ ${p.avg_cost}`);
   }

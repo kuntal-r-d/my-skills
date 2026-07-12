@@ -1,0 +1,9 @@
+{
+  "moat": false,
+  "_moat_source": "Qualitative: small 4th-generation private commercial bank (listed 2023); no structural exclusivity or scale advantage in a crowded sector",
+  "debt_to_equity": 1.66,
+  "_debt_to_equity_source": "stockanalysis.com balance sheet TTM: total debt (borrowings) 17,336M / shareholders equity 10,471M. Bank: deposits excluded",
+  "buyback": false,
+  "_buyback_source": "Share count +12.3% YoY to 678.63M (stock dividend); no buyback, no DSE buyback framework",
+  "_bank_na_fields": "inventory_turnover, current_ratio, ncav_per_share, interest_coverage not meaningful for banks, left unfilled"
+}

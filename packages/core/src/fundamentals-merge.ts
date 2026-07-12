@@ -13,6 +13,16 @@ const FIELD_PRECEDENCE: Record<string, readonly string[]> = {
   sector: ['dse', 'lankabd'],
   revenue: ['stockanalysis'],
   price: ['dse', 'stockanalysis', 'lankabd'],
+  eps_history: ['dse', 'stockanalysis', 'lankabd'],
+  earnings_growth: ['stockanalysis', 'dse', 'lankabd'],
+  revenue_growth: ['stockanalysis', 'lankabd'],
+  operating_margin: ['stockanalysis_statistics', 'lankabd'],
+  return_on_assets: ['stockanalysis_statistics', 'lankabd'],
+  interest_coverage: ['stockanalysis_statistics', 'lankabd'],
+  free_cash_flow: ['stockanalysis_statistics', 'lankabd'],
+  inventory_turnover: ['stockanalysis_statistics'],
+  inventory_turnover_prev: ['stockanalysis_statistics'],
+  peg: ['stockanalysis_statistics', 'stockanalysis', 'lankabd'],
   current_ratio: ['stockanalysis_statistics', 'amarstock'],
 };
 

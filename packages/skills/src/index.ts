@@ -6,6 +6,14 @@ export { analyze as fundamentalAnalysisAnalyze } from './fundamental-analysis/an
 export { checklist as valueInvestmentChecklist } from './value-investment-checklist/checklist.js';
 export { analyze as technicalAnalysisAnalyze } from './technical-analysis/analyze.js';
 export { screen as momentumScreen } from './momentum-screen/screen.js';
+export { screen as minerviniSepaScreen } from './minervini-sepa/screen.js';
+export { screen as canSlimScreen } from './can-slim/screen.js';
+export { screen as darvasBoxScreen } from './darvas-box/screen.js';
+export { screen as livermorePivotScreen } from './livermore-pivot/screen.js';
+export { screen as stageAnalysisScreen } from './stage-analysis/screen.js';
+export { screen as dowTheoryScreen } from './dow-theory/screen.js';
+export { screen as launchpadScreen } from './launchpad/screen.js';
+export { analyze as multiTimeframeAnalyze } from './multi-timeframe/analyze.js';
 export { analyze as riskManagerAnalyze } from './risk-manager/analyze.js';
 export { screen as stockScreenerScreen, parseQuery as stockScreenerParseQuery } from './stock-screener/screen.js';
 export { mine as patternMinerMine } from './pattern-miner/mine.js';
@@ -13,7 +21,7 @@ export { synthesize as signalSynthesizerSynthesize } from './signal-synthesizer/
 export { build as dailyBriefingBuild } from './daily-briefing/brief.js';
 export { render as tickerDossierRender } from './ticker-dossier/dossier.js';
 
-export { readInput, writeOutput, runCli, parseCliArgs } from './cli.js';
+export { context as sectorMacroInsightsContext } from './sector-macro-insights/context.js';
 
 import { run as financialTermsEducatorRunFn } from './financial-terms-educator/lookup.js';
 import { assess as macroRegimeAssessFn } from './macro-regime/regime.js';
@@ -23,12 +31,23 @@ import { analyze as fundamentalAnalysisAnalyzeFn } from './fundamental-analysis/
 import { checklist as valueInvestmentChecklistFn } from './value-investment-checklist/checklist.js';
 import { analyze as technicalAnalysisAnalyzeFn } from './technical-analysis/analyze.js';
 import { screen as momentumScreenFn } from './momentum-screen/screen.js';
+import { screen as minerviniSepaScreenFn } from './minervini-sepa/screen.js';
+import { screen as canSlimScreenFn } from './can-slim/screen.js';
+import { screen as darvasBoxScreenFn } from './darvas-box/screen.js';
+import { screen as livermorePivotScreenFn } from './livermore-pivot/screen.js';
+import { screen as stageAnalysisScreenFn } from './stage-analysis/screen.js';
+import { screen as dowTheoryScreenFn } from './dow-theory/screen.js';
+import { screen as launchpadScreenFn } from './launchpad/screen.js';
+import { analyze as multiTimeframeAnalyzeFn } from './multi-timeframe/analyze.js';
 import { analyze as riskManagerAnalyzeFn } from './risk-manager/analyze.js';
 import { screen as stockScreenerScreenFn } from './stock-screener/screen.js';
 import { mine as patternMinerMineFn } from './pattern-miner/mine.js';
 import { synthesize as signalSynthesizerSynthesizeFn } from './signal-synthesizer/synthesize.js';
 import { build as dailyBriefingBuildFn } from './daily-briefing/brief.js';
 import { render as tickerDossierRenderFn } from './ticker-dossier/dossier.js';
+import { context as sectorMacroInsightsContextFn } from './sector-macro-insights/context.js';
+
+export { readInput, writeOutput, runCli, parseCliArgs } from './cli.js';
 
 export const skills = {
   'financial-terms-educator': { run: financialTermsEducatorRunFn },
@@ -39,10 +58,19 @@ export const skills = {
   'value-investment-checklist': { checklist: valueInvestmentChecklistFn },
   'technical-analysis': { analyze: technicalAnalysisAnalyzeFn },
   'momentum-screen': { screen: momentumScreenFn },
+  'minervini-sepa': { screen: minerviniSepaScreenFn },
+  'can-slim': { screen: canSlimScreenFn },
+  'darvas-box': { screen: darvasBoxScreenFn },
+  'livermore-pivot': { screen: livermorePivotScreenFn },
+  'stage-analysis': { screen: stageAnalysisScreenFn },
+  'dow-theory': { screen: dowTheoryScreenFn },
+  launchpad: { screen: launchpadScreenFn },
+  'multi-timeframe': { analyze: multiTimeframeAnalyzeFn },
   'risk-manager': { analyze: riskManagerAnalyzeFn },
   'stock-screener': { screen: stockScreenerScreenFn },
   'pattern-miner': { mine: patternMinerMineFn },
   'signal-synthesizer': { synthesize: signalSynthesizerSynthesizeFn },
   'daily-briefing': { build: dailyBriefingBuildFn },
   'ticker-dossier': { render: tickerDossierRenderFn },
+  'sector-macro-insights': { context: sectorMacroInsightsContextFn },
 } as const;

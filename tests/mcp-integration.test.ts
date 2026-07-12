@@ -10,8 +10,9 @@ const fixture = JSON.parse(
 );
 
 describe('MCP registry', () => {
-  it('registers 14 skills', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(14);
+  it('registers 19 skills', () => {
+    expect(Object.keys(SKILLS)).toHaveLength(23);
+    expect(SKILLS).toHaveProperty('sector_macro_insights');
   });
 });
 
@@ -25,6 +26,12 @@ describe('Skill dispatch', () => {
   it('runs technical_analysis', () => {
     const result = runSkill('technical_analysis', fixture);
     expect(result).toHaveProperty('score');
+  });
+
+  it('runs sector_macro_insights', () => {
+    const result = runSkill('sector_macro_insights', { sector: 'pharmaceuticals', scope: 'both' });
+    expect(result.skill).toBe('sector-macro-insights');
+    expect(result.rating).toBe('instructions');
   });
 });
 

@@ -425,6 +425,210 @@ const MOMENTUM_COPY: Record<string, Copy> = {
     bangla: 'উপরে ১০% এর মধ্যে বড় বাধা না থাকা — দাম ছুটতে পারে।',
     example: 'Resistance ৳110, price ৳95 → ~16% headroom → clear path.',
   },
+  // --- Minervini SEPA (VCP, fundamentals, risk) ---
+  'Volatility contraction (ranges tightening)': {
+    simple: 'Each recent price pause is narrower than the one before — like a spring coiling before a possible jump up.',
+    bangla: 'প্রতিটি সাম্প্রতিক দামের বিরতি আগেরটির চেয়ে সঙ্কুচিত — ভেতরে চাপ জমছে, বিক্রেতারা দুর্বল হচ্ছে।',
+    example: 'Range shrinks from 15% to 10% to 6% over three bases — classic VCP tightening.',
+  },
+  'ATR declining vs prior segment': {
+    simple: 'Average daily price swings are getting smaller — calm often comes before a sharp move.',
+    bangla: 'গড় দৈনিক ওঠানামা কমছে — শান্তি প্রায়ই বড় ছুটির আগে আসে।',
+    example: 'ATR falling while price holds steady often signals sellers are exhausted.',
+  },
+  'Price in upper half of base': {
+    simple: 'While moving sideways, price stays in the top half of the range — buyers are absorbing selling.',
+    bangla: 'পাশ্বরেখায় চলাকালীন দাম রেঞ্জের উপরের অর্ধে — ক্রেতারা বিক্রি শোষণ করছে।',
+    example: 'Base ৳90–৳100 with price at ৳97 shows demand at the highs.',
+  },
+  'EPS growth >= 20% (latest period)': {
+    simple: 'Earnings per share grew at least 20% in the latest period — the business is growing profits quickly.',
+    bangla: 'সর্বশেষ সময়ে শেয়ারপ্রতি আয় (EPS) কমপক্ষে ২০% বেড়েছে — লাভ দ্রুত বাড়ছে।',
+    example: 'EPS ৳2.0 → ৳2.5 is 25% growth — passes Minervini’s growth bar.',
+  },
+  'Earnings acceleration (growth speeding up)': {
+    simple: 'This period’s profit growth is faster than last period’s — growth is speeding up, not slowing.',
+    bangla: 'এই সময়ের লাভের বৃদ্ধি গত সময়ের চেয়ে দ্রুত — বৃদ্ধি ত্বরান্বিত হচ্ছে।',
+    example: 'EPS growth 10% then 18% then 28% shows true acceleration.',
+  },
+  'ATR/price < 6%': {
+    simple: 'Day-to-day price moves are modest (under ~6% of the stock price) — easier to set a tight stop.',
+    bangla: 'দৈনিক ওঠানামা মাঝারি (দামের ~৬% এর নিচে) — টাইট স্টপ রাখা সহজ।',
+    example: 'ATR ৳4 on a ৳100 stock = 4% — controlled volatility.',
+  },
+  'Not extended >15% above 50-day MA': {
+    simple: 'Price has not run too far above its 50-day average — you are not chasing an already extended move.',
+    bangla: 'দাম ৫০ দিনের গড়ের খুব উপরে নয় — ইতিমধ্যে অতিরিক্ত ছুটে ওঠা স্টক নয়।',
+    example: '50-day MA ৳100, price ৳112 (12% above) → still OK; ৳120 (20%) → too extended.',
+  },
+  // --- CAN SLIM ---
+  'Current quarterly EPS growth >= 18%': {
+    simple: 'Latest-quarter earnings per share jumped at least ~18% — strong recent profit growth.',
+    bangla: 'সর্বশেষ ত্রৈমাসিকে EPS কমপক্ষে ~১৮% বেড়েছে — সাম্প্রতিক লাভের বৃদ্ধি শক্তিশালী।',
+    example: 'Quarter EPS ৳1.00 → ৳1.20 = 20% — passes CAN SLIM “C”.',
+  },
+  'Earnings trend positive (latest > prior)': {
+    simple: 'The most recent EPS is higher than the one before — earnings are moving up, not down.',
+    bangla: 'সর্বশেষ EPS আগেরটির চেয়ে বেশি — আয় ঊর্ধ্বমুখী, নিম্নমুখী নয়।',
+    example: 'EPS rising ৳1.8 → ৳2.1 shows a positive earnings trend.',
+  },
+  'Annual EPS growth positive (multi-year)': {
+    simple: 'Over several years, earnings have grown on average — not a one-quarter fluke.',
+    bangla: 'কয়েক বছর ধরে গড়ে EPS বেড়েছে — শুধু এক ত্রৈমাসিকের ঝলক নয়।',
+    example: 'EPS CAGR 12% over five years supports a real growth story.',
+  },
+  'ROE >= 15% (quality proxy)': {
+    simple: 'Return on equity is at least 15% — the company earns good profit on shareholders’ money.',
+    bangla: 'ROE কমপক্ষে ১৫% — শেয়ারহোল্ডারের টাকায় ভালো লাভ আসছে।',
+    example: 'ROE 18% means ৳18 profit per ৳100 of equity — quality growth.',
+  },
+  'Within 15% of 52-week high': {
+    simple: 'Price is very close to its yearly high — a sign of leadership and fresh strength.',
+    bangla: 'দাম বার্ষিক সর্বোচ্চের খুব কাছে — নেতৃত্ব ও নতুন শক্তির চিহ্ন।',
+    example: '52-week high ৳100, price ৳88 → 12% below → near-high leader.',
+  },
+  'Positive earnings surprise': {
+    simple: 'The company beat what analysts expected — a positive surprise that can spark the next leg up.',
+    bangla: 'আশার চেয়ে ভালো ফলাফল — ইতিবাচক চমক যা পরের ধাপের উত্থান ঘটাতে পারে।',
+    example: 'EPS beat + strong volume day is a classic CAN SLIM catalyst.',
+  },
+  'Relative volume > 1.2x (demand)': {
+    simple: 'Today’s volume is more than 20% above normal — extra buyers are showing up.',
+    bangla: 'আজকের ভলিউম স্বাভাবিকের ২০% এর বেশি — অতিরিক্ত ক্রেতা এসেছে।',
+    example: 'Relative volume 1.4 on a green day signals strong demand.',
+  },
+  'Reasonable supply (not mega-cap dilution)': {
+    simple: 'Share count is not huge — smaller supply can move faster when demand arrives.',
+    bangla: 'শেয়ার সংখ্যা বিশাল নয় — কম সাপ্লাই চাহিদায় দ্রুত নড়তে পারে।',
+    example: 'Under 500M shares is a practical DSE float proxy for CAN SLIM “S”.',
+  },
+  'Relative strength vs market': {
+    simple: 'The stock has risen more than the broad market — money is flowing into this name.',
+    bangla: 'সূচকের চেয়ে শেয়ার ভালো করেছে — টাকা এই দিকে আসছে।',
+    example: 'Stock +15% vs index +5% in 3 months → leadership.',
+  },
+  '12-month ROC positive': {
+    simple: 'Price is higher than it was about 12 months ago — positive momentum over a year.',
+    bangla: 'প্রায় ১২ মাস আগের চেয়ে দাম বেশি — বার্ষিক মোমেন্টাম ধনাত্মক।',
+    example: 'ROC +18% means the stock is up meaningfully over the past year.',
+  },
+  'Institutional sponsorship rising': {
+    simple: 'Big holders (institutions/funds) are increasing their stake — “smart money” interest is growing.',
+    bangla: 'বড় ধরনের হোল্ডাররা অংশ বাড়াচ্ছে — স্মার্ট মানির আগ্রহ বাড়ছে।',
+    example: 'Institutional % rising from 22% to 25% over two filings.',
+  },
+  'Fund holder count >= 2': {
+    simple: 'At least two funds hold the stock — not relying on a single buyer.',
+    bangla: 'কমপক্ষে দুটি ফান্ড শেয়ার ধরে — একক ক্রেতার উপর নির্ভর নয়।',
+    example: 'Three disclosed fund holders adds sponsorship breadth.',
+  },
+  'Market in uptrend': {
+    simple: 'The overall market is supportive — rising index or above its long average. Don’t fight a weak market.',
+    bangla: 'সামগ্রিক বাজার সহায়ক — সূচক উর্ধ্বমুখী বা দীর্ঘ গড়ের উপরে। দুর্বল বাজারের বিপক্ষে যাবেন না।',
+    example: 'DSEX above its 200-day MA is a risk-on backdrop for momentum trades.',
+  },
+  'Market 3M ROC positive': {
+    simple: 'The market index is up over roughly the last 3 months — short-term market momentum is positive.',
+    bangla: 'গত ~৩ মাসে সূচক বেড়েছে — স্বল্পমেয়াদি বাজার মোমেন্টাম ধনাত্মক।',
+    example: 'Index +6% over 13 weeks confirms a supportive “M” in CAN SLIM.',
+  },
+  // --- Darvas Box ---
+  'Trading inside a defined box': {
+    simple: 'Price is moving sideways between a clear ceiling and floor — consolidation, not wild trending.',
+    bangla: 'দাম স্পষ্ট ছাদ ও মেঝের মধ্যে পাশ্বরেখায় চলছে — সংহতকরণ, বিশৃঙ্খল ট্রেন্ড নয়।',
+    example: 'Box ৳48–৳52 for three weeks — classic Darvas consolidation.',
+  },
+  'Box range reasonably tight (< 25% width)': {
+    simple: 'The high–low range is not too wide — controlled consolidation, not chaos.',
+    bangla: 'উচ্চ–নিম্নের পার্থক্য বেশি নয় — নিয়ন্ত্রিত সংহতকরণ।',
+    example: 'Box width 12% of price is tight; 35% is too loose for Darvas.',
+  },
+  'Box tightening (VCP-style contraction)': {
+    simple: 'This box is narrower than the previous one — pressure building for a move.',
+    bangla: 'এই বক্স আগেরটির চেয়ে সঙ্কুচিত — ছুটির জন্য চাপ জমছে।',
+    example: 'Prior box 20% wide, current box 14% — tightening sequence.',
+  },
+  'Price at upper half of box': {
+    simple: 'Price sits in the top half of the range — buyers are defending the upper area.',
+    bangla: 'দাম রেঞ্জের উপরের অর্ধে — ক্রেতারা উপরের অংশ রক্ষা করছে।',
+    example: 'Box ৳50–৳60, price ৳57 — holding upper box.',
+  },
+  'Breakout above box high': {
+    simple: 'Price has pushed above the top of the box — classic Darvas entry signal.',
+    bangla: 'দাম বক্সের ছাদ ভেঙে উপরে — ক্লাসিক দারভাস এন্ট্রি সংকেত।',
+    example: 'Box high ৳52, close ৳53.5 on volume — breakout day.',
+  },
+  'Volume > 1.5x average on move': {
+    simple: 'Volume on the move is at least 50% above normal — real participation, not a thin fake breakout.',
+    bangla: 'ছুটির দিন ভলিউম স্বাভাবিকের কমপক্ষে ৫০% বেশি — সত্যিকারের অংশগ্রহণ।',
+    example: 'Relative volume 1.8× on breakout close validates the move.',
+  },
+  'Close above box high (or testing)': {
+    simple: 'The closing price is at or through the box ceiling — not just a brief intraday spike.',
+    bangla: 'ক্লোজিং দাম বক্সের ছাদে বা তার উপরে — শুধু ইনট্রাডে স্পাইক নয়।',
+    example: 'Close ৳52.2 vs box high ৳52.0 — accepted above the box.',
+  },
+  'Stop at box floor defined': {
+    simple: 'A clear stop exists at the bottom of the box — if price falls back in, you exit.',
+    bangla: 'বক্সের মেঝেতে স্পষ্ট স্টপ — দাম ফিরে এলে বের হন।',
+    example: 'Box low ৳48 is the mechanical Darvas stop level.',
+  },
+  'Stop distance acceptable (< 12%)': {
+    simple: 'The gap from current price down to that stop is less than ~12% — risk is defined and not huge.',
+    bangla: 'বর্তমান দাম থেকে স্টপ পর্যন্ত ব্যবধান ~১২% এর নিচে — ঝুঁকি সীমিত।',
+    example: 'Price ৳53, box stop ৳48 → ~9% risk — acceptable.',
+  },
+  'ATR/price < 8%': {
+    simple: 'Day-to-day volatility is not extreme — the box setup is tradeable without wild swings.',
+    bangla: 'দৈনিক অস্থিরতা চরম নয় — বক্স সেটআপে ট্রেড করা যায়।',
+    example: 'ATR/price 5% suits box trading; 12% is often too wild.',
+  },
+  // --- Livermore Pivot ---
+  'Pivot level identified': {
+    simple: 'A recent consolidation high is marked — the price level where momentum may accelerate if broken.',
+    bangla: 'সাম্প্রতিক সংহতকরণের উচ্চ স্তর চিহ্নিত — ভাঙলে গতি বাড়তে পারে এমন স্তর।',
+    example: 'Highest high of the last 20 bars before today = pivot at ৳65.',
+  },
+  'Price crossed pivot (go signal)': {
+    simple: 'Price has broken above that pivot — the “go” moment in Livermore’s method.',
+    bangla: 'দাম পিভট ভেঙে উপরে — লিভারমোরের “গো” মুহূর্ত।',
+    example: 'Pivot ৳65, close ৳66.5 — pivot cross trigger.',
+  },
+  'At or above pivot zone': {
+    simple: 'Price is holding at or above the pivot — the market is accepting higher prices.',
+    bangla: 'দাম পিভটে বা তার উপরে ধরে আছে — বাজার উচ্চ দাম মেনে নিচ্ছে।',
+    example: 'Holding ৳65–৳67 after pivot break shows acceptance.',
+  },
+  'Pyramiding levels mapped': {
+    simple: 'Higher add-on levels are identified above — you only add size at higher prices, never on weakness.',
+    bangla: 'উপরে অতিরিক্ত কেনার স্তর চিহ্নিত — শক্তিতে যোগ করুন, দুর্বলতায় নয়।',
+    example: 'Add at next pivot ৳70, then ৳75 — pyramid up only.',
+  },
+  'Volume confirms pivot cross': {
+    simple: 'The pivot break happened with above-average volume — conviction behind the move.',
+    bangla: 'পিভট ভাঙতে গড়ের চেয়ে বেশি ভলিউম — ছুটিতে বিশ্বাস।',
+    example: 'Pivot cross on 2× average volume is a validated Livermore go.',
+  },
+  'No averaging down (price above trail)': {
+    simple: 'Price is still above the trailing stop — you are not holding a loser and adding more (Livermore’s rule).',
+    bangla: 'দাম ট্রেইলিং স্টপের উপরে — হারানো পজিশনে আর কেনা নয় (লিভারমোরের নিয়ম)।',
+    example: 'Never add shares if price drops below your last pivot stop.',
+  },
+  'Market aligns with trade direction': {
+    simple: 'Both the stock and the broad market are moving up — you are not fighting the environment.',
+    bangla: 'শেয়ার ও সামগ্রিক বাজার উর্ধ্বমুখী — পরিবেশের বিপক্ষে নয়।',
+    example: 'Stock up 8% and index up 4% over 3 months — aligned tide.',
+  },
+  'Not over-extended past prior pivot': {
+    simple: 'Price has not blasted too far above the last pivot — avoids chasing an overextended move.',
+    bangla: 'দাম গত পিভটের খুব উপরে ছুটে যায়নি — অতিরিক্ত পিছু নেওয়া এড়ায়।',
+    example: 'Within 15% of prior pivot keeps risk/reward reasonable.',
+  },
+  'Trail stop below recent pivot low': {
+    simple: 'A stop sits under the recent pivot low — as price rises, you raise the stop under new pivot floors.',
+    bangla: 'সাম্প্রতিক পিভট নিম্নের নিচে স্টপ — দাম বাড়লে স্টপ তুলে নিন।',
+    example: 'Trail stop at ৳62 under pivot low ৳63 while price is ৳68.',
+  },
 };
 
 function fallbackCopy(_label: string, explanation: string): Copy {

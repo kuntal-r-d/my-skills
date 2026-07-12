@@ -20,6 +20,7 @@ import {
   getTickerBySymbol,
   listTickers,
   removePosition,
+  addPortfolioFill,
   setAccount,
   upsertPosition,
   upsertResearchMemo,
@@ -32,6 +33,9 @@ import {
   stripMeta,
   ingestAll,
   ingestOhlcv,
+  buildMacroLandscape,
+  buildSectorMacroDetail,
+  listMacroInsights,
 } from '@stock-buddy/ingest';
 import {
   buildClientResearchInstructions,
@@ -231,6 +235,48 @@ export async function handleDataTool(
       return { macro: snap?.payload ?? null, as_of: snap?.asOf, source: snap?.source };
     }
 
+    case 'get_sector_macro_context': {
+      const sector = args.sector ? String(args.sector).toLowerCase() : undefined;
+      const scope = args.scope ? String(args.scope) : 'both';
+      const days = args.days ? Number(args.days) : 14;
+      const landscape = await buildMacroLandscape(db);
+
+      if (sector) {
+        const detail = await buildSectorMacroDetail(db, sector);
+        if (!detail) return { error: `Unknown sector: ${sector}` };
+        const memos = await listMacroInsights(db, { sector, limit: 5 });
+        return {
+          sector: detail.display_name,
+          sector_slug: detail.slug,
+          scope,
+          as_of: landscape.as_of,
+          bangladesh: {
+            regime: landscape.bangladesh?.regime,
+            metrics: detail.metrics,
+            analysis: detail.bangladesh_analysis,
+          },
+          global: {
+            indicators: landscape.global?.indicators,
+            analysis: detail.global_analysis,
+          },
+          news: detail.news,
+          existing_memos: memos,
+          suggested_prompt: `Analyze ${detail.display_name} sector (${scope}) for DSE investors. Save memo via upsert_research_memo.`,
+        };
+      }
+
+      return {
+        as_of: landscape.as_of,
+        canonical_sectors: landscape.sectors,
+        bangladesh_regime: landscape.bangladesh?.regime,
+        global_indicators: landscape.global?.indicators,
+        cross_sector_insights: landscape.cross_sector_insights,
+        scope,
+        days,
+        suggested_prompt: 'Run sector_macro_insights for priority sectors or cross_sector spending themes.',
+      };
+    }
+
     case 'get_news': {
       const ticker = args.ticker ? String(args.ticker).toUpperCase() : undefined;
       const days = args.days ? Number(args.days) : 7;
@@ -310,12 +356,16 @@ export async function handleDataTool(
       const account = await getDefaultAccount(db);
       if (!account) return { error: 'No portfolio account' };
       const t = await ensureTicker(db, ticker, { sector: args.sector ? String(args.sector) : undefined });
-      await upsertPosition(db, account.id, t.id, {
+      const purpose = args.purpose === 'trading' ? 'trading' : 'investment';
+      await addPortfolioFill(db, account.id, t.id, {
         qty,
-        avgCost,
+        price: avgCost,
+        tradeDate: args.trade_date ? String(args.trade_date).slice(0, 10) : undefined,
+        notes: args.notes ? String(args.notes) : undefined,
         sector: args.sector ? String(args.sector) : t.sector ?? undefined,
         stopLevel: args.stop_level != null ? Number(args.stop_level) : undefined,
         targetLevel: args.target_level != null ? Number(args.target_level) : undefined,
+        purpose,
       });
       return { ok: true, ticker, qty, avg_cost: avgCost };
     }
@@ -754,6 +804,19 @@ export const DATA_TOOLS = [
   { name: 'get_fundamentals', description: 'Latest fundamentals snapshot.', inputSchema: { type: 'object', additionalProperties: true } },
   { name: 'get_shareholding', description: 'Monthly shareholding pattern.', inputSchema: { type: 'object', additionalProperties: true } },
   { name: 'get_macro', description: 'Latest Bangladesh macro snapshot.', inputSchema: { type: 'object', properties: {} } },
+  {
+    name: 'get_sector_macro_context',
+    description:
+      'Sector macro landscape: canonical sectors, snapshots, news, memos, BD regime, global indicators. Omit sector for full landscape.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sector: { type: 'string', description: 'Sector slug, e.g. pharmaceuticals' },
+        scope: { type: 'string', enum: ['bangladesh', 'global', 'both', 'cross_sector'] },
+        days: { type: 'number', description: 'News lookback days' },
+      },
+    },
+  },
   { name: 'get_news', description: 'Recent news items.', inputSchema: { type: 'object', additionalProperties: true } },
   { name: 'get_data_status', description: 'Data freshness per entity.', inputSchema: { type: 'object', additionalProperties: true } },
   { name: 'list_tickers', description: 'List tickers in database.', inputSchema: { type: 'object', properties: {} } },

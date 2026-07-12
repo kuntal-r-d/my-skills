@@ -1,0 +1,13 @@
+{
+  "moat": false,
+  "_moat_source": "Qualitative: established 2nd-gen private commercial bank, well-run but no structural exclusivity in a crowded sector",
+  "roe": 0.188,
+  "_roe_source": "stockanalysis.com TTM: net income 9,084M / shareholders equity 48,387M",
+  "return_on_assets": 0.0138,
+  "_return_on_assets_source": "stockanalysis.com TTM: net income 9,084M / total assets 656,932M",
+  "debt_to_equity": 1.99,
+  "_debt_to_equity_source": "stockanalysis.com balance sheet TTM: total debt (borrowings) 96,483M / equity 48,387M. Bank: deposits excluded",
+  "buyback": false,
+  "_buyback_source": "No share count reduction; no DSE buyback framework",
+  "_bank_na_fields": "inventory_turnover, current_ratio, ncav_per_share, interest_coverage not meaningful for banks, left unfilled"
+}

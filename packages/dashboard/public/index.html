@@ -5,36 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stock Buddy Dashboard</title>
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
 </head>
 <body>
   <header class="header">
-    <div class="header-inner">
-      <h1>Stock Buddy</h1>
-      <p class="subtitle">DSE portfolio intelligence</p>
+    <div class="header-top">
+      <div class="header-brand">
+        <h1>Stock Buddy</h1>
+        <p class="subtitle">DSE portfolio intelligence</p>
+      </div>
+      <div class="header-actions">
+        <input type="search" id="global-ticker-search" class="global-search" placeholder="Jump to symbol…" aria-label="Search ticker" />
+        <button type="button" id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">◐ Theme</button>
+        <div class="mode-toggle" id="mode-toggle">
+          <span class="mode-label">View:</span>
+          <button type="button" class="mode-btn active" data-mode="both">Both</button>
+          <button type="button" class="mode-btn" data-mode="investment">Investment</button>
+          <button type="button" class="mode-btn" data-mode="momentum">Trading</button>
+        </div>
+        <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
+      </div>
     </div>
-    <div class="mode-toggle" id="mode-toggle">
-      <span class="mode-label">View mode:</span>
-      <button type="button" class="mode-btn active" data-mode="both">Both</button>
-      <button type="button" class="mode-btn" data-mode="investment">Investment</button>
-      <button type="button" class="mode-btn" data-mode="momentum">Trading</button>
-    </div>
-    <nav class="tabs" id="tabs">
-      <button type="button" class="tab active" data-panel="overview">Home</button>
-      <button type="button" class="tab" data-panel="tickers">Tickers</button>
-      <button type="button" class="tab" data-panel="ticker-detail">Analysis</button>
-      <button type="button" class="tab" data-panel="discover">Discover</button>
-      <button type="button" class="tab" data-panel="portfolio">Portfolio</button>
-      <button type="button" class="tab" data-panel="watchlist">Watchlist</button>
-      <button type="button" class="tab" data-panel="briefing">Briefing</button>
-      <button type="button" class="tab" data-panel="glossary">Glossary</button>
-      <button type="button" class="tab" data-panel="analytics">Analytics</button>
-      <button type="button" class="tab" data-panel="news">News</button>
-      <button type="button" class="tab" data-panel="macro">Macro</button>
-      <button type="button" class="tab" data-panel="skills">Skills</button>
-      <button type="button" class="tab" data-panel="daily">Daily</button>
-      <button type="button" class="tab" data-panel="ops">Ops</button>
+    <nav class="main-nav" id="main-nav" aria-label="Main navigation">
+      <div class="nav-group">
+        <span class="nav-group-label">Market</span>
+        <button type="button" class="tab active" data-panel="overview">Home</button>
+        <button type="button" class="tab" data-panel="macro">Macro</button>
+        <button type="button" class="tab" data-panel="news">News</button>
+      </div>
+      <div class="nav-group">
+        <span class="nav-group-label">Research</span>
+        <button type="button" class="tab" data-panel="ticker-detail">Analysis</button>
+        <button type="button" class="tab" data-panel="tickers">Stocks</button>
+        <button type="button" class="tab" data-panel="discover">Discover</button>
+      </div>
+      <div class="nav-group">
+        <span class="nav-group-label">My DSE</span>
+        <button type="button" class="tab" data-panel="portfolio">Portfolio</button>
+        <button type="button" class="tab" data-panel="watchlist">Watchlist</button>
+        <button type="button" class="tab" data-panel="briefing">Briefing</button>
+      </div>
+      <div class="nav-group">
+        <span class="nav-group-label">Learn</span>
+        <button type="button" class="tab" data-panel="glossary">Glossary</button>
+      </div>
+      <div class="nav-group nav-tools-wrap" id="nav-tools-wrap">
+        <span class="nav-group-label">Tools</span>
+        <button type="button" class="tab" id="nav-tools-trigger" aria-haspopup="true">More ▾</button>
+        <div class="nav-tools-menu" id="nav-tools-menu">
+          <button type="button" class="tab" data-panel="analytics">Analytics</button>
+          <button type="button" class="tab" data-panel="skills">Skills</button>
+          <button type="button" class="tab" data-panel="daily">Daily</button>
+          <button type="button" class="tab" data-panel="ops">Ops</button>
+        </div>
+      </div>
     </nav>
   </header>
 
@@ -45,7 +73,11 @@
         <button type="button" id="refresh-home" class="btn-sm">Refresh</button>
       </div>
 
-      <section class="home-section home-section-briefing" aria-labelledby="home-briefing-heading">
+      <div id="home-market-snapshot" class="market-snapshot" aria-label="Market snapshot">
+        <p class="market-snapshot-placeholder muted">Market index data will appear here after DSE Today ingest is configured.</p>
+      </div>
+
+      <section class="home-section home-section-briefing section-card" aria-labelledby="home-briefing-heading">
         <div class="home-section-head">
           <h3 id="home-briefing-heading">Daily briefing</h3>
           <button type="button" class="btn-sm linkish" data-panel="briefing">Full briefing →</button>
@@ -53,7 +85,7 @@
         <div id="home-briefing-content" class="briefing-shell briefing-shell-compact"><p class="muted">Loading briefing…</p></div>
       </section>
 
-      <section class="home-section home-section-news" aria-labelledby="home-news-heading">
+      <section class="home-section home-section-news section-card" aria-labelledby="home-news-heading">
         <div class="home-section-head">
           <h3 id="home-news-heading">News to watch</h3>
           <button type="button" class="btn-sm linkish" data-panel="news">All news →</button>
@@ -61,18 +93,29 @@
         <p class="home-news-intro muted">Disclosures, dividends, and headlines tied to your holdings, watchlist, and the wider DSE market.</p>
         <div id="home-important-news"><p class="muted">Loading news…</p></div>
       </section>
+
+      <section class="home-section home-section-ranked section-card" aria-labelledby="home-ranked-heading">
+        <div class="home-section-head">
+          <h3 id="home-ranked-heading">Top ranked</h3>
+          <button type="button" class="btn-sm linkish" data-panel="discover">Full rankings →</button>
+        </div>
+        <div id="home-ranked-preview" class="home-ranked-preview"><p class="muted">Loading rankings…</p></div>
+      </section>
     </section>
 
     <section id="panel-tickers" class="panel">
-      <div class="toolbar">
+      <h2 class="page-heading">All DSE stocks</h2>
+      <div class="toolbar wrap">
         <input type="search" id="ticker-search" placeholder="Filter symbols…" />
+        <div id="ticker-sector-chips" class="sector-chips"></div>
       </div>
       <div class="table-wrap" id="tickers-table"></div>
     </section>
 
     <section id="panel-ticker-detail" class="panel">
-      <div class="toolbar wrap">
-        <select id="ticker-select"></select>
+      <div class="toolbar wrap analysis-ticker-toolbar">
+        <input type="search" id="ticker-select-filter" class="ticker-select-filter" placeholder="Filter symbols…" aria-label="Filter ticker list" />
+        <select id="ticker-select" class="ticker-analysis-select" size="12" aria-label="Ticker with investment and momentum signals"></select>
         <button type="button" id="load-ticker">Load</button>
         <button type="button" id="analyze-full">Analyze Full</button>
         <button type="button" id="analyze-investment">Analyze Investment</button>
@@ -84,7 +127,12 @@
       <div id="ticker-meta" class="meta-bar"></div>
       <div id="ticker-commands-quick" class="ticker-commands-quick"></div>
 
-      <nav class="sub-tabs" id="analysis-subtabs">
+      <div id="analysis-hero" class="analysis-hero-host"></div>
+      <div id="analysis-verdict" class="analysis-verdict-host"></div>
+      <div id="analysis-health" class="analysis-health-host"></div>
+      <div id="analysis-keynums" class="analysis-keynums-host"></div>
+
+      <nav class="sub-tabs sub-tabs-sticky" id="analysis-subtabs">
         <button type="button" class="sub-tab active" data-sub="summary">Summary</button>
         <button type="button" class="sub-tab" data-sub="investment">Investment</button>
         <button type="button" class="sub-tab" data-sub="momentum">Momentum</button>
@@ -114,7 +162,7 @@
         <div><h3>Shareholding</h3><div class="chart-box sm"><canvas id="share-chart"></canvas></div></div>
         <div><h3>Watchlist</h3><div id="ticker-watchlist-actions" class="toolbar wrap"></div></div>
       </div>
-      <details class="dev-json-panel" id="dev-json-panel" open>
+      <details class="dev-json-panel" id="dev-json-panel">
         <summary class="dev-json-summary">
           <span>Developer JSON</span>
           <span id="json-freshness-badge" class="json-freshness-badge hidden"></span>
@@ -131,60 +179,125 @@
     </section>
 
     <section id="panel-discover" class="panel">
-      <div class="toolbar wrap">
-        <select id="discover-template">
-          <option value="momentum_leaders">Momentum leaders</option>
-          <option value="value">Value</option>
-          <option value="dividend_champions">Dividend</option>
-          <option value="oversold_quality">Oversold quality</option>
-        </select>
-        <select id="discover-sector"><option value="">All sectors</option></select>
-        <button type="button" id="run-discover">Run scan</button>
-        <span id="discover-status" class="muted"></span>
+      <h2 class="page-heading">Discover &amp; rankings</h2>
+      <div class="discover-tabs" role="tablist">
+        <button type="button" class="discover-tab active" data-discover-tab="screen">Screen</button>
+        <button type="button" class="discover-tab" data-discover-tab="rankings">Fundamental rankings</button>
+        <button type="button" class="discover-tab" data-discover-tab="top20">Top 20 momentum</button>
       </div>
-      <div id="discover-results"></div>
+      <div id="discover-panel-screen" class="discover-panel active">
+        <div class="toolbar wrap">
+          <select id="discover-template">
+            <option value="momentum_leaders">Momentum leaders</option>
+            <option value="value">Value</option>
+            <option value="dividend_champions">Dividend</option>
+            <option value="oversold_quality">Oversold quality</option>
+          </select>
+          <select id="discover-sector"><option value="">All sectors</option></select>
+          <button type="button" id="run-discover">Run scan</button>
+          <span id="discover-status" class="muted"></span>
+        </div>
+        <div id="discover-results"></div>
+      </div>
+      <div id="discover-panel-rankings" class="discover-panel">
+        <div class="toolbar wrap">
+          <button type="button" id="load-rankings" class="btn-sm">Refresh rankings</button>
+          <span id="rankings-status" class="muted"></span>
+        </div>
+        <div id="rankings-content"></div>
+      </div>
+      <div id="discover-panel-top20" class="discover-panel">
+        <div class="toolbar wrap">
+          <button type="button" id="load-top20" class="btn-sm">Refresh Top 20</button>
+          <span id="top20-status" class="muted"></span>
+        </div>
+        <div id="top20-content"></div>
+      </div>
     </section>
 
     <section id="panel-portfolio" class="panel">
+      <div id="portfolio-hero" class="portfolio-hero-host"></div>
+      <div id="portfolio-claude-prompts" class="claude-prompt-host"></div>
       <div id="portfolio-account-summary" class="meta-bar"></div>
       <p class="muted">Separate portfolios for long-term investment holdings and momentum trading positions.</p>
       <div class="portfolio-stack portfolio-grid">
         <div class="watchlist-panel">
           <h3>Investment</h3>
           <div class="portfolio-add toolbar wrap">
-            <input class="pos-symbol" data-purpose="investment" placeholder="Symbol" />
+            <input type="search" class="pos-filter" data-purpose="investment" placeholder="Filter symbols…" autocomplete="off" spellcheck="false" aria-label="Filter investment symbols" />
+            <select class="pos-symbol" data-purpose="investment" aria-label="Symbol">
+              <option value="">Choose symbol…</option>
+            </select>
+            <input class="pos-date" data-purpose="investment" type="date" aria-label="Trade date" title="Trade date" />
             <input class="pos-qty" data-purpose="investment" type="number" placeholder="Qty" />
-            <input class="pos-cost" data-purpose="investment" type="number" placeholder="Avg cost" />
-            <button type="button" class="add-position" data-purpose="investment">Add position</button>
+            <input class="pos-cost" data-purpose="investment" type="number" placeholder="Price" step="any" />
+            <input class="pos-notes" data-purpose="investment" type="text" placeholder="Notes (optional)" />
+            <button type="button" class="add-position" data-purpose="investment">Add fill</button>
           </div>
           <div id="portfolio-investment-summary" class="meta-bar"></div>
-          <div class="grid-2 portfolio-panel-grid">
-            <div class="chart-box sm"><canvas id="sector-chart-investment"></canvas></div>
-            <div class="table-wrap" id="portfolio-investment-table"></div>
+          <div class="portfolio-panel-layout">
+            <div class="portfolio-charts">
+              <div class="chart-box portfolio-chart-item">
+                <div class="portfolio-chart-canvas-wrap"><canvas id="sector-chart-investment"></canvas></div>
+              </div>
+              <div class="chart-box portfolio-chart-item">
+                <div class="portfolio-chart-canvas-wrap"><canvas id="ticker-chart-investment"></canvas></div>
+              </div>
+            </div>
+            <div class="table-wrap portfolio-table-wrap" id="portfolio-investment-table"></div>
           </div>
         </div>
         <div class="watchlist-panel">
           <h3>Momentum trading</h3>
           <p class="muted momentum-trading-hint">Each level shows <strong>ATR</strong> and <strong>Struct</strong> rows — run <strong>Analyze Full</strong> on each holding to populate both. Hover for formulas. Developer JSON: <code>risk.strategies.structure</code>.</p>
-          <div class="portfolio-add toolbar wrap">
-            <input class="pos-symbol" data-purpose="trading" placeholder="Symbol" />
-            <input class="pos-qty" data-purpose="trading" type="number" placeholder="Qty" />
-            <input class="pos-cost" data-purpose="trading" type="number" placeholder="Avg cost" />
-            <button type="button" class="add-position" data-purpose="trading">Add position</button>
+          <div class="portfolio-add-trading">
+            <div id="trading-suggested-panel" class="portfolio-suggested-panel hidden">
+              <h4>Suggested (risk-manager)</h4>
+              <div class="suggested-grid">
+                <div class="suggested-item"><span class="suggested-label">Buy zone</span><span id="trading-suggest-buy-zone" class="suggested-value">—</span></div>
+                <div class="suggested-item"><span class="suggested-label">Stop-loss</span><span id="trading-suggest-stop" class="suggested-value">—</span></div>
+                <div class="suggested-item"><span class="suggested-label">Target</span><span id="trading-suggest-target" class="suggested-value">—</span></div>
+                <div class="suggested-item"><span class="suggested-label">Position size</span><span id="trading-suggest-size" class="suggested-value">—</span></div>
+              </div>
+            </div>
+            <div class="portfolio-my-levels toolbar wrap">
+              <input type="search" class="pos-filter" data-purpose="trading" placeholder="Filter symbols…" autocomplete="off" spellcheck="false" aria-label="Filter trading symbols" />
+              <select class="pos-symbol" data-purpose="trading" aria-label="Symbol">
+                <option value="">Choose symbol…</option>
+              </select>
+              <input class="pos-date" data-purpose="trading" type="date" aria-label="Trade date" title="Trade date" />
+              <input class="pos-qty" data-purpose="trading" type="number" placeholder="Qty" />
+              <input class="pos-cost" data-purpose="trading" type="number" placeholder="Price" step="any" />
+              <input class="pos-notes" data-purpose="trading" type="text" placeholder="Notes (optional)" />
+              <input class="pos-stop" data-purpose="trading" type="number" placeholder="My stop-loss" step="any" />
+              <input class="pos-target" data-purpose="trading" type="number" placeholder="My target" step="any" />
+              <button type="button" class="add-position" data-purpose="trading">Add fill</button>
+            </div>
+            <p id="trading-suggest-status" class="muted trading-suggest-status"></p>
           </div>
           <div id="portfolio-trading-summary" class="meta-bar"></div>
           <div id="portfolio-trading-mirror" class="portfolio-mirror-banner-wrap"></div>
           <div class="portfolio-trading-actions toolbar wrap">
             <button type="button" id="sync-trading-portfolio" class="btn-sm hidden">Copy to momentum trading</button>
           </div>
-          <div class="table-wrap" id="portfolio-trading-table"></div>
-          <div class="chart-box sm portfolio-trading-chart"><canvas id="sector-chart-trading"></canvas></div>
+          <div class="portfolio-panel-layout">
+            <div class="portfolio-charts">
+              <div class="chart-box portfolio-chart-item">
+                <div class="portfolio-chart-canvas-wrap"><canvas id="sector-chart-trading"></canvas></div>
+              </div>
+              <div class="chart-box portfolio-chart-item">
+                <div class="portfolio-chart-canvas-wrap"><canvas id="ticker-chart-trading"></canvas></div>
+              </div>
+            </div>
+            <div class="table-wrap portfolio-table-wrap" id="portfolio-trading-table"></div>
+          </div>
         </div>
       </div>
     </section>
 
     <section id="panel-watchlist" class="panel">
       <p class="muted">Separate lists for long-term investment ideas and short-term trading setups.</p>
+      <div id="watchlist-claude-prompts" class="claude-prompt-host"></div>
       <div class="grid-2 watchlist-grid">
         <div class="watchlist-panel">
           <h3>Investment</h3>
@@ -226,6 +339,7 @@
     </section>
 
     <section id="panel-glossary" class="panel">
+      <h2 class="page-heading">Learn</h2>
       <p class="glossary-page-intro muted">Plain-language guide in <strong>English</strong> and <strong>বাংলা</strong>. Fundamental and technical terms are separated. Click a section or term to expand.</p>
       <div class="toolbar glossary-toolbar wrap">
         <input type="search" id="glossary-search" placeholder="Search… (e.g. RSI, ROE, stop, checklist)" />
@@ -242,11 +356,12 @@
     </section>
 
     <section id="panel-news" class="panel">
+      <h2 class="page-heading">Market news</h2>
       <div class="toolbar">
         <button type="button" id="refresh-news">Refresh news</button>
         <span class="muted" id="news-meta"></span>
       </div>
-      <div class="table-wrap" id="all-news"></div>
+      <div id="all-news" class="news-card-feed"></div>
     </section>
 
     <section id="panel-macro" class="panel">
@@ -320,8 +435,56 @@
     </section>
   </main>
 
-  <footer class="footer" id="app-footer">Personal investment workspace — verify live prices before acting</footer>
+  <footer class="footer" id="app-footer">
+    <strong>Educational analysis only — not financial advice.</strong>
+    Verify live prices and company filings on DSE before acting. Stock Buddy scores reflect historical data, not future price moves.
+  </footer>
+  <div id="portfolio-fills-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="portfolio-fills-title">
+    <div class="modal-backdrop" data-close-modal="portfolio-fills"></div>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <h3 id="portfolio-fills-title">Buy history</h3>
+        <button type="button" class="btn-sm modal-close" data-close-modal="portfolio-fills" aria-label="Close">×</button>
+      </div>
+      <div id="portfolio-fills-body" class="modal-body"></div>
+    </div>
+  </div>
+  <div id="agent-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="agent-detail-title">
+    <div class="modal-backdrop" data-close-agent-detail></div>
+    <div class="modal-panel modal-panel-md">
+      <div class="modal-head">
+        <h3 id="agent-detail-title">Agent status</h3>
+        <button type="button" class="btn-sm modal-close" data-close-agent-detail aria-label="Close">×</button>
+      </div>
+      <div class="modal-body" id="agent-detail-body"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn-sm" data-close-agent-detail>Close</button>
+      </div>
+    </div>
+  </div>
+  <div id="action-modal" class="modal modal-confirm hidden" role="alertdialog" aria-modal="true" aria-labelledby="action-modal-title" aria-describedby="action-modal-message">
+    <div class="modal-backdrop" data-close-action-modal="cancel"></div>
+    <div class="modal-panel modal-panel-sm">
+      <div class="modal-head">
+        <h3 id="action-modal-title">Confirm</h3>
+        <button type="button" class="btn-sm modal-close" data-close-action-modal="cancel" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="action-modal-message" class="action-modal-message"></p>
+        <div id="action-modal-input-wrap" class="action-modal-input-wrap hidden">
+          <label id="action-modal-input-label" for="action-modal-input"></label>
+          <input id="action-modal-input" type="text" />
+          <p id="action-modal-input-hint" class="muted action-modal-input-hint hidden"></p>
+        </div>
+        <div class="action-modal-actions">
+          <button type="button" class="btn-sm" id="action-modal-cancel" data-close-action-modal="cancel">Cancel</button>
+          <button type="button" class="btn-sm action-modal-confirm" id="action-modal-confirm">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="toast-host" class="toast-host" aria-live="polite" aria-relevant="additions"></div>
+  <script src="/analysis-agent-education.js"></script>
   <script src="/analysis-ui.js"></script>
   <script src="/app.js"></script>
 </body>

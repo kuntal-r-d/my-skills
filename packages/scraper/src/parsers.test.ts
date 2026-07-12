@@ -6,6 +6,7 @@ import {
   parseDseCompanyHtml,
   parseDseShareholdingHtml,
   parseStockAnalysisStatisticsHtml,
+  parseStockAnalysisStatisticsEmbedded,
   parseStockAnalysisOhlcvHtml,
 } from './sources.js';
 import { parseLankabdDataMatrixHtml } from './lankabd.js';
@@ -55,6 +56,24 @@ describe('DSE parsers', () => {
     expect(f.pe).toBe(12.45);
     expect(f.market_cap).toBeCloseTo(1234560000, -3);
     expect(f.book_value_per_share).toBe(22.1);
+  });
+
+  it('parseStockAnalysisStatisticsEmbedded extracts liquidity and cash-flow stats', () => {
+    const html = `
+      {id:"currentRatio",title:"Current Ratio",value:"2.07",hover:"2.072"}
+      {id:"interestCoverage",title:"Interest Coverage",value:"6.95",hover:"6.947"}
+      {id:"roa",title:"Return on Assets (ROA)",value:"9.51%",hover:"9.513%"}
+      {id:"operatingMargin",title:"Operating Margin",value:"34.87%",hover:"34.866%"}
+      {id:"fcf",title:"Free Cash Flow",value:"5.95B",hover:"5,954,867,270"}
+      {id:"inventoryturnover",title:"Inventory Turnover",value:"6.60",hover:"6.602"}
+    `;
+    const f = parseStockAnalysisStatisticsEmbedded(html);
+    expect(f.current_ratio).toBeCloseTo(2.07, 2);
+    expect(f.interest_coverage).toBeCloseTo(6.95, 2);
+    expect(f.return_on_assets).toBeCloseTo(0.0951, 4);
+    expect(f.operating_margin).toBeCloseTo(0.3487, 4);
+    expect(f.free_cash_flow).toBeCloseTo(5.95e9, -6);
+    expect(f.inventory_turnover).toBeCloseTo(6.6, 1);
   });
 
   it('parseStockAnalysisStatisticsHtml extracts ROE, P/B, debt/equity', () => {

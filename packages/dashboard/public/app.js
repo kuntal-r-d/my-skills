@@ -11,17 +11,58 @@ if (!UI) {
 
 let ohlcvChart = null;
 let shareChart = null;
-let sectorCharts = { investment: null, trading: null };
+let sectorCharts = {};
+const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#a855f7', '#14b8a6', '#f97316', '#84cc16'];
 let currentTickerData = null;
 let allTickers = [];
 let currentAnalysis = null;
 let currentSnapshotMeta = null;
 let viewMode = 'both';
 let valueBucket = 'buffett';
+let momentumStrategyTab = 'minervini_sepa';
 let glossaryTerms = [];
 let glossarySections = [];
 let rawOhlcv = [];
 let activeJsonKey = null;
+let tickerSortKey = 'symbol';
+let tickerSortDir = 'asc';
+let tickerSectorFilter = '';
+let discoverTab = 'screen';
+
+function chartColors() {
+  const root = getComputedStyle(document.documentElement);
+  return {
+    line: root.getPropertyValue('--chart-line').trim() || '#2563eb',
+    muted: root.getPropertyValue('--chart-muted').trim() || '#94a3b8',
+  };
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('stock-buddy-theme');
+  if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+}
+
+function toggleTheme() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  if (dark) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('stock-buddy-theme', 'light');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('stock-buddy-theme', 'dark');
+  }
+  if (rawOhlcv.length) renderChart(resampleOhlcv(rawOhlcv, $('#chart-tf')?.value ?? 'daily'));
+}
+
+function closeMobileNav() {
+  $('#main-nav')?.classList.remove('open');
+  const toggle = $('#nav-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+function closeToolsMenu() {
+  $('#nav-tools-wrap')?.classList.remove('open');
+}
 
 const TOAST_DEFAULT_MS = 3200;
 const TOAST_ERROR_MS = 5000;
@@ -54,6 +95,170 @@ function showToast(message, kind = 'info', durationMs) {
   el.addEventListener('click', () => {
     if (timer) window.clearTimeout(timer);
     dismiss();
+  });
+}
+
+function portfolioBookLabel(purpose) {
+  return purpose === 'trading' ? 'momentum trading' : 'investment';
+}
+
+let actionModalResolve = null;
+
+/**
+ * @returns {Promise<{ confirmed: boolean, value?: string }>}
+ */
+function showActionModal({
+  title,
+  message,
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  danger = false,
+  input,
+}) {
+  return new Promise((resolve) => {
+    const modal = $('#action-modal');
+    const titleEl = $('#action-modal-title');
+    const messageEl = $('#action-modal-message');
+    const inputWrap = $('#action-modal-input-wrap');
+    const inputEl = $('#action-modal-input');
+    const inputLabel = $('#action-modal-input-label');
+    const inputHint = $('#action-modal-input-hint');
+    const confirmBtn = $('#action-modal-confirm');
+    const cancelBtn = $('#action-modal-cancel');
+    if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) {
+      resolve({ confirmed: false });
+      return;
+    }
+
+    actionModalResolve = resolve;
+    titleEl.textContent = title ?? 'Confirm';
+    messageEl.textContent = message ?? '';
+    cancelBtn.textContent = cancelLabel;
+    confirmBtn.textContent = confirmLabel;
+    confirmBtn.classList.toggle('is-danger', Boolean(danger));
+
+    if (input && inputWrap && inputEl && inputLabel) {
+      inputWrap.classList.remove('hidden');
+      inputLabel.textContent = input.label ?? 'Value';
+      inputEl.type = input.type ?? 'text';
+      inputEl.value = input.value ?? '';
+      inputEl.min = input.min ?? '';
+      inputEl.max = input.max ?? '';
+      inputEl.step = input.step ?? 'any';
+      inputEl.placeholder = input.placeholder ?? '';
+      if (inputHint) {
+        if (input.hint) {
+          inputHint.textContent = input.hint;
+          inputHint.classList.remove('hidden');
+        } else {
+          inputHint.textContent = '';
+          inputHint.classList.add('hidden');
+        }
+      }
+    } else if (inputWrap) {
+      inputWrap.classList.add('hidden');
+    }
+
+    modal.classList.remove('hidden');
+
+    const focusTarget = input && inputEl ? inputEl : confirmBtn;
+    window.setTimeout(() => focusTarget?.focus(), 0);
+
+    const onConfirm = () => {
+      if (input && inputEl) {
+        const val = inputEl.value.trim();
+        if (!val) {
+          showToast(`${input.label ?? 'Value'} is required`, 'error');
+          inputEl.focus();
+          return;
+        }
+        if (input.type === 'number') {
+          const num = Number(val);
+          if (!Number.isFinite(num) || num <= 0) {
+            showToast('Enter a positive number', 'error');
+            inputEl.focus();
+            return;
+          }
+          if (input.min != null && num < Number(input.min)) {
+            showToast(`Minimum is ${input.min}`, 'error');
+            inputEl.focus();
+            return;
+          }
+          if (input.max != null && num > Number(input.max)) {
+            showToast(`Maximum is ${input.max}`, 'error');
+            inputEl.focus();
+            return;
+          }
+        }
+        closeActionModal({ confirmed: true, value: val });
+        return;
+      }
+      closeActionModal({ confirmed: true });
+    };
+
+    confirmBtn.onclick = onConfirm;
+    cancelBtn.onclick = () => closeActionModal({ confirmed: false });
+    if (inputEl) {
+      inputEl.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onConfirm();
+        }
+      };
+    }
+  });
+}
+
+function closeAgentDetailModal() {
+  $('#agent-detail-modal')?.classList.add('hidden');
+}
+
+function showAgentDetailModal({ title, html }) {
+  const modal = $('#agent-detail-modal');
+  const titleEl = $('#agent-detail-title');
+  const bodyEl = $('#agent-detail-body');
+  if (!modal || !titleEl || !bodyEl) return;
+  titleEl.textContent = title ?? 'Agent status';
+  bodyEl.innerHTML = html ?? '<p class="muted">No details available.</p>';
+  modal.classList.remove('hidden');
+}
+
+function bindAgentDetailModal() {
+  document.querySelectorAll('[data-close-agent-detail]').forEach((el) => {
+    el.addEventListener('click', closeAgentDetailModal);
+  });
+}
+
+function openAgentStatusDetail(agentKey, lens) {
+  if (!UI?.renderAgentDetailModalContent || !currentAnalysis) return;
+  const cards = currentAnalysis.agent_cards ?? {};
+  const syn = currentAnalysis.synthesis ?? {};
+  const label = {
+    fundamental: 'Fundamental',
+    smart_money: 'Smart money',
+    macro: 'Macro',
+    sentiment: 'Sentiment',
+    technical: 'Technical',
+    volume_flow: 'Volume flow',
+  }[agentKey] ?? agentKey;
+  const lensLabel = lens === 'momentum' ? 'Momentum' : 'Investment';
+  const html = UI.renderAgentDetailModalContent(agentKey, lens, cards, syn);
+  showAgentDetailModal({ title: `${label} — ${lensLabel} signal`, html });
+}
+
+function closeActionModal(result = { confirmed: false }) {
+  const modal = $('#action-modal');
+  modal?.classList.add('hidden');
+  const inputEl = $('#action-modal-input');
+  if (inputEl) inputEl.onkeydown = null;
+  const resolve = actionModalResolve;
+  actionModalResolve = null;
+  resolve?.(result);
+}
+
+function initActionModal() {
+  document.querySelectorAll('[data-close-action-modal]').forEach((el) => {
+    el.addEventListener('click', () => closeActionModal({ confirmed: false }));
   });
 }
 
@@ -188,8 +393,12 @@ function setHashRoute(panel, ticker, { replace = true } = {}) {
 
 function showPanel(name, { updateHash = true, ticker = null, historyMode = 'replace' } = {}) {
   const panel = VALID_PANELS.has(name) ? name : 'overview';
-  $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.panel === panel));
+  $$('.tab').forEach((t) => {
+    if (t.dataset.panel) t.classList.toggle('active', t.dataset.panel === panel);
+  });
   $$('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${panel}`));
+  closeMobileNav();
+  closeToolsMenu();
   if (updateHash) {
     setHashRoute(panel, panel === 'ticker-detail' ? ticker : null, {
       replace: historyMode === 'replace',
@@ -268,6 +477,7 @@ function destroyChart(chart) {
 }
 
 function resampleOhlcv(bars, tf) {
+  if (UI?.resampleOhlcvCalendar) return UI.resampleOhlcvCalendar(bars, tf);
   if (tf === 'daily') return bars;
   const out = [];
   const chunk = tf === 'weekly' ? 5 : 21;
@@ -276,13 +486,18 @@ function resampleOhlcv(bars, tf) {
     if (!slice.length) continue;
     out.push({
       date: slice[slice.length - 1].date,
+      open: slice[0].open,
+      high: Math.max(...slice.map((b) => b.high)),
+      low: Math.min(...slice.map((b) => b.low)),
       close: slice[slice.length - 1].close,
+      volume: slice.reduce((s, b) => s + (b.volume ?? 0), 0),
     });
   }
   return out;
 }
 
 function renderChart(bars) {
+  const colors = chartColors();
   const labels = bars.map((b) => b.date);
   const closes = bars.map((b) => b.close);
   ohlcvChart = destroyChart(ohlcvChart);
@@ -290,27 +505,61 @@ function renderChart(bars) {
     type: 'line',
     data: {
       labels,
-      datasets: [{ label: 'Close (BDT)', data: closes, borderColor: '#3b82f6', tension: 0.1, pointRadius: 0 }],
+      datasets: [{ label: 'Close (BDT)', data: closes, borderColor: colors.line, tension: 0.1, pointRadius: 0 }],
     },
     options: {
       responsive: true,
-      plugins: { legend: { labels: { color: '#8b9cb3' } } },
+      plugins: { legend: { labels: { color: colors.muted } } },
       scales: {
-        x: { ticks: { color: '#8b9cb3', maxTicksLimit: 8 } },
-        y: { ticks: { color: '#8b9cb3' } },
+        x: { ticks: { color: colors.muted, maxTicksLimit: 8 } },
+        y: { ticks: { color: colors.muted } },
       },
     },
   });
+}
+
+function renderAnalysisAboveFold() {
+  if (!UI) return;
+  const ticker = currentTickerData?.ticker;
+  const ohlcv = currentTickerData?.ohlcv ?? rawOhlcv;
+  const a = currentAnalysis;
+  const heroEl = $('#analysis-hero');
+  const verdictEl = $('#analysis-verdict');
+  const healthEl = $('#analysis-health');
+  const keyEl = $('#analysis-keynums');
+  if (heroEl) heroEl.innerHTML = UI.renderStockHero(ticker, ohlcv, a);
+  if (verdictEl) {
+    verdictEl.innerHTML = a
+      ? UI.renderPlainVerdict(a.synthesis, a.value_investment_checklist, UI.resolveMomentumTrading(a), ticker)
+      : '<p class="muted">Run Analyze for a plain-English verdict.</p>';
+  }
+  if (healthEl) {
+    healthEl.innerHTML = a?.value_investment_checklist
+      ? UI.renderHealthCheck(a.value_investment_checklist)
+      : '';
+  }
+  if (keyEl) {
+    keyEl.innerHTML = currentTickerData?.fundamentals
+      ? UI.renderKeyNumbers(currentTickerData.fundamentals, currentTickerData)
+      : '';
+  }
 }
 
 function renderFullAnalysis() {
   if (!UI) return;
   const a = currentAnalysis;
   if (!a) {
-    ['summary', 'investment', 'momentum', 'business', 'risk', 'history'].forEach((s) => {
+    const sym = currentTickerData?.ticker?.symbol ?? currentTickerData?.symbol;
+    ['summary', 'momentum', 'business', 'risk', 'history'].forEach((s) => {
       const el = $(`#sub-${s}`);
       if (el) el.innerHTML = '<p class="muted">No analysis — run Analyze.</p>';
     });
+    const invEl = $('#sub-investment');
+    if (invEl) {
+      invEl.innerHTML =
+        (sym ? UI.renderTickerClaudePrompts(sym, null) : '') +
+        '<p class="muted">No analysis — run Analyze or paste a Claude MCP prompt above.</p>';
+    }
     $('#analysis-json').textContent = '';
     $('#json-provenance').innerHTML = '<p class="muted">No snapshot — run Analyze to populate JSON.</p>';
     const badge = $('#json-freshness-badge');
@@ -325,6 +574,7 @@ function renderFullAnalysis() {
     if (jsonNav) jsonNav.innerHTML = '';
     activeJsonKey = null;
     updateAnalysisDataBar();
+    renderAnalysisAboveFold();
     if (currentTickerData?.news) {
       $('#sub-summary').innerHTML = UI.renderTickerNewsTeaser(currentTickerData.news, 3);
       bindSubPanelLinks('#sub-summary');
@@ -334,19 +584,28 @@ function renderFullAnalysis() {
 
   const cards = a.agent_cards ?? {};
   const syn = a.synthesis ?? {};
-  const ms = a.momentum_screen;
+  const mt = UI.resolveMomentumTrading(a);
   const vc = a.value_investment_checklist;
-  const rot = a.momentum_rotation;
+  const rot = a.momentum_rotation ?? mt?.momentum_rotation;
 
   $('#sub-summary').innerHTML =
-    UI.renderComparison(syn, ms, vc) + UI.renderTickerNewsTeaser(currentTickerData?.news, 3);
+    UI.renderComparison(syn, mt, vc) +
+    UI.renderRecentMomentumBlock(currentTickerData?.ohlcv ?? rawOhlcv) +
+    UI.renderTickerNewsTeaser(currentTickerData?.news, 3);
   $('#sub-investment').innerHTML =
+    UI.renderTickerClaudePrompts(currentTickerData?.ticker?.symbol ?? currentTickerData?.symbol, vc) +
+    (viewMode !== 'momentum' ? UI.renderSynthesisAgentBoard(cards, syn, 'investment') : '') +
     UI.renderThinkingCard('Investment Agent', cards.fundamental, 'Fundamentals, value criteria, long-term thesis (REQ-006)') +
     (viewMode !== 'momentum' ? `<div class="checklist-block"><h4>Value checklist</h4>${UI.renderValueChecklist(vc, valueBucket)}</div>` : '');
   $('#sub-momentum').innerHTML =
-    UI.renderThinkingCard('Momentum Agent', cards.technical, 'Technical indicators, SEPA, volume (REQ-007)') +
+    (viewMode !== 'investment' ? UI.renderSynthesisAgentBoard(cards, syn, 'momentum') : '') +
+    UI.renderThinkingCard('Technical Agent', cards.technical, 'Technical indicators and chart context (REQ-007)') +
     UI.renderIndicators(cards.technical) +
-    (viewMode !== 'investment' ? `<div class="checklist-block"><h4>Momentum checklist</h4>${UI.renderMomentumChecklist(ms, rot)}</div>` : '');
+    (viewMode !== 'investment'
+      ? `<div class="checklist-block"><h4>Momentum master strategies</h4>${UI.renderMomentumStrategiesPanel(mt, momentumStrategyTab, rot)}</div>` +
+        UI.renderMultiTimeframePanel(mt?.multi_timeframe) +
+        UI.renderMarketStructurePanel(mt?.market_structure)
+      : '');
   $('#sub-business').innerHTML = UI.renderBusiness(
     currentTickerData?.fundamentals,
     currentTickerData?.news,
@@ -395,11 +654,16 @@ function renderFullAnalysis() {
 
   $$('.bucket-tab').forEach((btn) => {
     btn.onclick = () => {
-      valueBucket = btn.dataset.bucket;
+      if (btn.dataset.strategy != null) {
+        momentumStrategyTab = btn.dataset.strategy;
+      } else {
+        valueBucket = btn.dataset.bucket;
+      }
       renderFullAnalysis();
     };
   });
   updateAnalysisDataBar();
+  renderAnalysisAboveFold();
 }
 
 async function loadTickerAnalysis(symbol) {
@@ -446,6 +710,7 @@ async function runAnalyze(mode) {
       throw new Error(String(data.analysis.error));
     }
     currentAnalysis = data.analysis;
+    patchTickerListAnalysis(data.symbol ?? sym, data.analysis);
     currentSnapshotMeta = {
       id: data.snapshot_id,
       created_at: new Date().toISOString(),
@@ -517,16 +782,17 @@ async function loadTickerDetail(symbol) {
   shareChart = destroyChart(shareChart);
   if (sh.length) {
     const last = sh[sh.length - 1];
+    const colors = chartColors();
     shareChart = new Chart($('#share-chart'), {
       type: 'doughnut',
       data: {
         labels: ['Sponsor', 'Institution', 'Foreign', 'Public', 'Govt'],
         datasets: [{
           data: [last.sponsor, last.institution, last.foreign, last.public, last.govt],
-          backgroundColor: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#64748b'],
+          backgroundColor: ['#2563eb', '#8b5cf6', '#16a34a', '#d97706', colors.muted],
         }],
       },
-      options: { plugins: { legend: { labels: { color: '#8b9cb3' } } } },
+      options: { plugins: { legend: { labels: { color: colors.muted } } } },
     });
   }
 
@@ -563,53 +829,128 @@ function bindPanelLinks(root = 'body') {
 
 async function loadOverview() {
   $('#home-briefing-content').innerHTML = '<p class="muted">Loading…</p>';
-  const data = await api('/api/overview');
+  const [data, rankings] = await Promise.all([
+    api('/api/overview'),
+    api('/api/rankings?limit=5').catch(() => ({ rankings: [] })),
+  ]);
   lastBriefingPayload = data.briefing ?? null;
-  const home = UI.renderHome(data);
+  const home = UI.renderHome({ ...data, topRanked: rankings.rankings });
 
   $('#home-briefing-content').innerHTML = home.briefing;
   $('#home-important-news').innerHTML = home.importantNews;
+  const rankedEl = $('#home-ranked-preview');
+  if (rankedEl) rankedEl.innerHTML = home.rankedPreview;
 
   bindHomeClicks('#panel-overview');
   bindPanelLinks('#panel-overview');
+  $$('#home-ranked-preview [data-symbol]').forEach((el) => {
+    el.addEventListener('click', () => openTicker(el.dataset.symbol));
+  });
+}
+
+function renderTickersPanel() {
+  const q = () => ($('#ticker-search').value || '').toUpperCase();
+  const filtered = allTickers.filter((t) => {
+    const matchQ = t.symbol.includes(q()) || (t.name ?? '').toUpperCase().includes(q());
+    const matchSector = !tickerSectorFilter || (t.sector ?? '') === tickerSectorFilter;
+    return matchQ && matchSector;
+  });
+  $('#tickers-table').innerHTML = UI.renderTickersTable(filtered, {
+    sortKey: tickerSortKey,
+    sortDir: tickerSortDir,
+    sectorFilter: tickerSectorFilter,
+  });
+  $$('#tickers-table [data-symbol]').forEach((el) => {
+    el.addEventListener('click', () => openTicker(el.dataset.symbol));
+  });
+  $$('#tickers-table th[data-sort]').forEach((th) => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (tickerSortKey === key) tickerSortDir = tickerSortDir === 'asc' ? 'desc' : 'asc';
+      else {
+        tickerSortKey = key;
+        tickerSortDir = 'asc';
+      }
+      renderTickersPanel();
+    });
+  });
+}
+
+function renderSectorChips() {
+  const chipsEl = $('#ticker-sector-chips');
+  if (!chipsEl) return;
+  const sectors = [...new Set(allTickers.map((t) => t.sector).filter(Boolean))].sort();
+  chipsEl.innerHTML =
+    `<button type="button" class="sector-chip-btn ${tickerSectorFilter === '' ? 'active' : ''}" data-sector="">All</button>`
+    + sectors.map((s) =>
+      `<button type="button" class="sector-chip-btn ${tickerSectorFilter === s ? 'active' : ''}" data-sector="${UI.esc(s)}">${UI.esc(s)}</button>`,
+    ).join('');
+  $$('#ticker-sector-chips .sector-chip-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      tickerSectorFilter = btn.dataset.sector ?? '';
+      renderTickersPanel();
+      renderSectorChips();
+    });
+  });
+}
+
+function refreshTickerSelectOptions(filter) {
+  const sel = $('#ticker-select');
+  if (!sel) return;
+  const cur = sel.value;
+  const q = filter ?? $('#ticker-select-filter')?.value ?? '';
+  const { html } = populateTickerSelectOptions(q);
+  sel.innerHTML = html;
+  if (cur && allTickers.some((t) => t.symbol === cur)) sel.value = cur;
+  else if (!q && allTickers.some((t) => t.symbol === 'LHB')) sel.value = 'LHB';
+}
+
+function patchTickerListAnalysis(symbol, analysis) {
+  const sym = String(symbol ?? '').toUpperCase();
+  const t = allTickers.find((x) => x.symbol === sym);
+  if (!t || !analysis) return;
+  const syn = analysis.synthesis ?? {};
+  const inv = syn.investment ?? {};
+  const mom = syn.momentum ?? {};
+  const vc = analysis.value_investment_checklist ?? {};
+  const mt = analysis.momentum_trading ?? {};
+  const summary = mt.summary ?? {};
+  const ms = analysis.momentum_screen ?? {};
+  if (inv.composite_1_10 != null) t.investment_score = inv.composite_1_10;
+  if (inv.rating) t.investment_rating = inv.rating;
+  if (mom.composite_1_10 != null) t.momentum_score = mom.composite_1_10;
+  if (mom.rating) t.momentum_rating = mom.rating;
+  if (vc.rating) t.value_grade = vc.rating;
+  if (vc.key_metrics?.gpa != null) t.gpa = vc.key_metrics.gpa;
+  const momGrade = summary.rating ?? summary.consensus_grade ?? ms.rating;
+  if (momGrade) t.momentum_grade = momGrade;
+  const momCount = summary.overall_count ?? ms.key_metrics?.overall_count;
+  if (momCount) t.momentum_count = momCount;
+  refreshTickerSelectOptions();
+  if ($('#panel-tickers')?.classList.contains('active')) renderTickersPanel();
 }
 
 async function loadTickers() {
   const { tickers } = await api('/api/tickers');
   allTickers = [...tickers].sort((a, b) => a.symbol.localeCompare(b.symbol));
-  const q = () => ($('#ticker-search').value || '').toUpperCase();
-  const render = () => {
-    const filtered = tickers.filter((t) => t.symbol.includes(q()));
-    $('#tickers-table').innerHTML = table(
-      ['Symbol', 'Name', 'Sector', 'Bars', 'Last', ''],
-      filtered.map((t) => [
-        `<span class="clickable" data-symbol="${t.symbol}">${t.symbol}</span>`,
-        t.name ?? '—',
-        t.sector ?? '—',
-        t.ohlcv_bars,
-        UI.fmtDate(t.last_trade_date),
-        `<span class="clickable" data-symbol="${t.symbol}">View →</span>`,
-      ]),
-    );
-    $$('#tickers-table [data-symbol]').forEach((el) => {
-      el.addEventListener('click', () => openTicker(el.dataset.symbol));
-    });
-  };
-  $('#ticker-search').oninput = render;
-  render();
+  $('#ticker-search').oninput = () => renderTickersPanel();
+  $('#ticker-select-filter')?.addEventListener('input', (e) => {
+    refreshTickerSelectOptions(e.target.value ?? '');
+  });
+  renderSectorChips();
+  renderTickersPanel();
 
   const sel = $('#ticker-select');
-  sel.innerHTML = allTickers.map((t) => `<option value="${t.symbol}">${t.symbol}</option>`).join('');
-  if (allTickers.some((t) => t.symbol === 'LHB')) sel.value = 'LHB';
+  if (sel) refreshTickerSelectOptions();
 
   populateWatchSelects('investment');
   populateWatchSelects('trading');
+  populatePosSymbolSelects('investment');
+  populatePosSymbolSelects('trading');
+  initPortfolioFillDates();
 }
 
-function populateWatchSelects(purpose, filter = '') {
-  const sel = $(`#watch-select-${purpose}`);
-  if (!sel) return;
-
+function populateTickerSelectOptions(filter = '') {
   const q = filter.trim().toUpperCase();
   const filtered = q
     ? allTickers.filter(
@@ -617,47 +958,477 @@ function populateWatchSelects(purpose, filter = '') {
       )
     : allTickers;
 
-  const cur = sel.value;
   const cap = 400;
   const slice = filtered.slice(0, cap);
-  sel.innerHTML =
+  const html =
     '<option value="">Choose symbol…</option>'
     + slice.map((t) => {
-      const label = t.name ? `${t.symbol} — ${t.name}` : t.symbol;
+      const label = UI.renderTickerOptionLabel(t);
       return `<option value="${UI.esc(t.symbol)}">${UI.esc(label)}</option>`;
     }).join('')
     + (filtered.length > cap ? `<option value="" disabled>…${filtered.length - cap} more — narrow filter</option>` : '');
 
+  return { html, slice };
+}
+
+function populateWatchSelects(purpose, filter = '') {
+  const sel = $(`#watch-select-${purpose}`);
+  if (!sel) return;
+
+  const { html, slice } = populateTickerSelectOptions(filter);
+  const cur = sel.value;
+  sel.innerHTML = html;
+
   if (cur && slice.some((t) => t.symbol === cur)) sel.value = cur;
 }
 
-function renderSectorChart(purpose, portfolio, { canvasPrefix = '' } = {}) {
-  const canvas = $(`#${canvasPrefix}sector-chart-${purpose}`);
-  if (!canvas) return;
-  const chartKey = canvasPrefix ? `${canvasPrefix}${purpose}` : purpose;
-  sectorCharts[chartKey] = destroyChart(sectorCharts[chartKey]);
-  if (!portfolio?.sector_allocation?.length) return;
+function populatePosSymbolSelects(purpose, filter = '') {
+  const sel = $(`.pos-symbol[data-purpose="${purpose}"]`);
+  if (!sel) return;
 
+  const { html, slice } = populateTickerSelectOptions(filter);
+  const cur = sel.value;
+  sel.innerHTML = html;
+
+  if (cur && slice.some((t) => t.symbol === cur)) sel.value = cur;
+}
+
+function buildTickerAllocation(positions) {
+  if (!positions?.length) return [];
+  const items = positions.map((p) => ({
+    label: p.ticker,
+    value: p.market_value ?? p.cost_basis ?? 0,
+  })).filter((x) => x.value > 0);
+  const total = items.reduce((s, x) => s + x.value, 0);
+  return items
+    .map((x) => ({ ...x, pct: total > 0 ? (x.value / total) * 100 : 0 }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function pieLabelsWithPct(items) {
+  return items.map((i) => `${i.label ?? i.sector} (${UI.fmtNum(i.pct, 1)}%)`);
+}
+
+function renderPieChart(canvas, chartKey, items, title) {
+  if (!canvas) return;
+  sectorCharts[chartKey] = destroyChart(sectorCharts[chartKey]);
+  if (!items?.length) return;
+
+  const values = items.map((i) => i.value);
   sectorCharts[chartKey] = new Chart(canvas, {
     type: 'pie',
     data: {
-      labels: portfolio.sector_allocation.map((s) => s.sector),
+      labels: pieLabelsWithPct(items),
       datasets: [{
-        data: portfolio.sector_allocation.map((s) => s.value),
-        backgroundColor: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b'],
+        data: values,
+        backgroundColor: PIE_COLORS.slice(0, items.length),
       }],
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: 6 },
       plugins: {
-        legend: { labels: { color: '#8b9cb3' } },
-        title: {
-          display: true,
-          text: purpose === 'trading' ? 'Trading sector allocation' : 'Investment sector allocation',
-          color: '#8b9cb3',
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#8b9cb3',
+            boxWidth: 12,
+            font: { size: 11 },
+            padding: 10,
+          },
+        },
+        title: { display: true, text: title, color: '#8b9cb3', font: { size: 12 }, padding: { bottom: 8 } },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              const item = items[ctx.dataIndex];
+              return ` ${item.label ?? item.sector}: ৳${UI.fmtNum(item.value, 0)} (${UI.fmtNum(item.pct, 1)}%)`;
+            },
+          },
         },
       },
     },
   });
+}
+
+function renderPortfolioCharts(purpose, portfolio, { canvasPrefix = '' } = {}) {
+  const sectorCanvas = $(`#${canvasPrefix}sector-chart-${purpose}`);
+  const tickerCanvas = $(`#${canvasPrefix}ticker-chart-${purpose}`);
+  const sectorKey = `${canvasPrefix}${purpose}-sector`;
+  const tickerKey = `${canvasPrefix}${purpose}-ticker`;
+
+  const sectorItems = (portfolio?.sector_allocation ?? []).map((s) => ({
+    label: s.sector,
+    sector: s.sector,
+    value: s.value,
+    pct: s.pct ?? 0,
+  }));
+
+  const tickerItems = buildTickerAllocation(portfolio?.positions);
+  const bookLabel = purpose === 'trading' ? 'Trading' : 'Investment';
+
+  renderPieChart(sectorCanvas, sectorKey, sectorItems, `${bookLabel} by sector`);
+  renderPieChart(tickerCanvas, tickerKey, tickerItems, `${bookLabel} by ticker`);
+}
+
+function resizePortfolioCharts() {
+  requestAnimationFrame(() => {
+    for (const chart of Object.values(sectorCharts)) {
+      chart?.resize?.();
+    }
+  });
+}
+
+function todayInputDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function initPortfolioFillDates() {
+  for (const purpose of ['investment', 'trading']) {
+    const el = $(`.pos-date[data-purpose="${purpose}"]`);
+    if (el && !el.value) el.value = todayInputDate();
+  }
+}
+
+let fillsModalSymbol = '';
+let fillsModalPurpose = 'investment';
+
+function closePortfolioFillsModal() {
+  $('#portfolio-fills-modal')?.classList.add('hidden');
+  fillsModalSymbol = '';
+}
+
+async function refreshPortfolioFillsModal() {
+  if (!fillsModalSymbol) return;
+  const body = $('#portfolio-fills-body');
+  if (!body) return;
+  try {
+    const data = await api(`/api/portfolio/positions/${encodeURIComponent(fillsModalSymbol)}/fills?purpose=${fillsModalPurpose}`);
+    body.innerHTML = UI.renderPortfolioFillsModal(data);
+    bindPortfolioFillsModal(body);
+  } catch (e) {
+    body.innerHTML = `<p class="muted">${UI.esc(e.message || 'Could not load buy history')}</p>`;
+  }
+}
+
+function setFillRowEditing(row, editing) {
+  if (!row) return;
+  row.classList.toggle('is-editing', editing);
+  if (editing) row.classList.remove('is-splitting');
+  row.querySelectorAll('.fill-view').forEach((el) => el.classList.toggle('hidden', editing));
+  const editCell = row.querySelector('.fill-edit');
+  if (editCell) editCell.classList.toggle('hidden', !editing);
+  const splitCell = row.querySelector('.fill-split');
+  if (splitCell) splitCell.classList.toggle('hidden', true);
+}
+
+function setFillRowSplitting(row, splitting) {
+  if (!row) return;
+  row.classList.toggle('is-splitting', splitting);
+  if (splitting) row.classList.remove('is-editing');
+  row.querySelectorAll('.fill-view').forEach((el) => el.classList.toggle('hidden', splitting));
+  const splitCell = row.querySelector('.fill-split');
+  if (splitCell) splitCell.classList.toggle('hidden', !splitting);
+  const editCell = row.querySelector('.fill-edit');
+  if (editCell) editCell.classList.toggle('hidden', true);
+}
+
+async function submitPortfolioMove({ symbol, from, to, qty, maxQty, closeModal = false, skipConfirm = false }) {
+  const max = Number(maxQty);
+  const moveQty = qty == null || qty === '' ? max : Number(qty);
+  if (!moveQty || moveQty <= 0) {
+    showToast('Enter a positive share quantity', 'error');
+    return;
+  }
+  if (max > 0 && moveQty > max) {
+    showToast(`Cannot move more than ${max} shares`, 'error');
+    return;
+  }
+  const partial = max > 0 && moveQty < max;
+  const label = partial ? `${moveQty} of ${max}` : `all ${moveQty}`;
+  const fromLabel = portfolioBookLabel(from);
+  const toLabel = portfolioBookLabel(to);
+
+  if (!skipConfirm) {
+    const { confirmed } = await showActionModal({
+      title: `Move to ${toLabel}`,
+      message: `Move ${label} shares of ${symbol} from ${fromLabel} to ${toLabel}.\n\nOldest buy lots transfer first (FIFO). Each lot keeps its date, price, and notes.`,
+      confirmLabel: 'Move shares',
+    });
+    if (!confirmed) return;
+  }
+
+  const result = await api('/api/portfolio/move', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol, from, to, qty: moveQty }),
+  });
+  showToast(
+    partial
+      ? `Moved ${result.moved_qty} shares of ${symbol} to ${toLabel}`
+      : `Moved all ${result.moved_qty} shares of ${symbol} to ${toLabel}`,
+    'ok',
+  );
+  if (closeModal) closePortfolioFillsModal();
+  await loadPortfolio();
+}
+
+function bindPortfolioFillsModal(root) {
+  if (!root) return;
+
+  root.querySelector('#portfolio-add-fill-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const trade_date = form.trade_date?.value;
+    const qty = Number(form.qty?.value);
+    const price = Number(form.price?.value);
+    const notes = form.notes?.value?.trim() ?? '';
+    if (!trade_date || !qty || !price) {
+      showToast('Date, qty, and price are required', 'error');
+      return;
+    }
+    await api('/api/portfolio/positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: fillsModalSymbol,
+        qty,
+        avg_cost: price,
+        trade_date,
+        notes,
+        purpose: fillsModalPurpose,
+      }),
+    });
+    showToast('Fill added', 'ok');
+    form.reset();
+    if (form.trade_date) form.trade_date.value = new Date().toISOString().slice(0, 10);
+    await refreshPortfolioFillsModal();
+    await loadPortfolio();
+  });
+
+  root.querySelector('#portfolio-move-qty-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = root.querySelector('.move-pos-from-modal');
+    if (!btn) return;
+    await submitPortfolioMove({
+      symbol: btn.dataset.symbol,
+      from: btn.dataset.from,
+      to: btn.dataset.to,
+      qty: e.target.move_qty?.value,
+      maxQty: btn.dataset.maxQty,
+      closeModal: true,
+    });
+  });
+
+  root.querySelectorAll('.move-fill').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const to = btn.dataset.to;
+      const fillId = btn.dataset.fillId;
+      const sym = btn.dataset.symbol || fillsModalSymbol;
+      const from = btn.dataset.from || fillsModalPurpose;
+      const qty = btn.dataset.fillQty;
+      const price = btn.dataset.fillPrice;
+      const date = btn.dataset.fillDate;
+      const notes = btn.dataset.fillNotes;
+      const toLabel = portfolioBookLabel(to);
+      const fromLabel = portfolioBookLabel(from);
+      const priceStr = price != null && UI?.fmtNum ? `৳${UI.fmtNum(price, 2)}` : `৳${price}`;
+      let message = `Move ${qty} shares of ${sym}`;
+      if (date) message += ` (bought ${date}`;
+      if (price) message += date ? ` @ ${priceStr})` : ` @ ${priceStr}`;
+      else if (date) message += ')';
+      message += ` from ${fromLabel} to ${toLabel}.`;
+      if (notes) message += `\n\nNotes: “${notes}”`;
+      message += '\n\nThis fill keeps its full history in the destination book.';
+
+      const { confirmed } = await showActionModal({
+        title: 'Move this fill',
+        message,
+        confirmLabel: `Move to ${toLabel}`,
+      });
+      if (!confirmed) return;
+
+      try {
+        const result = await api(`/api/portfolio/fills/${fillId}/move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to }),
+        });
+        showToast(`Moved ${result.moved_qty} shares of ${sym} to ${toLabel}`, 'ok');
+        await refreshPortfolioFillsModal();
+        await loadPortfolio();
+      } catch (e) {
+        showToast(e.message || 'Could not move fill', 'error');
+      }
+    });
+  });
+
+  root.querySelectorAll('.split-fill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('.fill-row');
+      root.querySelectorAll('.fill-row.is-splitting, .fill-row.is-editing').forEach((r) => {
+        setFillRowSplitting(r, false);
+        setFillRowEditing(r, false);
+      });
+      setFillRowSplitting(row, true);
+      bindSplitPricePreview(row);
+    });
+  });
+
+  function bindSplitPricePreview(row) {
+    if (!row || row.dataset.splitPreviewBound) return;
+    row.dataset.splitPreviewBound = '1';
+    const qtyInput = row.querySelector('.fill-split-qty');
+    const priceInput = row.querySelector('.fill-split-price');
+    const preview = row.querySelector('.fill-split-preview');
+    const saveBtn = row.querySelector('.save-split');
+    if (!qtyInput || !preview || !saveBtn) return;
+    const lotQty = Number(saveBtn.dataset.lotQty);
+    const lotPrice = Number(saveBtn.dataset.lotPrice);
+    const update = () => {
+      const splitQty = Number(qtyInput.value);
+      const splitPrice = priceInput?.value?.trim() ? Number(priceInput.value) : lotPrice;
+      if (!splitQty || splitQty <= 0 || splitQty >= lotQty || !splitPrice || splitPrice <= 0) {
+        preview.textContent = '';
+        return;
+      }
+      const totalCost = lotQty * lotPrice;
+      const splitCost = splitQty * splitPrice;
+      const remainCost = totalCost - splitCost;
+      if (remainCost <= 0) {
+        preview.textContent = 'Split price too high for this quantity.';
+        preview.classList.add('neg');
+        return;
+      }
+      preview.classList.remove('neg');
+      const remainQty = lotQty - splitQty;
+      const remainPrice = remainCost / remainQty;
+      preview.textContent = `Remainder after split: ${remainQty} @ ৳${UI.fmtNum(remainPrice, 2)} (was ৳${UI.fmtNum(lotPrice, 2)})`;
+    };
+    qtyInput.addEventListener('input', update);
+    priceInput?.addEventListener('input', update);
+    update();
+  }
+
+  root.querySelectorAll('.cancel-split').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setFillRowSplitting(btn.closest('.fill-row'), false);
+    });
+  });
+
+  root.querySelectorAll('.save-split').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('.fill-row');
+      const splitQty = Number(row.querySelector('.fill-split-qty')?.value);
+      const splitPriceRaw = row.querySelector('.fill-split-price')?.value?.trim();
+      const lotQty = Number(btn.dataset.lotQty);
+      const lotPrice = Number(btn.dataset.lotPrice);
+      if (!splitQty || splitQty <= 0 || splitQty >= lotQty) {
+        showToast(`Split qty must be between 1 and ${lotQty - 1}`, 'error');
+        return;
+      }
+      const body = { split_qty: splitQty };
+      if (splitPriceRaw) {
+        const splitPrice = Number(splitPriceRaw);
+        if (!splitPrice || splitPrice <= 0) {
+          showToast('Split price must be positive', 'error');
+          return;
+        }
+        body.split_price = splitPrice;
+      }
+      try {
+        const result = await api(`/api/portfolio/fills/${btn.dataset.fillId}/split`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const remainMsg = result.remain_price != null
+          ? ` Remainder: ${result.remain_qty} @ ৳${UI.fmtNum(result.remain_price, 2)}.`
+          : '';
+        showToast(`Split ${result.split_qty} @ ৳${UI.fmtNum(result.split_price ?? lotPrice, 2)}.${remainMsg}`, 'ok');
+        await refreshPortfolioFillsModal();
+        await loadPortfolio();
+      } catch (e) {
+        showToast(e.message || 'Could not split lot', 'error');
+      }
+    });
+  });
+
+  root.querySelectorAll('.edit-fill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('.fill-row');
+      root.querySelectorAll('.fill-row.is-editing, .fill-row.is-splitting').forEach((r) => {
+        setFillRowEditing(r, false);
+        setFillRowSplitting(r, false);
+      });
+      setFillRowEditing(row, true);
+    });
+  });
+
+  root.querySelectorAll('.cancel-fill-edit').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setFillRowEditing(btn.closest('.fill-row'), false);
+    });
+  });
+
+  root.querySelectorAll('.save-fill').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('.fill-row');
+      const fillId = btn.dataset.fillId;
+      const trade_date = row.querySelector('.fill-edit-date')?.value;
+      const qty = Number(row.querySelector('.fill-edit-qty')?.value);
+      const price = Number(row.querySelector('.fill-edit-price')?.value);
+      const notes = row.querySelector('.fill-edit-notes')?.value?.trim() ?? '';
+      if (!trade_date || !qty || !price) {
+        showToast('Date, qty, and price are required', 'error');
+        return;
+      }
+      await api(`/api/portfolio/fills/${fillId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trade_date, qty, price, notes }),
+      });
+      showToast('Fill updated', 'ok');
+      await refreshPortfolioFillsModal();
+      await loadPortfolio();
+    });
+  });
+
+  root.querySelectorAll('.del-fill').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('.fill-row');
+      const qty = btn.dataset.fillQty || row?.querySelector('td:nth-child(2)')?.textContent?.trim();
+      const date = btn.dataset.fillDate || row?.querySelector('td:nth-child(1)')?.textContent?.trim();
+      const sym = fillsModalSymbol || 'this position';
+      const { confirmed } = await showActionModal({
+        title: 'Delete fill',
+        message: `Remove ${qty ? `${qty} shares` : 'this fill'}${date ? ` from ${date}` : ''} of ${sym}?\n\nPosition totals will be recalculated from remaining buy history.`,
+        confirmLabel: 'Delete fill',
+        danger: true,
+      });
+      if (!confirmed) return;
+      await api(`/api/portfolio/fills/${btn.dataset.fillId}`, { method: 'DELETE' });
+      showToast('Fill deleted — totals recalculated', 'info');
+      await refreshPortfolioFillsModal();
+      await loadPortfolio();
+    });
+  });
+}
+
+async function openPortfolioFillsModal(symbol, purpose) {
+  const modal = $('#portfolio-fills-modal');
+  const body = $('#portfolio-fills-body');
+  const title = $('#portfolio-fills-title');
+  if (!modal || !body || !title) return;
+
+  fillsModalSymbol = symbol;
+  fillsModalPurpose = purpose;
+  title.textContent = `${symbol} — buy history (${purpose})`;
+  body.innerHTML = '<p class="muted">Loading buy history…</p>';
+  modal.classList.remove('hidden');
+
+  await refreshPortfolioFillsModal();
 }
 
 function bindPortfolioPanel(root, purpose) {
@@ -673,6 +1444,124 @@ function bindPortfolioPanel(root, purpose) {
       showToast(`Removed ${sym} from ${posPurpose} portfolio`, 'info');
     });
   });
+  root.querySelectorAll('.move-pos').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const sym = btn.dataset.symbol;
+      const from = btn.dataset.from;
+      const to = btn.dataset.to;
+      const maxQty = Number(btn.dataset.qty);
+      const toLabel = portfolioBookLabel(to);
+      const fromLabel = portfolioBookLabel(from);
+      const { confirmed, value } = await showActionModal({
+        title: `Move to ${toLabel}`,
+        message: `How many shares of ${sym} to move from ${fromLabel} to ${toLabel}?\n\nOldest lots move first (FIFO).`,
+        confirmLabel: 'Move shares',
+        input: {
+          type: 'number',
+          label: 'Shares to move',
+          value: maxQty > 0 ? String(maxQty) : '',
+          min: 1,
+          max: maxQty > 0 ? maxQty : undefined,
+          step: 1,
+          hint: maxQty > 0 ? `Maximum available: ${maxQty} shares` : undefined,
+        },
+      });
+      if (!confirmed) return;
+      await submitPortfolioMove({
+        symbol: sym,
+        from,
+        to,
+        qty: value,
+        maxQty,
+        skipConfirm: true,
+      });
+    });
+  });
+  root.querySelectorAll('.view-fills').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      openPortfolioFillsModal(btn.dataset.symbol, btn.dataset.purpose ?? purpose);
+    });
+  });
+}
+
+function formatSuggestZone(atr, structure) {
+  const fmt = (low, high) => (low != null && high != null ? `৳${UI.fmtNum(low)} – ৳${UI.fmtNum(high)}` : null);
+  const atrZ = fmt(atr?.buy_zone_low, atr?.buy_zone_high);
+  const structZ = fmt(structure?.buy_zone_low, structure?.buy_zone_high);
+  const parts = [];
+  if (atrZ) parts.push(`ATR ${atrZ}`);
+  if (structZ) parts.push(`Struct ${structZ}`);
+  return parts.length ? parts.join(' · ') : '—';
+}
+
+function formatSuggestLevel(atr, structure, field) {
+  const parts = [];
+  if (atr?.[field] != null) parts.push(`ATR ৳${UI.fmtNum(atr[field])}`);
+  if (structure?.[field] != null) parts.push(`Struct ৳${UI.fmtNum(structure[field])}`);
+  return parts.length ? parts.join(' · ') : '—';
+}
+
+function formatSuggestSize(atr, structure) {
+  const parts = [];
+  if (atr?.position_value_bdt != null) {
+    parts.push(`ATR ৳${UI.fmtNum(atr.position_value_bdt, 0)}${atr.suggested_shares != null ? ` · ${UI.fmtNum(atr.suggested_shares, 0)} shares` : ''}`);
+  }
+  if (structure?.position_value_bdt != null) {
+    parts.push(`Struct ৳${UI.fmtNum(structure.position_value_bdt, 0)}${structure.suggested_shares != null ? ` · ${UI.fmtNum(structure.suggested_shares, 0)} shares` : ''}`);
+  }
+  return parts.length ? parts.join(' · ') : '—';
+}
+
+function clearTradingSuggestPanel() {
+  $('#trading-suggested-panel')?.classList.add('hidden');
+  for (const id of ['trading-suggest-buy-zone', 'trading-suggest-stop', 'trading-suggest-target', 'trading-suggest-size']) {
+    const el = $(`#${id}`);
+    if (el) el.textContent = '—';
+  }
+  const status = $('#trading-suggest-status');
+  if (status) status.textContent = '';
+}
+
+async function prefillTradingRisk(symbol) {
+  const sym = String(symbol ?? '').trim().toUpperCase();
+  if (!sym) {
+    clearTradingSuggestPanel();
+    return;
+  }
+  const status = $('#trading-suggest-status');
+  try {
+    if (status) status.textContent = 'Loading suggestions…';
+    const data = await api(`/api/tickers/${encodeURIComponent(sym)}/risk-suggest`);
+    const panel = $('#trading-suggested-panel');
+    if (!data.has_analysis) {
+      panel?.classList.add('hidden');
+      if (status) status.textContent = 'No analysis yet — run Analyze Full for suggestions.';
+      return;
+    }
+    panel?.classList.remove('hidden');
+    const { atr, structure } = data;
+    $('#trading-suggest-buy-zone').textContent = formatSuggestZone(atr, structure);
+    $('#trading-suggest-stop').textContent = formatSuggestLevel(atr, structure, 'stop_loss');
+    $('#trading-suggest-target').textContent = formatSuggestLevel(atr, structure, 'target');
+    $('#trading-suggest-size').textContent = formatSuggestSize(atr, structure);
+
+    const qtyEl = $('.pos-qty[data-purpose="trading"]');
+    const costEl = $('.pos-cost[data-purpose="trading"]');
+    const stopEl = $('.pos-stop[data-purpose="trading"]');
+    const targetEl = $('.pos-target[data-purpose="trading"]');
+    if (qtyEl && !qtyEl.value && atr?.suggested_shares != null) qtyEl.value = String(Math.round(atr.suggested_shares));
+    if (costEl && !costEl.value) {
+      const cost = atr?.buy_zone_high ?? atr?.entry;
+      if (cost != null) costEl.value = String(cost);
+    }
+    if (stopEl && !stopEl.value && atr?.stop_loss != null) stopEl.value = String(atr.stop_loss);
+    if (targetEl && !targetEl.value && atr?.target != null) targetEl.value = String(atr.target);
+
+    if (status) status.textContent = 'Suggested levels shown above — My stop/target pre-filled from ATR (editable).';
+  } catch (e) {
+    clearTradingSuggestPanel();
+    if (status) status.textContent = e.message || 'Could not load suggestions';
+  }
 }
 
 async function loadPortfolio() {
@@ -683,8 +1572,12 @@ async function loadPortfolio() {
     return;
   }
 
-  $('#portfolio-account-summary').innerHTML =
-    `Account <strong>${account.label}</strong> · Capital ৳${UI.fmtNum(account.capital_bdt, 0)} · Risk/trade ${UI.fmtNum(account.risk_per_trade_pct, 1)}%`;
+  $('#portfolio-account-summary').innerHTML = UI.renderPortfolioBrokerBar(data.metrics, account);
+
+  const heroEl = $('#portfolio-hero');
+  if (heroEl) {
+    heroEl.innerHTML = UI.renderPortfolioHero(data.investment, data.trading);
+  }
 
   for (const purpose of ['investment', 'trading']) {
     const portfolio = data[purpose] ?? data;
@@ -692,21 +1585,47 @@ async function loadPortfolio() {
 
     const tableEl = $(`#portfolio-${purpose}-table`);
     if (purpose === 'trading') {
-      $('#portfolio-trading-mirror').innerHTML = UI.renderTradingMirrorBanner(portfolio.mirrored_from_investment);
+      $('#portfolio-trading-mirror').innerHTML = '';
       const syncBtn = $('#sync-trading-portfolio');
+      const tradingEmpty = !(portfolio.positions?.length);
+      const investmentHas = (data.investment?.positions?.length ?? 0) > 0;
       if (syncBtn) {
-        syncBtn.classList.toggle('hidden', !portfolio.mirrored_from_investment);
+        syncBtn.classList.toggle('hidden', !(tradingEmpty && investmentHas));
       }
       tableEl.innerHTML = UI.renderMomentumPortfolioTable(portfolio.positions, {
         purpose,
-        showActions: !portfolio.mirrored_from_investment,
+        showActions: true,
       });
     } else {
-      tableEl.innerHTML = UI.renderPortfolioTable(portfolio.positions, { purpose });
+      tableEl.innerHTML = UI.renderPortfolioTable(portfolio.positions, { purpose, showActions: true });
     }
     bindPortfolioPanel(tableEl, purpose);
 
-    renderSectorChart(purpose, portfolio);
+    renderPortfolioCharts(purpose, portfolio);
+  }
+  resizePortfolioCharts();
+
+  const host = $('#portfolio-claude-prompts');
+  if (host && UI?.renderBatchClaudePrompts) {
+    const invTickers = (data.investment?.positions ?? []).map((p) => p.ticker);
+    const trTickers = (data.trading?.positions ?? []).map((p) => p.ticker);
+    host.innerHTML =
+      UI.renderBatchClaudePrompts({
+        title: 'Complete data fill — entire portfolio',
+        description: 'UPGDCL-style pipeline for every holding: ingest, 30-point checklist, research gaps, save to Postgres. Includes portfolio context for risk.',
+        symbols: invTickers,
+        purpose: 'investment',
+        type: 'portfolio',
+      }) +
+      (trTickers.length
+        ? UI.renderBatchClaudePrompts({
+            title: 'Trading book — complete fill',
+            description: 'Same pipeline for momentum trading positions.',
+            symbols: trTickers,
+            purpose: 'trading',
+            type: 'portfolio',
+          })
+        : '');
   }
 }
 
@@ -714,18 +1633,46 @@ async function addPortfolioPosition(purpose) {
   const symbol = $(`.pos-symbol[data-purpose="${purpose}"]`)?.value.trim();
   const qty = Number($(`.pos-qty[data-purpose="${purpose}"]`)?.value);
   const avg_cost = Number($(`.pos-cost[data-purpose="${purpose}"]`)?.value);
-  if (!symbol || !qty || !avg_cost) return false;
+  if (!symbol) {
+    showToast('Choose a symbol from the list', 'error');
+    return false;
+  }
+  if (!qty || !avg_cost) return false;
 
-  await api('/api/portfolio/positions', {
+  const trade_date = $(`.pos-date[data-purpose="${purpose}"]`)?.value || todayInputDate();
+  const notes = $(`.pos-notes[data-purpose="${purpose}"]`)?.value.trim();
+
+  const body = { symbol, qty, avg_cost, purpose, trade_date };
+  if (notes) body.notes = notes;
+  if (purpose === 'trading') {
+    const stopRaw = $(`.pos-stop[data-purpose="trading"]`)?.value;
+    const targetRaw = $(`.pos-target[data-purpose="trading"]`)?.value;
+    if (stopRaw !== '' && stopRaw != null) body.stop_level = Number(stopRaw);
+    if (targetRaw !== '' && targetRaw != null) body.target_level = Number(targetRaw);
+  }
+
+  const result = await api('/api/portfolio/positions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ symbol, qty, avg_cost, purpose }),
+    body: JSON.stringify(body),
   });
 
   $(`.pos-symbol[data-purpose="${purpose}"]`).value = '';
+  $(`.pos-date[data-purpose="${purpose}"]`).value = todayInputDate();
   $(`.pos-qty[data-purpose="${purpose}"]`).value = '';
   $(`.pos-cost[data-purpose="${purpose}"]`).value = '';
-  showToast(`Added ${symbol.toUpperCase()} to ${purpose} portfolio`, 'ok');
+  $(`.pos-notes[data-purpose="${purpose}"]`).value = '';
+  if (purpose === 'trading') {
+    $(`.pos-stop[data-purpose="trading"]`).value = '';
+    $(`.pos-target[data-purpose="trading"]`).value = '';
+    clearTradingSuggestPanel();
+  }
+  const totalQty = result.qty ?? qty;
+  const avgCost = result.avg_cost ?? body.avg_cost;
+  showToast(
+    `Added ${result.added_qty ?? qty} ${symbol.toUpperCase()} — total ${UI.fmtNum(totalQty, 0)} @ ৳${UI.fmtNum(avgCost, 2)}`,
+    'ok',
+  );
   await loadPortfolio();
   return true;
 }
@@ -749,13 +1696,18 @@ async function addWatchlistSymbol(purpose, symbol) {
 }
 
 async function loadWatchlists() {
+  const allByPurpose = {};
   for (const purpose of ['investment', 'trading']) {
     const { watchlist } = await api(`/api/watchlist?purpose=${purpose}`);
+    allByPurpose[purpose] = watchlist ?? [];
     const el = $(`#watchlist-${purpose}`);
     if (!el) continue;
     el.innerHTML = UI.renderWatchlistTable(watchlist);
     el.querySelectorAll('[data-symbol].clickable').forEach((n) => {
       n.addEventListener('click', () => openTicker(n.dataset.symbol));
+    });
+    el.querySelectorAll('.watch-open').forEach((btn) => {
+      btn.addEventListener('click', () => openTicker(btn.dataset.symbol));
     });
     el.querySelectorAll('.rm-watch').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -765,6 +1717,29 @@ async function loadWatchlists() {
         showToast(`Removed ${sym} from ${btn.dataset.purpose} watchlist`, 'info');
       });
     });
+  }
+  const host = $('#watchlist-claude-prompts');
+  if (host && UI?.renderBatchClaudePrompts) {
+    const invSyms = (allByPurpose.investment ?? []).map((w) => w.symbol);
+    const trSyms = (allByPurpose.trading ?? []).map((w) => w.symbol);
+    const combined = [...new Set([...invSyms, ...trSyms])];
+    host.innerHTML =
+      UI.renderBatchClaudePrompts({
+        title: 'Complete data fill — entire watchlist',
+        description: 'Runs the UPGDCL-style pipeline for every watchlist symbol: ingest, fill value checklist, research gaps, save memos. Paste into Claude Code / Cursor.',
+        symbols: combined,
+        purpose: 'investment',
+        type: 'watchlist',
+      }) +
+      (trSyms.length && trSyms.join(',') !== invSyms.join(',')
+        ? UI.renderBatchClaudePrompts({
+            title: 'Trading watchlist — complete fill',
+            description: 'Same pipeline for momentum watchlist symbols only.',
+            symbols: trSyms,
+            purpose: 'trading',
+            type: 'watchlist',
+          })
+        : '');
   }
 }
 
@@ -790,6 +1765,50 @@ async function loadDiscover() {
   sel.innerHTML = '<option value="">All sectors</option>' +
     sectors.sectors.map((s) => `<option value="${s}">${s}</option>`).join('');
   sel.value = cur;
+}
+
+function showDiscoverTab(name) {
+  discoverTab = name;
+  $$('.discover-tab').forEach((t) => t.classList.toggle('active', t.dataset.discoverTab === name));
+  $$('.discover-panel').forEach((p) => p.classList.toggle('active', p.id === `discover-panel-${name}`));
+  if (name === 'rankings') loadRankings();
+  if (name === 'top20') loadTop20();
+}
+
+async function loadRankings() {
+  const status = $('#rankings-status');
+  const content = $('#rankings-content');
+  if (status) status.textContent = 'Loading…';
+  try {
+    const data = await api('/api/rankings?limit=100');
+    if (status) status.textContent = `${data.count ?? 0} stocks ranked`;
+    if (content) {
+      content.innerHTML = UI.renderRankingsPanel(data);
+      $$('#rankings-content [data-symbol]').forEach((el) => {
+        el.addEventListener('click', () => openTicker(el.dataset.symbol));
+      });
+    }
+  } catch (e) {
+    if (status) status.textContent = `Error: ${e.message}`;
+  }
+}
+
+async function loadTop20() {
+  const status = $('#top20-status');
+  const content = $('#top20-content');
+  if (status) status.textContent = 'Loading…';
+  try {
+    const data = await api('/api/market/top20');
+    if (status) status.textContent = `${data.count ?? 0} leaders`;
+    if (content) {
+      content.innerHTML = UI.renderTop20Panel(data.rows);
+      $$('#top20-content [data-symbol]').forEach((el) => {
+        el.addEventListener('click', () => openTicker(el.dataset.symbol));
+      });
+    }
+  } catch (e) {
+    if (status) status.textContent = `Error: ${e.message}`;
+  }
 }
 
 async function runDiscover() {
@@ -985,36 +2004,32 @@ async function loadNews() {
     return `<span class="news-ticker"><span class="clickable" data-symbol="${n.symbol}">${UI.esc(n.symbol)}</span>${bn}</span>`;
   };
 
-  $('#all-news').innerHTML = table(
-    ['Date', 'Ticker', 'Headline', 'Source', 'Category'],
-    news.map((n) => [
-      UI.fmtDate(n.publishedDate),
-      fmtTicker(n),
-      n.url ? `<a href="${n.url}" target="_blank" rel="noopener">${UI.esc(n.headline)}</a>` : UI.esc(n.headline),
-      UI.esc(SOURCE_LABELS[n.source] ?? n.source ?? '—'),
-      UI.esc(n.category ?? '—'),
-    ]),
-  );
+  $('#all-news').innerHTML = UI.renderNewsCardFeed(news, { sourceLabels: SOURCE_LABELS, tickerBn: TICKER_BN });
   $$('#all-news [data-symbol]').forEach((el) => {
     el.addEventListener('click', () => openTicker(el.dataset.symbol));
   });
 }
 
+let macroSectorSlug = '';
+
 async function loadMacro() {
   const content = $('#macro-content');
   const meta = $('#macro-meta');
-  if (content) content.innerHTML = '<p class="muted">Loading macro snapshot…</p>';
+  if (content) content.innerHTML = '<p class="muted">Loading macro landscape…</p>';
   try {
-    const { macro } = await api('/api/macro');
-    if (!macro) {
-      if (meta) meta.textContent = '';
-      if (content) content.innerHTML = UI.renderMacroPanel(null);
-      return;
+    const landscape = await api('/api/macro/landscape');
+    let sectorDetail = null;
+    if (macroSectorSlug) {
+      sectorDetail = await api(`/api/macro/sectors/${encodeURIComponent(macroSectorSlug)}`);
     }
     if (meta) {
-      meta.textContent = `As of ${UI.fmtDate(macro.as_of)} · ${UI.macroSourceLabel(macro.source)}`;
+      const src = landscape?.bangladesh?.macro?.source;
+      meta.textContent = `As of ${UI.fmtDate(landscape.as_of)}${src ? ` · ${UI.macroSourceLabel(src)}` : ''}`;
     }
-    if (content) content.innerHTML = UI.renderMacroPanel(macro);
+    if (content) {
+      content.innerHTML = UI.renderMacroLandscape(landscape, sectorDetail);
+      bindMacroInteractions();
+    }
   } catch (e) {
     if (meta) meta.textContent = '';
     if (content) {
@@ -1022,6 +2037,49 @@ async function loadMacro() {
     }
   }
 }
+
+function bindMacroInteractions() {
+  $$('[data-macro-sector]').forEach((el) => {
+    el.addEventListener('click', () => {
+      macroSectorSlug = el.dataset.macroSector ?? '';
+      loadMacro();
+    });
+  });
+  $$('[data-macro-back]').forEach((el) => {
+    el.addEventListener('click', () => {
+      macroSectorSlug = '';
+      loadMacro();
+    });
+  });
+  $$('[data-macro-scroll]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById(el.dataset.macroScroll)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+$('#panel-macro')?.addEventListener('click', async (e) => {
+  const copyBtn = e.target.closest('[data-copy-cmd]');
+  if (!copyBtn) return;
+  const cmd = copyBtn.getAttribute('data-copy-cmd');
+  await copyCommand(cmd, copyBtn.textContent?.trim());
+});
+
+function bindClaudePromptCopy(root) {
+  const el = typeof root === 'string' ? $(root) : root;
+  if (!el || el._claudeCopyBound) return;
+  el._claudeCopyBound = true;
+  el.addEventListener('click', async (e) => {
+    const copyBtn = e.target.closest('[data-copy-cmd]');
+    if (!copyBtn || !el.contains(copyBtn)) return;
+    const cmd = copyBtn.getAttribute('data-copy-cmd');
+    await copyCommand(cmd, copyBtn.textContent?.trim());
+  });
+}
+
+bindClaudePromptCopy('#panel-watchlist');
+bindClaudePromptCopy('#panel-portfolio');
 
 let skillsCache = [];
 let activeSkillSlug = '';
@@ -1259,9 +2317,41 @@ async function loadOps() {
 
 $$('.tab').forEach((btn) => {
   btn.addEventListener('click', () => {
+    if (!btn.dataset.panel) return;
     navigateToPanel(btn.dataset.panel, { historyMode: 'push' });
   });
 });
+
+$('#nav-toggle')?.addEventListener('click', () => {
+  const nav = $('#main-nav');
+  const open = nav?.classList.toggle('open');
+  $('#nav-toggle')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+});
+
+$('#nav-tools-trigger')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('#nav-tools-wrap')?.classList.toggle('open');
+});
+
+document.addEventListener('click', () => closeToolsMenu());
+
+$('#theme-toggle')?.addEventListener('click', toggleTheme);
+
+$('#global-ticker-search')?.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const sym = e.target.value.trim().toUpperCase();
+  if (sym) {
+    openTicker(sym);
+    e.target.value = '';
+  }
+});
+
+$$('.discover-tab').forEach((btn) => {
+  btn.addEventListener('click', () => showDiscoverTab(btn.dataset.discoverTab ?? 'screen'));
+});
+
+bindClick('#load-rankings', loadRankings);
+bindClick('#load-top20', loadTop20);
 
 $('#panel-daily')?.addEventListener('click', async (e) => {
   const copyBtn = e.target.closest('[data-copy-cmd]');
@@ -1282,6 +2372,12 @@ $$('.watch-add-manual').forEach((btn) => {
 $$('.watch-filter').forEach((input) => {
   input.addEventListener('input', () => {
     populateWatchSelects(input.dataset.purpose, input.value);
+  });
+});
+
+$$('.pos-filter').forEach((input) => {
+  input.addEventListener('input', () => {
+    populatePosSymbolSelects(input.dataset.purpose, input.value);
   });
 });
 
@@ -1350,6 +2446,11 @@ $('#panel-ticker-detail')?.addEventListener('click', async (e) => {
 
   const moreBtn = e.target.closest('[data-sub-jump="commands"]');
   if (moreBtn) showSubPanel('commands');
+
+  const agentBtn = e.target.closest('.agent-status-btn');
+  if (agentBtn?.dataset.agentKey) {
+    openAgentStatusDetail(agentBtn.dataset.agentKey, agentBtn.dataset.agentLens ?? 'investment');
+  }
 });
 
 bindClick('#run-discover', runDiscover);
@@ -1401,13 +2502,59 @@ $$('.add-position').forEach((btn) => {
   });
 });
 
+const tradingSymbolSelect = $('.pos-symbol[data-purpose="trading"]');
+tradingSymbolSelect?.addEventListener('change', (e) => prefillTradingRisk(e.target.value));
+
+$$('[data-close-modal="portfolio-fills"]').forEach((el) => {
+  el.addEventListener('click', closePortfolioFillsModal);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('#action-modal')?.classList.contains('hidden')) {
+    closeActionModal({ confirmed: false });
+    return;
+  }
+  if (!$('#agent-detail-modal')?.classList.contains('hidden')) {
+    closeAgentDetailModal();
+    return;
+  }
+  closePortfolioFillsModal();
+});
+
+initActionModal();
+bindAgentDetailModal();
+
 $('#sync-trading-portfolio')?.addEventListener('click', async () => {
   const { copied } = await api('/api/portfolio/sync-trading', { method: 'POST' });
   showToast(`Copied ${copied} positions to momentum trading`, 'ok');
   await loadPortfolio();
 });
 
+$('#portfolio-account-summary')?.addEventListener('submit', async (e) => {
+  const form = e.target.closest('#portfolio-broker-form');
+  if (!form) return;
+  e.preventDefault();
+  const fd = new FormData(form);
+  const body = {};
+  const lb = String(fd.get('loan_balance_bdt') ?? '').trim();
+  const pp = String(fd.get('purchasing_power_bdt') ?? '').trim();
+  const equity = String(fd.get('equity_bdt') ?? '').trim();
+  if (lb !== '') body.loan_balance_bdt = Number(lb);
+  else body.loan_balance_bdt = null;
+  if (pp !== '') body.purchasing_power_bdt = Number(pp);
+  else body.purchasing_power_bdt = null;
+  if (equity !== '') body.equity_bdt = Number(equity);
+  await api('/api/portfolio/account', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  showToast('Account metrics saved', 'ok');
+  await loadPortfolio();
+});
+
 async function init() {
+  initTheme();
   const route = parseHashRoute();
   showPanel(route.panel, { updateHash: false, ticker: route.ticker });
   try {

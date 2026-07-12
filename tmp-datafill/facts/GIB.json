@@ -1,0 +1,11 @@
+{
+  "moat": false,
+  "_moat_source": "Qualitative: distressed 4th-gen Islamic bank; NPL ~87-90% (re-audit), negative equity, no franchise advantage (TBS News 2025)",
+  "buyback": false,
+  "_buyback_source": "No buyback; share count grew; no DSE buyback framework",
+  "dividend_yield": 0,
+  "_dividend_yield_source": "No dividend declared for 2023 or 2024 (TBS News: audit found heavy losses)",
+  "return_on_assets": -0.19,
+  "_return_on_assets_source": "stockanalysis.com TTM: net loss -35,243M / total assets 185,628M",
+  "_undefined_fields": "roe, pe, pb, peg, debt_to_equity, profit_margin, intrinsic_value undefined: negative equity (-43,840M), negative earnings and revenue. Bank N/A: current_ratio, inventory_turnover, ncav_per_share, interest_coverage"
+}

@@ -1,6 +1,6 @@
 ---
 name: momentum-screen
-description: Runs the Minervini SEPA + Driehaus 25-point momentum checklist over a DSE stock and returns a pass/fail per criterion, an overall count (e.g. 18/25), a category-weighted momentum score and a Momentum Grade (A+..F). Use when the user wants a momentum screen, trend-template check, "does this stock qualify as a leader", "is GP a momentum buy", SEPA/Minervini/Driehaus screen, or a relative-strength read for a Dhaka Stock Exchange ticker.
+description: Deprecated shim — returns Minervini SEPA only. Use minervini-sepa, can-slim, darvas-box, livermore-pivot, or analyze_ticker momentum/full mode for all four master strategies.
 license: Apache-2.0
 compatibility: Prompt-first Agent Skill. Usable with the script absent. Script is Python 3.8+ stdlib-only, no network.
 metadata:

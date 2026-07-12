@@ -137,7 +137,9 @@ export function checklist(data: Record<string, unknown>): Record<string, unknown
   const rg = g('revenue_growth') as number | undefined;
   const pe = g('pe') as number | undefined;
   addCriterion(11, 'lynch', 'PEG < 1.0',
-    peg != null ? { passed: peg < 1.0, value: peg } : { ...missing('peg'), value: peg },
+    peg != null ? { passed: peg < 1.0, value: peg }
+      : eg != null && eg <= 0 ? { passed: false, value: { peg, earnings_growth: eg } }
+      : { ...missing('peg'), value: peg },
     'Paying less than 1x growth for earnings is the GARP sweet spot.');
   addCriterion(12, 'lynch', 'Earnings growth 15-30%',
     eg != null ? { passed: eg >= 0.15 && eg <= 0.30, value: eg } : { ...missing('earnings_growth'), value: eg },
@@ -155,8 +157,10 @@ export function checklist(data: Record<string, unknown>): Record<string, unknown
   const inv = g('inventory_turnover') as number | undefined;
   const invPrev = g('inventory_turnover_prev') as number | undefined;
   let invPass: CriterionResult;
-  if (inv == null || invPrev == null) {
+  if (inv == null) {
     invPass = { ...missing('inventory_turnover'), value: { current: inv, previous: invPrev } };
+  } else if (invPrev == null) {
+    invPass = { passed: false, value: { current: inv, previous: invPrev } };
   } else {
     invPass = { passed: inv > invPrev, value: { current: inv, previous: invPrev } };
   }
