@@ -15,6 +15,8 @@
     "build:docker": "npm run build -w @stock-buddy/core && npm run build -w @stock-buddy/db && npm run build -w @stock-buddy/scraper && npm run build -w @stock-buddy/data-adapter && npm run build -w @stock-buddy/skills && npm run build -w @stock-buddy/agents && npm run build -w @stock-buddy/mcp-server && npm run build -w @stock-buddy/ingest && npm run build -w @stock-buddy/data-mcp-server && npm run build -w @stock-buddy/dashboard",
     "db:migrate": "npm run db:migrate -w @stock-buddy/db",
     "db:seed": "npm run db:seed -w @stock-buddy/db",
+    "db:export-sqlite": "node scripts/db-export-sqlite.mjs",
+    "db:import-sqlite": "node scripts/db-import-sqlite.mjs",
     "ingest": "tsx packages/ingest/src/cli.ts",
     "ingest:one": "node packages/ingest/dist/cli.js",
     "ingest:daily": "npm run ingest -- --job daily",
