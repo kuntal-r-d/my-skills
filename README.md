@@ -25,9 +25,40 @@ npm ci
 npm run build
 npm run build:skills-cli
 
+# Restore shared market-data SQLite from data/stockbuddy.sqlite.gz
+# (live DB files are gitignored — other machines need this step)
+cp .env.example .env   # DATABASE_URL=file:data/stockbuddy.sqlite
+npm run db:restore-snapshot
+
 # Run the server (stdio)
 npm start
 # or: npx stock-buddy-mcp
+```
+
+### Database on a new machine
+
+Live SQLite (`data/stockbuddy.sqlite`) is **not** in git. The portable snapshot is `data/stockbuddy.sqlite.gz`.
+
+```bash
+# from repo root — removes local DB, unpacks .gz, runs migrations
+npm run db:restore-snapshot
+```
+
+Equivalent manual steps:
+
+```bash
+rm -f data/stockbuddy.sqlite data/stockbuddy.sqlite-* data/stockbuddy.export.sqlite
+gunzip -k data/stockbuddy.sqlite.gz
+npm run db:migrate
+```
+
+To refresh the snapshot for others (on a machine with up-to-date data):
+
+```bash
+gzip -c data/stockbuddy.sqlite > data/stockbuddy.sqlite.gz
+git add data/stockbuddy.sqlite.gz
+git commit -m "chore: refresh shared SQLite market-data snapshot"
+git push
 ```
 
 ## 📦 Features
