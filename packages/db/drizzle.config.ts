@@ -3,8 +3,8 @@ import { defineConfig } from 'drizzle-kit';
 export default defineConfig({
   schema: './src/schema.ts',
   out: './drizzle',
-  dialect: 'postgresql',
+  dialect: 'sqlite',
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? 'postgresql://stockbuddy:stockbuddy@localhost:5432/stockbuddy',
+    url: process.env.DATABASE_URL?.replace(/^file:/, '') ?? 'data/stockbuddy.sqlite',
   },
 });

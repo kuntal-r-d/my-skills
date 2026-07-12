@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findUniqueNearMatch, isAdjacentTransposition, isLikelySymbolTypo, levenshtein } from '../src/symbols.js';
+import { findUniqueNearMatch, isAdjacentTransposition, isLikelySymbolTypo } from '../src/symbols.js';
 
 describe('symbol typo resolution', () => {
   it('detects UPGDLC as transposition of UPGDCL', () => {

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { CANONICAL_SECTORS, normalizeSector, sectorSlug } from '@stock-buddy/core';
-import type { Db } from './client.js';
+import { rowsFromExecute, type Db } from './client.js';
 import {
   analysisSnapshots,
   dataFreshness,
@@ -691,7 +691,7 @@ export async function countPortfolioLotsByTicker(
   const rows = await db
     .select({
       tickerId: portfolioLots.tickerId,
-      n: sql<number>`count(*)::int`,
+      n: sql<number>`cast(count(*) as integer)`,
     })
     .from(portfolioLots)
     .where(and(eq(portfolioLots.accountId, accountId), eq(portfolioLots.purpose, purpose)))
@@ -1338,9 +1338,9 @@ export async function listRecentAnalyses(db: Db, limit = 30) {
       createdAt: analysisSnapshots.createdAt,
       modelVersion: analysisSnapshots.modelVersion,
       symbol: tickers.symbol,
-      investmentScore: sql<number | null>`(${analysisSnapshots.payload}->'synthesis'->'investment'->>'composite_1_10')::int`,
-      momentumScore: sql<number | null>`(${analysisSnapshots.payload}->'synthesis'->'momentum'->>'composite_1_10')::int`,
-      riskRating: sql<string | null>`${analysisSnapshots.payload}->'risk'->>'rating'`,
+      investmentScore: sql<number | null>`CAST(json_extract(${analysisSnapshots.payload}, '$.synthesis.investment.composite_1_10') AS INTEGER)`,
+      momentumScore: sql<number | null>`CAST(json_extract(${analysisSnapshots.payload}, '$.synthesis.momentum.composite_1_10') AS INTEGER)`,
+      riskRating: sql<string | null>`json_extract(${analysisSnapshots.payload}, '$.risk.rating')`,
     })
     .from(analysisSnapshots)
     .innerJoin(tickers, eq(analysisSnapshots.tickerId, tickers.id))
@@ -1359,7 +1359,7 @@ export async function listRecentAnalyses(db: Db, limit = 30) {
 
 export async function getAnalyticsKpi(db: Db) {
   const [snapCount] = await db
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`cast(count(*) as integer)` })
     .from(analysisSnapshots);
 
   const outcomes = await db
@@ -1374,8 +1374,8 @@ export async function getAnalyticsKpi(db: Db) {
   const agentStats = await db
     .select({
       agentName: predictionOutcomes.agentName,
-      total: sql<number>`count(*)::int`,
-      wins: sql<number>`count(*) filter (where ${predictionOutcomes.actualReturn1m} > 0)::int`,
+      total: sql<number>`cast(count(*) as integer)`,
+      wins: sql<number>`cast(count(*) filter (where ${predictionOutcomes.actualReturn1m} > 0) as integer)`,
     })
     .from(predictionOutcomes)
     .where(sql`${predictionOutcomes.agentName} is not null`)
@@ -1505,29 +1505,27 @@ export interface TopPerformerRow {
 }
 
 export async function listTopPerformers(db: Db, limit = 10, lookbackBars = 21): Promise<TopPerformerRow[]> {
-  const rows = await db.execute(sql`
-    SELECT t.symbol, t.name, t.sector,
-      ROUND(((last.close - past.close) / past.close * 100)::numeric, 2) AS roc_1m_pct,
-      last.close AS last_close,
-      last.trade_date AS last_trade_date
-    FROM tickers t
-    JOIN LATERAL (
-      SELECT close, trade_date FROM ohlcv_daily
-      WHERE ticker_id = t.id
-      ORDER BY trade_date DESC
-      LIMIT 1
-    ) last ON true
-    JOIN LATERAL (
-      SELECT close FROM ohlcv_daily
-      WHERE ticker_id = t.id
-      ORDER BY trade_date DESC
-      OFFSET ${lookbackBars} LIMIT 1
-    ) past ON true
-    WHERE past.close > 0 AND last.close > 0 AND t.is_active = true
-    ORDER BY roc_1m_pct DESC
-    LIMIT ${limit}
-  `);
-  return rows as unknown as TopPerformerRow[];
+  const pastRn = lookbackBars + 1;
+  const rows = rowsFromExecute<TopPerformerRow>(
+    db.all(sql`
+      WITH ranked AS (
+        SELECT ticker_id, close, trade_date,
+          ROW_NUMBER() OVER (PARTITION BY ticker_id ORDER BY trade_date DESC) AS rn
+        FROM ohlcv_daily
+      )
+      SELECT t.symbol, t.name, t.sector,
+        ROUND(((last.close - past.close) / past.close * 100), 2) AS roc_1m_pct,
+        last.close AS last_close,
+        last.trade_date AS last_trade_date
+      FROM tickers t
+      JOIN ranked last ON last.ticker_id = t.id AND last.rn = 1
+      JOIN ranked past ON past.ticker_id = t.id AND past.rn = ${pastRn}
+      WHERE past.close > 0 AND last.close > 0 AND t.is_active = 1
+      ORDER BY roc_1m_pct DESC
+      LIMIT ${limit}
+    `),
+  );
+  return rows;
 }
 
 export type ResearchSourceInput = {
@@ -2017,62 +2015,111 @@ export type SectorMetricsRow = {
   bottom_roc_1m_pct: number | null;
 };
 
-export async function aggregateSectorMetrics(db: Db, lookback1m = 21, lookback3m = 63): Promise<SectorMetricsRow[]> {
-  const rows = await db.execute(sql`
-    WITH ticker_returns AS (
-      SELECT t.id, t.symbol, t.sector,
-        ROUND(((last.close - past1.close) / NULLIF(past1.close, 0) * 100)::numeric, 2) AS roc_1m,
-        ROUND(((last.close - past3.close) / NULLIF(past3.close, 0) * 100)::numeric, 2) AS roc_3m,
-        last.close AS last_close
-      FROM tickers t
-      JOIN LATERAL (
-        SELECT close FROM ohlcv_daily WHERE ticker_id = t.id ORDER BY trade_date DESC LIMIT 1
-      ) last ON true
-      JOIN LATERAL (
-        SELECT close FROM ohlcv_daily WHERE ticker_id = t.id ORDER BY trade_date DESC OFFSET ${lookback1m} LIMIT 1
-      ) past1 ON true
-      JOIN LATERAL (
-        SELECT close FROM ohlcv_daily WHERE ticker_id = t.id ORDER BY trade_date DESC OFFSET ${lookback3m} LIMIT 1
-      ) past3 ON true
-      WHERE t.is_active = true AND t.sector IS NOT NULL AND past1.close > 0 AND past3.close > 0
-    ),
-    latest_fund AS (
-      SELECT DISTINCT ON (f.ticker_id) f.ticker_id,
-        (f.payload->>'pe_ratio')::float AS pe_ratio
-      FROM fundamentals_snapshots f
-      ORDER BY f.ticker_id, f.as_of DESC
-    )
-    SELECT
-      COALESCE(t.sector, 'Unknown') AS sector_display,
-      COUNT(*)::int AS ticker_count,
-      ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.roc_1m))::numeric, 2) AS median_roc_1m_pct,
-      ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.roc_3m))::numeric, 2) AS median_roc_3m_pct,
-      ROUND(AVG(lf.pe_ratio)::numeric, 2) AS avg_pe,
-      (ARRAY_AGG(t.symbol ORDER BY t.roc_1m DESC NULLS LAST))[1] AS top_performer,
-      MAX(t.roc_1m) AS top_roc_1m_pct,
-      (ARRAY_AGG(t.symbol ORDER BY t.roc_1m ASC NULLS LAST))[1] AS bottom_performer,
-      MIN(t.roc_1m) AS bottom_roc_1m_pct
-    FROM ticker_returns t
-    LEFT JOIN latest_fund lf ON lf.ticker_id = t.id
-    GROUP BY t.sector
-    ORDER BY median_roc_1m_pct DESC NULLS LAST
-  `);
+function median(nums: number[]): number | null {
+  if (!nums.length) return null;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const value =
+    sorted.length % 2 === 0 ? ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2 : (sorted[mid] ?? 0);
+  return Math.round(value * 100) / 100;
+}
 
-  return (rows as unknown as Array<Record<string, unknown>>).map((r) => {
-    const display = String(r.sector_display ?? 'Unknown');
-    return {
-      sector_slug: sectorSlug(display) ?? display.toLowerCase().replace(/\s+/g, '-'),
-      sector_display: normalizeSector(display) ?? display,
-      ticker_count: Number(r.ticker_count ?? 0),
-      median_roc_1m_pct: r.median_roc_1m_pct != null ? Number(r.median_roc_1m_pct) : null,
-      median_roc_3m_pct: r.median_roc_3m_pct != null ? Number(r.median_roc_3m_pct) : null,
-      avg_pe: r.avg_pe != null ? Number(r.avg_pe) : null,
-      top_performer: r.top_performer != null ? String(r.top_performer) : null,
-      top_roc_1m_pct: r.top_roc_1m_pct != null ? Number(r.top_roc_1m_pct) : null,
-      bottom_performer: r.bottom_performer != null ? String(r.bottom_performer) : null,
-      bottom_roc_1m_pct: r.bottom_roc_1m_pct != null ? Number(r.bottom_roc_1m_pct) : null,
-    };
-  });
+export async function aggregateSectorMetrics(db: Db, lookback1m = 21, lookback3m = 63): Promise<SectorMetricsRow[]> {
+  const past1Rn = lookback1m + 1;
+  const past3Rn = lookback3m + 1;
+
+  type ReturnRow = {
+    id: number;
+    symbol: string;
+    sector: string;
+    roc_1m: number | null;
+    roc_3m: number | null;
+  };
+
+  const returns = rowsFromExecute<ReturnRow>(
+    db.all(sql`
+      WITH ranked AS (
+        SELECT ticker_id, close,
+          ROW_NUMBER() OVER (PARTITION BY ticker_id ORDER BY trade_date DESC) AS rn
+        FROM ohlcv_daily
+      )
+      SELECT t.id, t.symbol, t.sector,
+        CASE WHEN past1.close > 0
+          THEN ROUND(((last.close - past1.close) / past1.close * 100), 2)
+          ELSE NULL END AS roc_1m,
+        CASE WHEN past3.close > 0
+          THEN ROUND(((last.close - past3.close) / past3.close * 100), 2)
+          ELSE NULL END AS roc_3m
+      FROM tickers t
+      JOIN ranked last ON last.ticker_id = t.id AND last.rn = 1
+      JOIN ranked past1 ON past1.ticker_id = t.id AND past1.rn = ${past1Rn}
+      JOIN ranked past3 ON past3.ticker_id = t.id AND past3.rn = ${past3Rn}
+      WHERE t.is_active = 1 AND t.sector IS NOT NULL
+    `),
+  );
+
+  type PeRow = { ticker_id: number; pe_ratio: number | null };
+  const peRows = rowsFromExecute<PeRow>(
+    db.all(sql`
+      SELECT f.ticker_id,
+        CAST(json_extract(f.payload, '$.pe_ratio') AS REAL) AS pe_ratio
+      FROM fundamentals_snapshots f
+      INNER JOIN (
+        SELECT ticker_id, MAX(as_of) AS max_as_of
+        FROM fundamentals_snapshots
+        GROUP BY ticker_id
+      ) latest ON f.ticker_id = latest.ticker_id AND f.as_of = latest.max_as_of
+    `),
+  );
+  const peByTicker = new Map(peRows.map((r) => [r.ticker_id, r.pe_ratio]));
+
+  type Bucket = {
+    display: string;
+    rows: ReturnRow[];
+    peValues: number[];
+  };
+  const bySector = new Map<string, Bucket>();
+
+  for (const row of returns) {
+    if (row.roc_1m == null || row.roc_3m == null) continue;
+    const display = row.sector || 'Unknown';
+    let bucket = bySector.get(display);
+    if (!bucket) {
+      bucket = { display, rows: [], peValues: [] };
+      bySector.set(display, bucket);
+    }
+    bucket.rows.push(row);
+    const pe = peByTicker.get(row.id);
+    if (pe != null && Number.isFinite(pe)) bucket.peValues.push(pe);
+  }
+
+  const out: SectorMetricsRow[] = [];
+  for (const bucket of bySector.values()) {
+    const roc1 = bucket.rows.map((r) => r.roc_1m!).filter((n) => Number.isFinite(n));
+    const roc3 = bucket.rows.map((r) => r.roc_3m!).filter((n) => Number.isFinite(n));
+    const top = [...bucket.rows].sort((a, b) => (b.roc_1m ?? -Infinity) - (a.roc_1m ?? -Infinity))[0];
+    const bottom = [...bucket.rows].sort((a, b) => (a.roc_1m ?? Infinity) - (b.roc_1m ?? Infinity))[0];
+    const avgPe =
+      bucket.peValues.length > 0
+        ? Math.round((bucket.peValues.reduce((a, b) => a + b, 0) / bucket.peValues.length) * 100) / 100
+        : null;
+
+    out.push({
+      sector_slug: sectorSlug(bucket.display) ?? bucket.display.toLowerCase().replace(/\s+/g, '-'),
+      sector_display: normalizeSector(bucket.display) ?? bucket.display,
+      ticker_count: bucket.rows.length,
+      median_roc_1m_pct: median(roc1),
+      median_roc_3m_pct: median(roc3),
+      avg_pe: avgPe,
+      top_performer: top?.symbol ?? null,
+      top_roc_1m_pct: top?.roc_1m ?? null,
+      bottom_performer: bottom?.symbol ?? null,
+      bottom_roc_1m_pct: bottom?.roc_1m ?? null,
+    });
+  }
+
+  out.sort((a, b) => (b.median_roc_1m_pct ?? -Infinity) - (a.median_roc_1m_pct ?? -Infinity));
+  return out;
 }
 
 export async function upsertSectorSnapshot(

@@ -46,7 +46,7 @@ export const EXAMPLE_PUBLIC_SOURCES: Record<
 > = {
   connectivity: {
     example_sources: [
-      'Start Postgres: docker compose up -d postgres',
+      'Ensure SQLite DB exists: npm run db:migrate && npm run db:seed (or db:adopt-export)',
       'Migrate/seed: npm run db:migrate && npm run db:seed',
       'Ingest ticker: npm run ingest -- --ticker GP --job all --days 365',
       'Reload stock-buddy-data MCP in Cursor / Claude / Codex / Gemini',

@@ -7,6 +7,7 @@ import {
   getDb,
   closeDb,
   loadEnv,
+  rowsFromExecute,
   getDefaultAccount,
   setAccount,
   getFreshness,
@@ -135,17 +136,19 @@ function gradeToFundamentalScore(grade: string | undefined, gpa: number | undefi
 }
 
 async function fetchTickerMarketExtras(db: ReturnType<typeof getDb>) {
-  const priceRows = (await db.execute(sql`
-    WITH ranked AS (
-      SELECT ticker_id, close, trade_date,
-        ROW_NUMBER() OVER (PARTITION BY ticker_id ORDER BY trade_date DESC) AS rn
-      FROM ohlcv_daily
-    )
-    SELECT r1.ticker_id AS ticker_id, r1.close AS last_close, r2.close AS prev_close
-    FROM ranked r1
-    LEFT JOIN ranked r2 ON r1.ticker_id = r2.ticker_id AND r2.rn = 2
-    WHERE r1.rn = 1
-  `)) as unknown as { ticker_id: number; last_close: number; prev_close: number | null }[];
+  const priceRows = rowsFromExecute<{ ticker_id: number; last_close: number; prev_close: number | null }>(
+    db.all(sql`
+      WITH ranked AS (
+        SELECT ticker_id, close, trade_date,
+          ROW_NUMBER() OVER (PARTITION BY ticker_id ORDER BY trade_date DESC) AS rn
+        FROM ohlcv_daily
+      )
+      SELECT r1.ticker_id AS ticker_id, r1.close AS last_close, r2.close AS prev_close
+      FROM ranked r1
+      LEFT JOIN ranked r2 ON r1.ticker_id = r2.ticker_id AND r2.rn = 2
+      WHERE r1.rn = 1
+    `),
+  );
   const priceMap = new Map<number, { last_close: number; chg_pct: number | null }>();
   for (const row of priceRows) {
     const chg = row.prev_close && row.last_close
@@ -167,32 +170,7 @@ async function fetchTickerMarketExtras(db: ReturnType<typeof getDb>) {
     if (!fundMap.has(f.tickerId)) fundMap.set(f.tickerId, f.payload);
   }
 
-  const analysisRows = (await db.execute(sql`
-    WITH latest AS (
-      SELECT ticker_id, MAX(created_at) AS max_created
-      FROM analysis_snapshots
-      WHERE skill = 'analyze_ticker'
-      GROUP BY ticker_id
-    )
-    SELECT a.ticker_id,
-      (a.payload->'synthesis'->'investment'->>'composite_1_10')::float AS investment_score,
-      a.payload->'synthesis'->'investment'->>'rating' AS investment_rating,
-      (a.payload->'synthesis'->'momentum'->>'composite_1_10')::float AS momentum_score,
-      a.payload->'synthesis'->'momentum'->>'rating' AS momentum_rating,
-      a.payload->'value_investment_checklist'->>'rating' AS value_grade,
-      (a.payload->'value_investment_checklist'->'key_metrics'->>'gpa')::float AS gpa,
-      COALESCE(
-        a.payload->'momentum_trading'->'summary'->>'rating',
-        a.payload->'momentum_trading'->'summary'->>'consensus_grade',
-        a.payload->'momentum_screen'->>'rating'
-      ) AS momentum_grade,
-      COALESCE(
-        a.payload->'momentum_trading'->'summary'->>'overall_count',
-        a.payload->'momentum_screen'->'key_metrics'->>'overall_count'
-      ) AS momentum_count
-    FROM analysis_snapshots a
-    INNER JOIN latest l ON a.ticker_id = l.ticker_id AND a.created_at = l.max_created
-  `)) as unknown as {
+  const analysisRows = rowsFromExecute<{
     ticker_id: number;
     investment_score: number | null;
     investment_rating: string | null;
@@ -202,7 +180,34 @@ async function fetchTickerMarketExtras(db: ReturnType<typeof getDb>) {
     gpa: number | null;
     momentum_grade: string | null;
     momentum_count: string | null;
-  }[];
+  }>(
+    db.all(sql`
+      WITH latest AS (
+        SELECT ticker_id, MAX(created_at) AS max_created
+        FROM analysis_snapshots
+        WHERE skill = 'analyze_ticker'
+        GROUP BY ticker_id
+      )
+      SELECT a.ticker_id,
+        CAST(json_extract(a.payload, '$.synthesis.investment.composite_1_10') AS REAL) AS investment_score,
+        json_extract(a.payload, '$.synthesis.investment.rating') AS investment_rating,
+        CAST(json_extract(a.payload, '$.synthesis.momentum.composite_1_10') AS REAL) AS momentum_score,
+        json_extract(a.payload, '$.synthesis.momentum.rating') AS momentum_rating,
+        json_extract(a.payload, '$.value_investment_checklist.rating') AS value_grade,
+        CAST(json_extract(a.payload, '$.value_investment_checklist.key_metrics.gpa') AS REAL) AS gpa,
+        COALESCE(
+          json_extract(a.payload, '$.momentum_trading.summary.rating'),
+          json_extract(a.payload, '$.momentum_trading.summary.consensus_grade'),
+          json_extract(a.payload, '$.momentum_screen.rating')
+        ) AS momentum_grade,
+        COALESCE(
+          json_extract(a.payload, '$.momentum_trading.summary.overall_count'),
+          json_extract(a.payload, '$.momentum_screen.key_metrics.overall_count')
+        ) AS momentum_count
+      FROM analysis_snapshots a
+      INNER JOIN latest l ON a.ticker_id = l.ticker_id AND a.created_at = l.max_created
+    `),
+  );
   const analysisMap = new Map<number, {
     investment_score?: number;
     investment_rating?: string;
@@ -329,12 +334,12 @@ async function fetchPortfolio(db: ReturnType<typeof getDb>, purpose: PortfolioPu
 
 app.get('/api/stats', asyncHandler(async (_req, res) => {
   const counts = await withDb(async (db) => {
-    const [tickerRow] = await db.select({ n: sql<number>`count(*)::int` }).from(tickers);
-    const [ohlcvRow] = await db.select({ n: sql<number>`count(*)::int` }).from(ohlcvDaily);
-    const [fundRow] = await db.select({ n: sql<number>`count(*)::int` }).from(fundamentalsSnapshots);
-    const [analysisRow] = await db.select({ n: sql<number>`count(*)::int` }).from(analysisSnapshots);
-    const [posRow] = await db.select({ n: sql<number>`count(*)::int` }).from(portfolioPositions);
-    const [watchRow] = await db.select({ n: sql<number>`count(*)::int` }).from(watchlistTickers);
+    const [tickerRow] = await db.select({ n: sql<number>`cast(count(*) as integer)` }).from(tickers);
+    const [ohlcvRow] = await db.select({ n: sql<number>`cast(count(*) as integer)` }).from(ohlcvDaily);
+    const [fundRow] = await db.select({ n: sql<number>`cast(count(*) as integer)` }).from(fundamentalsSnapshots);
+    const [analysisRow] = await db.select({ n: sql<number>`cast(count(*) as integer)` }).from(analysisSnapshots);
+    const [posRow] = await db.select({ n: sql<number>`cast(count(*) as integer)` }).from(portfolioPositions);
+    const [watchRow] = await db.select({ n: sql<number>`cast(count(*) as integer)` }).from(watchlistTickers);
     return {
       tickers: tickerRow?.n ?? 0,
       ohlcv_bars: ohlcvRow?.n ?? 0,
@@ -364,7 +369,7 @@ app.get('/api/tickers', asyncHandler(async (_req, res) => {
     const stats = await db
       .select({
         tickerId: ohlcvDaily.tickerId,
-        bars: sql<number>`count(*)::int`,
+        bars: sql<number>`cast(count(*) as integer)`,
         lastDate: sql<string>`max(${ohlcvDaily.tradeDate})`,
       })
       .from(ohlcvDaily)

@@ -1,4 +1,13 @@
-export { createDb, getDb, closeDb, getDatabaseUrl, type Db } from './client.js';
+export {
+  createDb,
+  getDb,
+  closeDb,
+  getDatabaseUrl,
+  getDatabasePath,
+  resolveSqlitePath,
+  rowsFromExecute,
+  type Db,
+} from './client.js';
 export { loadEnv } from './load-env.js';
 export { schema } from './client.js';
 export * from './schema.js';

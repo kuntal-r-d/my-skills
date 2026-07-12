@@ -2574,7 +2574,7 @@ async function init() {
   } catch (e) {
     document.body.insertAdjacentHTML(
       'afterbegin',
-      `<div class="error-banner">Failed to load: ${UI ? UI.esc(e.message) : e.message}. Is Postgres running? Try: docker compose up -d postgres && npm run db:migrate</div>`,
+      `<div class="error-banner">Failed to load: ${UI ? UI.esc(e.message) : e.message}. Is the SQLite DB ready? Try: npm run db:migrate && npm run db:seed</div>`,
     );
   }
 }

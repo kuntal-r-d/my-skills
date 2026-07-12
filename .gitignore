@@ -7,7 +7,9 @@ dist/
 coverage/
 .vitest/
 tests/golden/
-# Local uncompressed DB snapshot (commit the .gz instead)
+# Local SQLite DB (commit a .gz release asset instead)
 data/stockbuddy.sqlite
+data/stockbuddy.sqlite-*
+data/stockbuddy.export.sqlite
+data/stockbuddy.ci.sqlite
 data/stockbuddy.sqlite.tmp*
-

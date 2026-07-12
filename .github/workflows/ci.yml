@@ -42,20 +42,6 @@ jobs:
 
   data-platform:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: stockbuddy
-          POSTGRES_USER: stockbuddy
-          POSTGRES_PASSWORD: stockbuddy
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U stockbuddy -d stockbuddy"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -74,14 +60,15 @@ jobs:
 
       - name: Migrate and seed database
         env:
-          DATABASE_URL: postgresql://stockbuddy:stockbuddy@localhost:5432/stockbuddy
+          DATABASE_URL: file:data/stockbuddy.ci.sqlite
         run: |
+          mkdir -p data
           npm run db:migrate
           npm run db:seed
 
       - name: Contract builder and E2E tests
         env:
-          DATABASE_URL: postgresql://stockbuddy:stockbuddy@localhost:5432/stockbuddy
+          DATABASE_URL: file:data/stockbuddy.ci.sqlite
         run: npm test -- tests/data-platform.test.ts tests/data-platform-e2e.test.ts
 
   docker-build:

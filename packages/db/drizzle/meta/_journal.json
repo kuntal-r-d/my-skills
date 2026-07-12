@@ -1,82 +1,12 @@
 {
   "version": "7",
-  "dialect": "postgresql",
+  "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1782247895865,
-      "tag": "0000_concerned_mister_sinister",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1782252000000,
-      "tag": "0001_analysis_snapshots",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1782253000000,
-      "tag": "0002_dashboard_ui",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1782254000000,
-      "tag": "0003_research_sources",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1782256000000,
-      "tag": "0005_skill_overrides",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1782257000000,
-      "tag": "0006_portfolio_purpose",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1782258000000,
-      "tag": "0007_backfill_trading_portfolio",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1782259000000,
-      "tag": "0008_sectors",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1782260000000,
-      "tag": "0009_news_sector_tag",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1782261000000,
-      "tag": "0010_portfolio_lots",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1782262000000,
-      "tag": "0011_portfolio_broker_fields",
+      "version": "6",
+      "when": 1783867992291,
+      "tag": "0000_init_sqlite",
       "breakpoints": true
     }
   ]

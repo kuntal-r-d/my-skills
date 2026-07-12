@@ -10,7 +10,6 @@ const KEEP = new Set([
   'stock-buddy-data-mcp',
   'stock-buddy-ingest',
   'stock-buddy-dashboard',
-  'stock-buddy-postgres',
 ]);
 
 function sh(cmd) {

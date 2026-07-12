@@ -1,44 +1,39 @@
 import {
-  boolean,
-  date,
-  doublePrecision,
   index,
   integer,
-  jsonb,
-  pgTable,
-  serial,
+  real,
+  sqliteTable,
   text,
-  timestamp,
   unique,
   uniqueIndex,
-} from 'drizzle-orm/pg-core';
+} from 'drizzle-orm/sqlite-core';
 
-export const tickers = pgTable('tickers', {
-  id: serial('id').primaryKey(),
+export const tickers = sqliteTable('tickers', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
   symbol: text('symbol').notNull().unique(),
   name: text('name'),
   sector: text('sector'),
   commodityType: text('commodity_type'),
   exchange: text('exchange').notNull().default('DSE'),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
 });
 
-export const ohlcvDaily = pgTable(
+export const ohlcvDaily = sqliteTable(
   'ohlcv_daily',
   {
     tickerId: integer('ticker_id')
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
-    tradeDate: date('trade_date').notNull(),
-    open: doublePrecision('open').notNull(),
-    high: doublePrecision('high').notNull(),
-    low: doublePrecision('low').notNull(),
-    close: doublePrecision('close').notNull(),
+    tradeDate: text('trade_date').notNull(),
+    open: real('open').notNull(),
+    high: real('high').notNull(),
+    low: real('low').notNull(),
+    close: real('close').notNull(),
     volume: integer('volume').notNull().default(0),
     source: text('source').notNull().default('dse'),
-    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+    ingestedAt: integer('ingested_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     uniqueIndex('ohlcv_daily_ticker_date_idx').on(table.tickerId, table.tradeDate),
@@ -46,72 +41,72 @@ export const ohlcvDaily = pgTable(
   ],
 );
 
-export const fundamentalsSnapshots = pgTable(
+export const fundamentalsSnapshots = sqliteTable(
   'fundamentals_snapshots',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     tickerId: integer('ticker_id')
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
-    asOf: date('as_of').notNull(),
-    payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
+    asOf: text('as_of').notNull(),
+    payload: text('payload', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
     source: text('source').notNull(),
-    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+    ingestedAt: integer('ingested_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [unique('fundamentals_ticker_asof_source').on(table.tickerId, table.asOf, table.source)],
 );
 
-export const shareholdingMonthly = pgTable(
+export const shareholdingMonthly = sqliteTable(
   'shareholding_monthly',
   {
     tickerId: integer('ticker_id')
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
-    month: date('month').notNull(),
-    sponsor: doublePrecision('sponsor'),
-    govt: doublePrecision('govt'),
-    institution: doublePrecision('institution'),
-    foreign: doublePrecision('foreign'),
-    public: doublePrecision('public'),
+    month: text('month').notNull(),
+    sponsor: real('sponsor'),
+    govt: real('govt'),
+    institution: real('institution'),
+    foreign: real('foreign'),
+    public: real('public'),
     source: text('source').notNull().default('dse'),
-    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+    ingestedAt: integer('ingested_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [uniqueIndex('shareholding_ticker_month_idx').on(table.tickerId, table.month)],
 );
 
-export const macroSnapshots = pgTable('macro_snapshots', {
-  id: serial('id').primaryKey(),
-  asOf: date('as_of').notNull(),
-  payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
+export const macroSnapshots = sqliteTable('macro_snapshots', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  asOf: text('as_of').notNull(),
+  payload: text('payload', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
   source: text('source').notNull(),
-  ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+  ingestedAt: integer('ingested_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
 });
 
 /** Canonical DSE sector taxonomy with alias mapping. */
-export const sectors = pgTable(
+export const sectors = sqliteTable(
   'sectors',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     slug: text('slug').notNull(),
     displayName: text('display_name').notNull(),
     dseGroup: text('dse_group'),
-    aliases: jsonb('aliases').notNull().$type<string[]>().default([]),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    aliases: text('aliases', { mode: 'json' }).notNull().$type<string[]>().default([]),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [uniqueIndex('sectors_slug_idx').on(table.slug)],
 );
 
 /** Daily deterministic sector aggregates (returns, PE, news counts). */
-export const sectorSnapshots = pgTable(
+export const sectorSnapshots = sqliteTable(
   'sector_snapshots',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     sectorSlug: text('sector_slug').notNull(),
-    asOf: date('as_of').notNull(),
-    metricsJson: jsonb('metrics_json').notNull().$type<Record<string, unknown>>(),
-    newsSummaryJson: jsonb('news_summary_json').$type<Record<string, unknown>>(),
+    asOf: text('as_of').notNull(),
+    metricsJson: text('metrics_json', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
+    newsSummaryJson: text('news_summary_json', { mode: 'json' }).$type<Record<string, unknown>>(),
     source: text('source').notNull(),
-    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+    ingestedAt: integer('ingested_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     uniqueIndex('sector_snapshots_sector_asof_idx').on(table.sectorSlug, table.asOf),
@@ -119,36 +114,36 @@ export const sectorSnapshots = pgTable(
   ],
 );
 
-export const newsItems = pgTable(
+export const newsItems = sqliteTable(
   'news_items',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     tickerId: integer('ticker_id').references(() => tickers.id, { onDelete: 'cascade' }),
-    publishedDate: date('published_date').notNull(),
+    publishedDate: text('published_date').notNull(),
     headline: text('headline').notNull(),
     source: text('source'),
     category: text('category'),
     sectorTag: text('sector_tag'),
     url: text('url'),
-    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+    ingestedAt: integer('ingested_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [index('news_ticker_date_idx').on(table.tickerId, table.publishedDate)],
 );
 
-export const portfolioAccounts = pgTable('portfolio_accounts', {
-  id: serial('id').primaryKey(),
+export const portfolioAccounts = sqliteTable('portfolio_accounts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
   label: text('label').notNull().default('default'),
-  capitalBdt: doublePrecision('capital_bdt').notNull().default(1_000_000),
-  riskPerTradePct: doublePrecision('risk_per_trade_pct').notNull().default(1.0),
-  loanBalanceBdt: doublePrecision('loan_balance_bdt'),
-  purchasingPowerBdt: doublePrecision('purchasing_power_bdt'),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  capitalBdt: real('capital_bdt').notNull().default(1_000_000),
+  riskPerTradePct: real('risk_per_trade_pct').notNull().default(1.0),
+  loanBalanceBdt: real('loan_balance_bdt'),
+  purchasingPowerBdt: real('purchasing_power_bdt'),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
 });
 
-export const portfolioPositions = pgTable(
+export const portfolioPositions = sqliteTable(
   'portfolio_positions',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     accountId: integer('account_id')
       .notNull()
       .references(() => portfolioAccounts.id, { onDelete: 'cascade' }),
@@ -156,21 +151,21 @@ export const portfolioPositions = pgTable(
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
     purpose: text('purpose').notNull().default('investment'),
-    qty: doublePrecision('qty').notNull(),
-    avgCost: doublePrecision('avg_cost').notNull(),
+    qty: real('qty').notNull(),
+    avgCost: real('avg_cost').notNull(),
     sector: text('sector'),
-    stopLevel: doublePrecision('stop_level'),
-    targetLevel: doublePrecision('target_level'),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    stopLevel: real('stop_level'),
+    targetLevel: real('target_level'),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [unique('portfolio_account_ticker_purpose').on(table.accountId, table.tickerId, table.purpose)],
 );
 
 /** Individual buy fills that roll up into portfolio_positions totals. */
-export const portfolioLots = pgTable(
+export const portfolioLots = sqliteTable(
   'portfolio_lots',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     accountId: integer('account_id')
       .notNull()
       .references(() => portfolioAccounts.id, { onDelete: 'cascade' }),
@@ -178,67 +173,67 @@ export const portfolioLots = pgTable(
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
     purpose: text('purpose').notNull().default('investment'),
-    tradeDate: date('trade_date').notNull(),
-    qty: doublePrecision('qty').notNull(),
-    price: doublePrecision('price').notNull(),
+    tradeDate: text('trade_date').notNull(),
+    qty: real('qty').notNull(),
+    price: real('price').notNull(),
     notes: text('notes'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [index('portfolio_lots_lookup_idx').on(table.accountId, table.tickerId, table.purpose)],
 );
 
-export const ingestRuns = pgTable('ingest_runs', {
-  id: serial('id').primaryKey(),
+export const ingestRuns = sqliteTable('ingest_runs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
   jobName: text('job_name').notNull(),
   tickerId: integer('ticker_id').references(() => tickers.id, { onDelete: 'set null' }),
   status: text('status').notNull(),
-  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
-  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
+  finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
   rowsUpserted: integer('rows_upserted').notNull().default(0),
   errorMessage: text('error_message'),
   source: text('source'),
 });
 
-export const dataFreshness = pgTable(
+export const dataFreshness = sqliteTable(
   'data_freshness',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     entityType: text('entity_type').notNull(),
     tickerId: integer('ticker_id').references(() => tickers.id, { onDelete: 'cascade' }),
-    lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
-    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastSuccessAt: integer('last_success_at', { mode: 'timestamp_ms' }),
+    lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp_ms' }),
     staleAfterHours: integer('stale_after_hours').notNull().default(24),
   },
   (table) => [unique('freshness_entity_ticker').on(table.entityType, table.tickerId)],
 );
 
-export const watchlistTickers = pgTable(
+export const watchlistTickers = sqliteTable(
   'watchlist_tickers',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     tickerId: integer('ticker_id')
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
     purpose: text('purpose').notNull().default('investment'),
-    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+    addedAt: integer('added_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [uniqueIndex('watchlist_ticker_purpose_idx').on(table.tickerId, table.purpose)],
 );
 
 /** Immutable skill/agent analysis results (REQ-005 audit trail). */
-export const analysisSnapshots = pgTable(
+export const analysisSnapshots = sqliteTable(
   'analysis_snapshots',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     tickerId: integer('ticker_id')
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
     skill: text('skill').notNull().default('analyze_ticker'),
-    asOf: date('as_of').notNull(),
-    payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
+    asOf: text('as_of').notNull(),
+    payload: text('payload', { mode: 'json' }).notNull().$type<Record<string, unknown>>(),
     clientId: text('client_id'),
     modelVersion: text('model_version'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     index('analysis_snapshots_ticker_created_idx').on(table.tickerId, table.createdAt),
@@ -247,21 +242,21 @@ export const analysisSnapshots = pgTable(
 );
 
 /** Web/agent research citations saved from client sessions (REQ-014 lineage). */
-export const researchMemos = pgTable(
+export const researchMemos = sqliteTable(
   'research_memos',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     tickerId: integer('ticker_id').references(() => tickers.id, { onDelete: 'cascade' }),
     sessionId: text('session_id'),
     clientId: text('client_id'),
     title: text('title').notNull(),
     bodyMd: text('body_md').notNull(),
-    summaryJson: jsonb('summary_json').$type<Record<string, unknown>>(),
-    asOf: date('as_of'),
+    summaryJson: text('summary_json', { mode: 'json' }).$type<Record<string, unknown>>(),
+    asOf: text('as_of'),
     version: integer('version').notNull().default(1),
     parentMemoId: integer('parent_memo_id'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     index('research_memos_ticker_created_idx').on(table.tickerId, table.createdAt),
@@ -269,24 +264,24 @@ export const researchMemos = pgTable(
   ],
 );
 
-export const researchSources = pgTable(
+export const researchSources = sqliteTable(
   'research_sources',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     memoId: integer('memo_id').references(() => researchMemos.id, { onDelete: 'set null' }),
     tickerId: integer('ticker_id').references(() => tickers.id, { onDelete: 'cascade' }),
     url: text('url'),
     title: text('title').notNull(),
     publisher: text('publisher'),
-    publishedDate: date('published_date'),
-    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedDate: text('published_date'),
+    fetchedAt: integer('fetched_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
     queryContext: text('query_context'),
     category: text('category'),
-    extractedFacts: jsonb('extracted_facts').$type<Record<string, unknown>>(),
+    extractedFacts: text('extracted_facts', { mode: 'json' }).$type<Record<string, unknown>>(),
     sessionId: text('session_id'),
     clientId: text('client_id'),
     notes: text('notes'),
-    ingestedAt: timestamp('ingested_at', { withTimezone: true }).notNull().defaultNow(),
+    ingestedAt: integer('ingested_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     index('research_sources_ticker_fetched_idx').on(table.tickerId, table.fetchedAt),
@@ -297,21 +292,21 @@ export const researchSources = pgTable(
 );
 
 /** Custom SKILL.md overrides (dashboard / MCP skill editor). */
-export const skillOverrides = pgTable(
+export const skillOverrides = sqliteTable(
   'skill_overrides',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     slug: text('slug').notNull().unique(),
     toolName: text('tool_name'),
     name: text('name'),
     description: text('description'),
     skillMd: text('skill_md').notNull(),
-    metadataJson: jsonb('metadata_json').$type<Record<string, unknown>>(),
-    isActive: boolean('is_active').notNull().default(true),
+    metadataJson: text('metadata_json', { mode: 'json' }).$type<Record<string, unknown>>(),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     clientId: text('client_id'),
     version: integer('version').notNull().default(1),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [
     index('skill_overrides_slug_idx').on(table.slug),
@@ -319,23 +314,23 @@ export const skillOverrides = pgTable(
   ],
 );
 
-export const predictionOutcomes = pgTable(
+export const predictionOutcomes = sqliteTable(
   'prediction_outcomes',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey({ autoIncrement: true }),
     tickerId: integer('ticker_id')
       .notNull()
       .references(() => tickers.id, { onDelete: 'cascade' }),
-    signalDate: date('signal_date').notNull(),
+    signalDate: text('signal_date').notNull(),
     predictedAction: text('predicted_action').notNull(),
     predictedRating: text('predicted_rating'),
-    actualReturn1w: doublePrecision('actual_return_1w'),
-    actualReturn1m: doublePrecision('actual_return_1m'),
-    actualReturn3m: doublePrecision('actual_return_3m'),
+    actualReturn1w: real('actual_return_1w'),
+    actualReturn1m: real('actual_return_1m'),
+    actualReturn3m: real('actual_return_3m'),
     criterionId: integer('criterion_id'),
     agentName: text('agent_name'),
     snapshotId: integer('snapshot_id').references(() => analysisSnapshots.id, { onDelete: 'set null' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   },
   (table) => [index('prediction_outcomes_ticker_date_idx').on(table.tickerId, table.signalDate)],
 );
