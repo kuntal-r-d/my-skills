@@ -66,6 +66,24 @@ function dailyOhlcvDays(): number {
   return Number.isFinite(n) && n > 0 ? n : 90;
 }
 
+/** Total OHLCV fetch attempts per symbol (retries + 1); tunable via INGEST_OHLCV_RETRIES. */
+function ohlcvFetchAttempts(): number {
+  const n = parseInt(process.env.INGEST_OHLCV_RETRIES ?? '2', 10);
+  const retries = Number.isFinite(n) && n >= 0 ? n : 2;
+  return retries + 1;
+}
+
+/** Linear backoff between OHLCV fetch attempts; base tunable via INGEST_OHLCV_RETRY_MS. */
+function ohlcvRetryDelayMs(attempt: number): number {
+  const base = parseInt(process.env.INGEST_OHLCV_RETRY_MS ?? '750', 10);
+  const ms = Number.isFinite(base) && base >= 0 ? base : 750;
+  return ms * (attempt + 1);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function portfolioAndWatchlistSymbols(db: Db): Promise<string[]> {
   const symbols = new Set(await getWatchlistSymbols(db));
   const account = await getDefaultAccount(db);
@@ -79,31 +97,42 @@ async function portfolioAndWatchlistSymbols(db: Db): Promise<string[]> {
 export async function ingestOhlcv(db: Db, symbol: string, days = 365): Promise<number> {
   const started = new Date();
   const ticker = await ensureTicker(db, symbol);
-  const registry = createOhlcvRegistry();
+  const minBars = minOhlcvBarsForWindow(days);
 
   type Candidate = { rows: Awaited<ReturnType<typeof scraper.getHistoricalData>>; source: string };
-  const candidates: Candidate[] = [];
 
-  for (const source of registry) {
-    try {
-      const rows = await source.fetch(symbol, days);
-      if (rows.length) candidates.push({ rows, source: source.id });
-    } catch (err) {
-      console.warn(`[ingest] OHLCV source ${source.id} failed for ${symbol}:`, err);
-    }
-  }
-
+  // Transient dsebd.org failures (rate-limit/timeout) during the daily loop surface as an
+  // empty fetch for a symbol that actually has data — a single miss otherwise forces a full
+  // manual rerun of all symbols. Retry with backoff, keeping the best result across attempts,
+  // before recording failure. Genuinely empty symbols (e.g. suspended instruments) still fail
+  // after the retries, which is the correct outcome.
+  const attempts = ohlcvFetchAttempts();
   let rows: Candidate['rows'] = [];
   let source = 'dse';
   let bestCount = 0;
 
-  for (const c of candidates) {
-    const { bars } = sanitizeOhlcv(c.rows);
-    if (bars.length > bestCount) {
-      bestCount = bars.length;
-      rows = bars;
-      source = c.source;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const candidates: Candidate[] = [];
+    for (const src of createOhlcvRegistry()) {
+      try {
+        const fetched = await src.fetch(symbol, days);
+        if (fetched.length) candidates.push({ rows: fetched, source: src.id });
+      } catch (err) {
+        console.warn(`[ingest] OHLCV source ${src.id} failed for ${symbol}:`, err);
+      }
     }
+
+    for (const c of candidates) {
+      const { bars } = sanitizeOhlcv(c.rows);
+      if (bars.length > bestCount) {
+        bestCount = bars.length;
+        rows = bars;
+        source = c.source;
+      }
+    }
+
+    if (bestCount >= minBars) break;
+    if (attempt < attempts - 1) await sleep(ohlcvRetryDelayMs(attempt));
   }
 
   if (rows.length === 0) {
@@ -118,7 +147,6 @@ export async function ingestOhlcv(db: Db, symbol: string, days = 365): Promise<n
     return 0;
   }
 
-  const minBars = minOhlcvBarsForWindow(days);
   if (rows.length < minBars) {
     await recordIngestRun(db, {
       jobName: 'ingest_ohlcv',

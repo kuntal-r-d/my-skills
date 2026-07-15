@@ -91,7 +91,8 @@ async function main(): Promise<void> {
           }
           if (failed.length) {
             console.warn(
-              `  ⚠ No OHLCV for: ${failed.join(', ')} — DSE archive may be empty for these symbols; try Analyze after a full ingest.`,
+              `  ⚠ No OHLCV for: ${failed.join(', ')} — no tradeable bars after retries. ` +
+                `Symbols that fail every day are usually suspended/non-trading (archive reports only a flat reference close, no OHLC) and are safe to drop from the watchlist; a symbol that recovers on the next run was a transient fetch failure.`,
             );
           }
         }
