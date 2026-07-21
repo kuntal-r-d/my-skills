@@ -52,6 +52,9 @@ interface StrategyRecord {
 const RSI_OVERBOUGHT = 73;
 const MA10_EXTENSION = 1.08; // 8% above the 10-day MA counts as extended
 
+/** Reversal / bottom-fishing strategy — not a trend buy on its own in a downtrend. */
+const REVERSAL_STRATEGY = 'failure_test_reversal';
+
 /** Strategies whose trade plan is a genuine long entry we can act on tomorrow. */
 function isActionableBuy(plan: TradePlan | null | undefined): plan is TradePlan {
   return Boolean(plan && plan.status === 'actionable' && plan.direction === 'buy');
@@ -126,6 +129,9 @@ export function computeDailyBuySignal(
     .filter(([, strat]) => isActionableBuy(strat?.key_metrics?.trade_plan))
     .sort((a, b) => (num(b[1].score) ?? 0) - (num(a[1].score) ?? 0));
   const actionableCount = actionable.length;
+  // Actionable buys that are genuine trend strategies (exclude the reversal/bottom-fishing one).
+  const trendActionable = actionable.filter(([key]) => key !== REVERSAL_STRATEGY);
+  const trendActionableCount = trendActionable.length;
 
   // --- RSI, price, MA10 -------------------------------------------------------
   const rsi = extractRsi(strategies, technicalKm);
@@ -146,9 +152,19 @@ export function computeDailyBuySignal(
     synthRating === 'avoid';
 
   // --- Base verdict -----------------------------------------------------------
+  // In a downtrend, only genuine trend strategies count — a lone failure-test
+  // reversal attempt on a falling stock is not a lean-buy. Fewer than 2 trend-strategy
+  // actionable buys in a downtrend resolves to AVOID.
   let verdict: BuyVerdict;
-  if (actionableCount === 0 && downtrend) {
-    verdict = 'AVOID';
+  let lonelyReversalInDowntrend = false;
+  if (downtrend) {
+    if (trendActionableCount >= 2) {
+      verdict = 'BUY';
+    } else {
+      verdict = 'AVOID';
+      // Preserve the reversal flag: a single failure-test actionable buy is present but not a trend buy.
+      lonelyReversalInDowntrend = actionableCount > trendActionableCount;
+    }
   } else if (actionableCount >= 2) {
     verdict = 'BUY';
   } else {
@@ -247,7 +263,9 @@ export function computeDailyBuySignal(
       : `No actionable buys yet - stand aside and watch; ${rsiPhrase}`;
   } else {
     // AVOID
-    rationale = `No actionable buys and price in a downtrend - avoid; ${rsiPhrase}`;
+    rationale = lonelyReversalInDowntrend
+      ? `Downtrend; only a failure-test reversal attempt present - not a trend buy; ${rsiPhrase}`
+      : `No trend buys and price in a downtrend - avoid; ${rsiPhrase}`;
   }
 
   return {

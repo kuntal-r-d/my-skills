@@ -214,6 +214,45 @@ describe('computeDailyBuySignal', () => {
     expect(s.verdict).toBe('AVOID');
   });
 
+  it('AVOID: downtrend with a single failure-test reversal actionable buy is not a lean-buy (EBL case)', () => {
+    const p = payload({
+      consensus: 0.48,
+      rsi14: 41,
+      rating: 'hold',
+      trend: -0.3, // downtrend
+      strategies: {
+        // a lone reversal/bottom-fishing actionable BUY on a falling stock
+        failure_test_reversal: strat('actionable', 'buy', 0.5, { entry: 24.4, stop_loss: 24.2, take_profit_1: 24.81 }, 41),
+        darvas_box: strat('watch', 'buy', 0.3, { entry: 26, stop_loss: 23, take_profit_1: 30 }),
+        minervini_sepa: strat('watch', 'buy', 0.2, { entry: 27, stop_loss: 24, take_profit_1: 31 }),
+      },
+    });
+    const s = computeDailyBuySignal(p);
+    expect(s.verdict).toBe('AVOID');
+    expect(s.actionableCount).toBe(1); // the failure-test reversal is actionable...
+    expect(s.rationale).not.toContain('lean-buy'); // ...but not labelled a lean-buy
+    expect(s.rationale).toContain('failure-test reversal');
+    expect(s.rationale).toContain('not a trend buy');
+  });
+
+  it('BUY: downtrend flag does not block a genuine 2+ trend-strategy breakout', () => {
+    const p = payload({
+      consensus: 0.7,
+      rsi14: 60,
+      rating: 'hold',
+      trend: -0.1, // technically a downtrend flag...
+      strategies: {
+        // ...but two real trend strategies are actionable buys
+        minervini_sepa: strat('actionable', 'buy', 0.9, { entry: 50, stop_loss: 46, take_profit_1: 58 }),
+        can_slim: strat('actionable', 'buy', 0.8, { entry: 51, stop_loss: 47, take_profit_1: 60 }),
+        failure_test_reversal: strat('watch', 'sell', 0.4, { entry: 48, stop_loss: 49, take_profit_1: 45 }, 60),
+      },
+    });
+    const flat = Array.from({ length: 10 }, () => ({ date: '2026-07-10', open: 50, high: 50, low: 50, close: 50, volume: 1000 }));
+    const s = computeDailyBuySignal(p, flat);
+    expect(s.verdict).toBe('BUY'); // 2 trend-strategy actionable buys clears the downtrend
+  });
+
   it('falls back to synthesis composite for confidence when consensus is absent', () => {
     const p = payload({
       composite: 8,
