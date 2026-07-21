@@ -5,6 +5,8 @@ export type { RunAnalysisOptions, AnalysisMode } from './analysis.js';
 export { enrichRiskInAnalysis, hasStructureStrategy } from './risk-enrich.js';
 export { enrichMomentumTrading, buildMomentumTrading, hasMomentumTrading } from './momentum-trading.js';
 export { enrichMomentumInAnalysis } from './momentum-enrich.js';
+export { computeDailyBuySignal } from './buy-signal.js';
+export type { DailyBuySignal, BuyVerdict } from './buy-signal.js';
 export { enrichValueChecklistInAnalysis } from './value-enrich.js';
 export { runDailyBriefing } from './briefing.js';
 export { buildMacroLandscape, buildSectorMacroDetail, listMacroInsights } from './macro-landscape.js';

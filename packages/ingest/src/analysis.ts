@@ -11,6 +11,7 @@ import { buildTickerContract, stripMeta } from './contract-builder.js';
 import { computeMomentumRotation } from './rotation.js';
 import { enrichRiskInAnalysis } from './risk-enrich.js';
 import { enrichMomentumTrading } from './momentum-trading.js';
+import { computeDailyBuySignal } from './buy-signal.js';
 
 const MCP_VERSION = '2.0.0';
 
@@ -94,6 +95,9 @@ export async function runTickerAnalysis(
   }
 
   analysis = enrichRiskInAnalysis(analysis, payload);
+
+  const ohlcvBars = (payload.ohlcv as import('@stock-buddy/core').OhlcvBar[]) ?? [];
+  analysis.daily_buy_signal = computeDailyBuySignal(analysis, ohlcvBars);
 
   let snapshotId: number | undefined;
   if (opts.persist ?? true) {

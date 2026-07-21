@@ -2961,3 +2961,70 @@ tr.skills-row-active td { background: rgba(59, 130, 246, 0.12); }
   .progress-fill { transition: none; }
   .toast { transition: none; }
 }
+
+/* Closed-trade journal */
+.portfolio-closed-section { margin-top: 1.5rem; }
+.closed-trades-heading { margin: 0 0 0.5rem; font-size: 0.95rem; opacity: 0.9; }
+.closed-trades-table { font-size: 0.8rem; white-space: nowrap; }
+.closed-trades-note { margin-top: 0.4rem; font-size: 0.72rem; }
+.closed-add { margin: 0 0 0.75rem; }
+.closed-add > summary { cursor: pointer; font-size: 0.85rem; opacity: 0.85; user-select: none; }
+.closed-add-form { margin-top: 0.5rem; gap: 0.4rem; }
+.closed-add-form input { max-width: 132px; }
+.closed-del { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0 0.25rem; }
+.closed-del:hover { opacity: 0.7; }
+
+/* Portfolio books (full-width, book-tabbed layout) */
+.portfolio-books { display: flex; flex-direction: column; gap: 1.25rem; }
+.portfolio-book { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 1rem 1.1rem 1.25rem; }
+.portfolio-book-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.portfolio-book-head h3 { margin: 0; }
+.portfolio-book-head .meta-bar { margin: 0; flex: 1 1 auto; }
+.book-view-tabs { display: flex; gap: 0.4rem; border-bottom: 1px solid var(--border); margin-bottom: 0.9rem; }
+.book-view-tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; padding: 0.45rem 0.9rem; font-size: 0.9rem; font-weight: 500; }
+.book-view-tab:hover { color: var(--accent); }
+.book-view-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.book-view-panel { display: none; }
+.book-view-panel.active { display: block; }
+.book-view-panel .portfolio-charts { display: flex; flex-wrap: wrap; gap: 1rem; }
+
+/* Daily momentum buy-signal banner (Momentum tab) */
+.buy-signal-banner {
+  border: 1px solid var(--border);
+  border-left-width: 6px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 0.85rem 1rem;
+  margin: 0 0 1rem;
+}
+.buy-signal-head { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+.buy-signal-verdict {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.6rem;
+  border-radius: 6px;
+  color: #fff;
+}
+.buy-signal-title { font-weight: 600; color: var(--text); }
+.buy-signal-asof { color: var(--muted); font-size: 0.8rem; margin-left: auto; }
+.buy-signal-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  margin: 0.7rem 0 0.4rem;
+}
+.buy-signal-metric { display: flex; flex-direction: column; }
+.buy-signal-metric .bs-label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.buy-signal-metric .bs-value { font-weight: 600; font-size: 0.95rem; }
+.buy-signal-rationale { margin: 0.35rem 0 0; color: var(--text); font-size: 0.85rem; }
+
+.buy-signal-banner.buy { border-left-color: var(--green); background: color-mix(in srgb, var(--green) 8%, var(--surface)); }
+.buy-signal-banner.buy .buy-signal-verdict { background: var(--green); }
+.buy-signal-banner.wait { border-left-color: var(--amber); background: color-mix(in srgb, var(--amber) 8%, var(--surface)); }
+.buy-signal-banner.wait .buy-signal-verdict { background: var(--amber); }
+.buy-signal-banner.watch { border-left-color: var(--muted); background: color-mix(in srgb, var(--muted) 8%, var(--surface)); }
+.buy-signal-banner.watch .buy-signal-verdict { background: var(--muted); }
+.buy-signal-banner.avoid { border-left-color: var(--red); background: color-mix(in srgb, var(--red) 8%, var(--surface)); }
+.buy-signal-banner.avoid .buy-signal-verdict { background: var(--red); }

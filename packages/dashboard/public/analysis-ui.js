@@ -220,6 +220,41 @@ window.AnalysisUI = (function () {
     return null;
   }
 
+  /** Consolidated daily "should I buy tomorrow?" verdict banner for the Momentum tab. */
+  function renderBuySignalBanner(signal) {
+    if (!signal || typeof signal !== 'object') return '';
+    const verdict = String(signal.verdict ?? '').toUpperCase();
+    const variant = { BUY: 'buy', WAIT: 'wait', WATCH: 'watch', AVOID: 'avoid' }[verdict] ?? 'watch';
+    const bdt = (v) => (v != null && !Number.isNaN(v) ? `৳${fmtNum(v, 2)}` : '—');
+    const conf = signal.confidence != null ? `${Math.round(signal.confidence * 100)}%` : '—';
+    const rsi = signal.rsi != null ? fmtNum(signal.rsi, 0) : '—';
+    const pctVs = signal.pctVs10ma != null
+      ? `${signal.pctVs10ma >= 0 ? '+' : ''}${fmtNum(signal.pctVs10ma, 1)}%`
+      : '—';
+    const primary = signal.primaryStrategy
+      ? esc(String(signal.primaryStrategy).replace(/_/g, ' '))
+      : '—';
+    const levelsLabel = signal.actionableCount > 0 ? 'Entry' : 'Watch-trigger';
+    return `
+      <div class="buy-signal-banner ${variant}">
+        <div class="buy-signal-head">
+          <span class="buy-signal-verdict">${esc(verdict || '—')}</span>
+          <span class="buy-signal-title">Daily momentum verdict</span>
+          <span class="buy-signal-asof">${signal.asOf ? 'as of ' + esc(fmtDate(signal.asOf, { dateOnly: true })) : ''}</span>
+        </div>
+        <div class="buy-signal-levels">
+          <div class="buy-signal-metric"><span class="bs-label">${levelsLabel}</span><span class="bs-value">${bdt(signal.entry)}</span></div>
+          <div class="buy-signal-metric"><span class="bs-label">Stop</span><span class="bs-value">${bdt(signal.stop)}</span></div>
+          <div class="buy-signal-metric"><span class="bs-label">Target</span><span class="bs-value">${bdt(signal.target)}</span></div>
+          <div class="buy-signal-metric"><span class="bs-label">Confidence</span><span class="bs-value">${esc(conf)}</span></div>
+          <div class="buy-signal-metric"><span class="bs-label">RSI</span><span class="bs-value">${esc(rsi)}</span></div>
+          <div class="buy-signal-metric"><span class="bs-label">vs 10-MA</span><span class="bs-value">${esc(pctVs)}</span></div>
+          <div class="buy-signal-metric"><span class="bs-label">Primary</span><span class="bs-value">${primary}</span></div>
+        </div>
+        <p class="buy-signal-rationale">${esc(signal.rationale ?? '')}</p>
+      </div>`;
+  }
+
   function renderSynthesisAgentBoard(agentCards, synthesis, lens) {
     const lensData = synthesis?.[lens] ?? {};
     const contributions = lensData.contributions ?? {};
@@ -4283,6 +4318,7 @@ Educational analysis only. Not financial advice.`;
     fmtDateWithAge,
     formatAge,
     renderThinkingCard,
+    renderBuySignalBanner,
     renderSynthesisAgentBoard,
     renderAgentDetailModalContent,
     renderRiskPanel,

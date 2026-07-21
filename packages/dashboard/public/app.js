@@ -598,6 +598,7 @@ function renderFullAnalysis() {
     UI.renderThinkingCard('Investment Agent', cards.fundamental, 'Fundamentals, value criteria, long-term thesis (REQ-006)') +
     (viewMode !== 'momentum' ? `<div class="checklist-block"><h4>Value checklist</h4>${UI.renderValueChecklist(vc, valueBucket)}</div>` : '');
   $('#sub-momentum').innerHTML =
+    UI.renderBuySignalBanner(a.daily_buy_signal) +
     (viewMode !== 'investment' ? UI.renderSynthesisAgentBoard(cards, syn, 'momentum') : '') +
     UI.renderThinkingCard('Technical Agent', cards.technical, 'Technical indicators and chart context (REQ-007)') +
     UI.renderIndicators(cards.technical) +
