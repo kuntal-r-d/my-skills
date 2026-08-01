@@ -1,5 +1,5 @@
 # Stock Buddy MCP Server — TypeScript (Node 20)
-FROM node:20-slim
+FROM node:25-slim
 
 WORKDIR /app
 
