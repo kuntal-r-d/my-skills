@@ -262,16 +262,53 @@ function initActionModal() {
   });
 }
 
-async function copyCommand(text, label) {
+// The async Clipboard API is unavailable on non-secure origins and is denied to
+// a cross-origin frame (the workspace app embed) unless the parent delegates
+// clipboard-write. execCommand still works in both, given a user gesture.
+function legacyCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '-1000px';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  try {
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    ta.remove();
+  }
+}
+
+async function copyText(text) {
   if (!text) return false;
   try {
-    await navigator.clipboard.writeText(text);
-    setAnalysisStatus(label ? `Copied: ${label}` : 'Command copied', 'ok');
-    return true;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
   } catch {
-    setAnalysisStatus('Copy failed — select command manually', 'error');
-    return false;
+    // fall through to the legacy path
   }
+  return legacyCopy(text);
+}
+
+async function copyCommand(text, label) {
+  if (!text) return false;
+  const ok = await copyText(text);
+  if (ok) {
+    const msg = label ? `Copied: ${label}` : 'Command copied';
+    setAnalysisStatus(msg, 'ok');
+    showToast(msg, 'ok');
+  } else {
+    setAnalysisStatus('Copy failed — select command manually', 'error');
+    showToast('Copy failed — select the text manually', 'error');
+  }
+  return ok;
 }
 
 function renderTickerCommands(symbol) {
@@ -1851,10 +1888,9 @@ async function copyBriefingMarkdown() {
     showToast('Refresh briefing first', 'info');
     return;
   }
-  try {
-    await navigator.clipboard.writeText(md);
+  if (await copyText(md)) {
     showToast('Briefing markdown copied', 'ok');
-  } catch {
+  } else {
     showToast('Could not copy to clipboard', 'info');
   }
 }
@@ -2410,11 +2446,12 @@ bindClick('#analyze-momentum', () => runAnalyze('momentum'));
 bindClick('#json-copy', async () => {
   const text = $('#analysis-json')?.textContent ?? '';
   if (!text) return;
-  try {
-    await navigator.clipboard.writeText(text);
+  if (await copyText(text)) {
     setAnalysisStatus('JSON copied to clipboard', 'ok');
-  } catch {
+    showToast('JSON copied to clipboard', 'ok');
+  } else {
     setAnalysisStatus('Copy failed — select JSON manually', 'error');
+    showToast('Copy failed — select the JSON manually', 'error');
   }
 });
 
