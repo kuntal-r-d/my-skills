@@ -2,6 +2,7 @@ import type { Db } from '@stock-buddy/db';
 import {
   ensureTicker,
   getDefaultAccount,
+  getFreshness,
   getLatestFundamentals,
   getOhlcv,
   getShareholding,
@@ -33,6 +34,8 @@ import {
   createOhlcvRegistry,
   fetchAllFundamentals,
   fetchLankabdDataMatrix,
+  fetchDseIndexHistory,
+  DSE_INDEX_SYMBOLS,
   DSEScraper,
   type ShareholdingRow,
   type TickerRef,
@@ -94,10 +97,172 @@ async function portfolioAndWatchlistSymbols(db: Db): Promise<string[]> {
   return [...symbols];
 }
 
+/** Pure check: missing/invalid timestamp or older than maxAgeDays. */
+export function isStaleTimestamp(
+  lastSuccessAt: Date | string | null | undefined,
+  maxAgeDays: number,
+  nowMs = Date.now(),
+): boolean {
+  if (lastSuccessAt == null) return true;
+  const t = lastSuccessAt instanceof Date ? lastSuccessAt.getTime() : new Date(lastSuccessAt).getTime();
+  if (!Number.isFinite(t)) return true;
+  return nowMs - t > maxAgeDays * 24 * 60 * 60 * 1000;
+}
+
+/** True when entity has no successful freshness row or last success is older than maxAgeDays. */
+export async function isEntityStale(
+  db: Db,
+  entityType: string,
+  tickerId: number,
+  maxAgeDays: number,
+): Promise<boolean> {
+  const rows = await getFreshness(db, tickerId);
+  const hit = rows.find((r) => r.entityType === entityType);
+  return isStaleTimestamp(hit?.lastSuccessAt ?? null, maxAgeDays);
+}
+
+function slowBooksMaxAgeDays(): number {
+  const n = parseInt(process.env.INGEST_SLOW_MAX_AGE_DAYS ?? '14', 10);
+  return Number.isFinite(n) && n > 0 ? n : 14;
+}
+
+function slowBooksMinOhlcvBars(): number {
+  const n = parseInt(process.env.INGEST_SLOW_MIN_OHLCV_BARS ?? '240', 10);
+  return Number.isFinite(n) && n > 0 ? n : 240;
+}
+
+export type SlowBooksResult = {
+  symbols: string[];
+  fundamentals: Record<string, 'ran' | 'skipped' | 'failed'>;
+  shareholding: Record<string, 'ran' | 'skipped' | 'failed'>;
+  ohlcv: Record<string, number | 'skipped'>;
+};
+
+/**
+ * Lean weekly refresh for portfolio ∪ watchlist:
+ * fundamentals + shareholding when stale (default >14d), and OHLCV top-up to 365d
+ * when bar count is under the momentum floor (~240). Does NOT replace ingest:daily.
+ */
+export async function ingestSlowBooks(
+  db: Db,
+  opts: { maxAgeDays?: number; minOhlcvBars?: number; symbols?: string[] } = {},
+): Promise<SlowBooksResult> {
+  const maxAgeDays = opts.maxAgeDays ?? slowBooksMaxAgeDays();
+  const minBars = opts.minOhlcvBars ?? slowBooksMinOhlcvBars();
+  const symbols = (opts.symbols ?? (await portfolioAndWatchlistSymbols(db)))
+    .map((s) => s.toUpperCase())
+    .filter((s) => !(DSE_INDEX_SYMBOLS as readonly string[]).includes(s))
+    .sort();
+
+  const result: SlowBooksResult = {
+    symbols,
+    fundamentals: {},
+    shareholding: {},
+    ohlcv: {},
+  };
+
+  for (const symbol of symbols) {
+    const ticker = await ensureTicker(db, symbol);
+
+    const fundStale = await isEntityStale(db, 'fundamentals', ticker.id, maxAgeDays);
+    const fundSnap = fundStale ? null : await getLatestFundamentals(db, ticker.id);
+    if (fundStale || !fundSnap) {
+      try {
+        await ingestFundamentals(db, symbol);
+        result.fundamentals[symbol] = 'ran';
+      } catch (err) {
+        console.warn(`[ingest:slow-books] fundamentals failed for ${symbol}:`, err);
+        result.fundamentals[symbol] = 'failed';
+      }
+    } else {
+      result.fundamentals[symbol] = 'skipped';
+    }
+
+    const shareStale = await isEntityStale(db, 'shareholding', ticker.id, maxAgeDays);
+    const shareRows = shareStale ? [] : await getShareholding(db, ticker.id, 1);
+    if (shareStale || !shareRows.length) {
+      try {
+        await ingestShareholding(db, symbol);
+        result.shareholding[symbol] = 'ran';
+      } catch (err) {
+        console.warn(`[ingest:slow-books] shareholding failed for ${symbol}:`, err);
+        result.shareholding[symbol] = 'failed';
+      }
+    } else {
+      result.shareholding[symbol] = 'skipped';
+    }
+
+    const bars = await getOhlcv(db, ticker.id, { limit: minBars + 20 });
+    if (bars.length < minBars) {
+      try {
+        result.ohlcv[symbol] = await ingestOhlcv(db, symbol, 365);
+      } catch (err) {
+        console.warn(`[ingest:slow-books] OHLCV top-up failed for ${symbol}:`, err);
+        result.ohlcv[symbol] = 0;
+      }
+    } else {
+      result.ohlcv[symbol] = 'skipped';
+    }
+  }
+
+  return result;
+}
+
+/**
+ * One-shot bootstrap when a ticker is added to watchlist/portfolio:
+ * OHLCV (365d) + fundamentals + shareholding + news + analysis.
+ * Safe to fire-and-forget from the dashboard (errors logged, not thrown to client).
+ */
+export async function bootstrapTickerOnAdd(db: Db, symbol: string, days = 365): Promise<void> {
+  const sym = symbol.toUpperCase();
+  if ((DSE_INDEX_SYMBOLS as readonly string[]).includes(sym)) return;
+  console.log(`[ingest:on-add] bootstrapping ${sym}...`);
+  await ingestAll(db, sym, days);
+  console.log(`[ingest:on-add] done ${sym}`);
+}
+
 export async function ingestOhlcv(db: Db, symbol: string, days = 365): Promise<number> {
   const started = new Date();
   const ticker = await ensureTicker(db, symbol);
   const minBars = minOhlcvBarsForWindow(days);
+
+  // Indexes are not on day_end_archive — route to the market-information archive.
+  const symUpper = symbol.toUpperCase();
+  if ((DSE_INDEX_SYMBOLS as readonly string[]).includes(symUpper)) {
+    const series = await fetchDseIndexHistory(days);
+    const rows = series[symUpper as (typeof DSE_INDEX_SYMBOLS)[number]] ?? [];
+    if (!rows.length) {
+      await recordIngestRun(db, {
+        jobName: 'ingest_ohlcv',
+        tickerId: ticker.id,
+        status: 'failed',
+        errorMessage: 'No index OHLCV from dse-index-archive',
+        startedAt: started,
+      });
+      await updateFreshness(db, 'ohlcv', ticker.id, false, 24);
+      return 0;
+    }
+    const mapped = rows.map((r) => ({
+      tradeDate: r.date,
+      open: r.open,
+      high: r.high,
+      low: r.low,
+      close: r.close,
+      volume: r.volume,
+      source: 'dse-index-archive',
+    }));
+    const count = await upsertOhlcvBatch(db, ticker.id, mapped);
+    await recordIngestRun(db, {
+      jobName: 'ingest_ohlcv',
+      tickerId: ticker.id,
+      status: 'ok',
+      rowsUpserted: count,
+      source: 'dse-index-archive',
+      startedAt: started,
+    });
+    await updateFreshness(db, 'ohlcv', ticker.id, true, 24);
+    return count;
+  }
 
   type Candidate = { rows: Awaited<ReturnType<typeof scraper.getHistoricalData>>; source: string };
 
@@ -505,19 +670,81 @@ export async function ingestWatchlist(db: Db, days = 365): Promise<void> {
   }
 }
 
-/** Pre-market refresh: macro, market news, OHLCV for portfolio + watchlist symbols. */
-export async function ingestDaily(db: Db): Promise<{
+/**
+ * Fetch DSEX / DSES / DS30 from the DSE market-information archive (one POST
+ * covers all three). Equity OHLCV sources return 0 for index symbols.
+ */
+export async function ingestMarketIndexes(
+  db: Db,
+  days = 365,
+): Promise<Record<string, number>> {
+  const started = new Date();
+  const series = await fetchDseIndexHistory(days);
+  const result: Record<string, number> = {};
+  let total = 0;
+  for (const symbol of DSE_INDEX_SYMBOLS) {
+    const rows = series[symbol] ?? [];
+    const ticker = await ensureTicker(db, symbol);
+    if (!rows.length) {
+      result[symbol] = 0;
+      continue;
+    }
+    const mapped = rows.map((r) => ({
+      tradeDate: r.date,
+      open: r.open,
+      high: r.high,
+      low: r.low,
+      close: r.close,
+      volume: r.volume,
+      source: 'dse-index-archive',
+    }));
+    const n = await upsertOhlcvBatch(db, ticker.id, mapped);
+    await updateFreshness(db, 'ohlcv', ticker.id, true, 24);
+    result[symbol] = n;
+    total += n;
+  }
+  await recordIngestRun(db, {
+    jobName: 'ingest_market_indexes',
+    status: total > 0 ? 'ok' : 'failed',
+    rowsUpserted: total,
+    source: 'dse-index-archive',
+    startedAt: started,
+    ...(total === 0 ? { errorMessage: 'No index bars from dse-index-archive' } : {}),
+  });
+  return result;
+}
+
+/**
+ * Pre-market refresh: macro, market news, OHLCV, then the analysis pipeline for
+ * portfolio + watchlist symbols. Set `opts.analysis = false` for a data-only run
+ * (skips the per-symbol analysis snapshots).
+ */
+export async function ingestDaily(
+  db: Db,
+  opts: { analysis?: boolean } = {},
+): Promise<{
   news_rows: number;
   retagged_news: number;
   ohlcv: Record<string, number>;
+  analysis: Record<string, number>;
   symbols: string[];
+  indexes: Record<string, number>;
 }> {
   const started = new Date();
+  const runAnalysis = opts.analysis ?? true;
   const days = dailyOhlcvDays();
   const symbols = await portfolioAndWatchlistSymbols(db);
 
   await ingestMacro(db);
   const newsRows = await ingestNewsMarket(db);
+  // Indexes: top up ~max(daily window, 90d) each daily run so relative-strength
+  // never goes stale. Full 365d catch-up is `npm run ingest -- --job indexes --days 365`.
+  let indexes: Record<string, number> = {};
+  try {
+    indexes = await ingestMarketIndexes(db, Math.max(days, 90));
+  } catch (err) {
+    console.warn('[ingest:daily] market indexes skipped:', err);
+  }
   try {
     await ingestSectorSnapshots(db);
   } catch (err) {
@@ -541,6 +768,23 @@ export async function ingestDaily(db: Db): Promise<{
   }
 
   const ohlcvTotal = Object.values(ohlcv).reduce((s, n) => s + n, 0);
+
+  // Analysis snapshots for the same portfolio + watchlist set, using the fresh
+  // OHLCV just ingested. Per-symbol try/catch mirrors the OHLCV loop: a single
+  // failing symbol does not abort the run (0 = failed/not persisted).
+  const analysis: Record<string, number> = {};
+  if (runAnalysis) {
+    const { ingestAnalysis } = await import('./analysis.js');
+    for (const symbol of symbols) {
+      try {
+        analysis[symbol] = await ingestAnalysis(db, symbol);
+      } catch (err) {
+        console.warn(`[ingest:daily] analysis failed for ${symbol}:`, err);
+        analysis[symbol] = 0;
+      }
+    }
+  }
+
   try {
     const { maybeRefreshSectorInsightsOnDaily } = await import('./sector-insights-llm.js');
     await maybeRefreshSectorInsightsOnDaily(db);
@@ -555,7 +799,7 @@ export async function ingestDaily(db: Db): Promise<{
     startedAt: started,
   });
 
-  return { news_rows: newsRows, retagged_news: retagged, ohlcv, symbols };
+  return { news_rows: newsRows, retagged_news: retagged, ohlcv, analysis, symbols, indexes };
 }
 
 /** REQ-012: record snapshot outcomes when future prices are available. */

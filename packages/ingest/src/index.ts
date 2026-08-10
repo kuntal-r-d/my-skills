@@ -24,5 +24,11 @@ export {
   ingestWatchlist,
   ingestDaily,
   ingestFundamentalsUniverse,
+  ingestMarketIndexes,
+  ingestSlowBooks,
+  bootstrapTickerOnAdd,
+  isEntityStale,
+  isStaleTimestamp,
 } from './jobs.js';
+export type { SlowBooksResult } from './jobs.js';
 export { refreshSectorInsights, maybeRefreshSectorInsightsOnDaily } from './sector-insights-llm.js';

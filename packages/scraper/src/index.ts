@@ -57,6 +57,16 @@ export {
 } from './sources.js';
 
 export {
+  DSE_INDEX_SYMBOLS,
+  DSE_INDEX_ARCHIVE_URL,
+  DSE_INDEX_RECENT_URL,
+  fetchDseIndexHistory,
+  fetchDseIndexOhlcv,
+  parseDseIndexHistoryHtml,
+  type DseIndexSymbol,
+} from './index-archive.js';
+
+export {
   createFundamentalsRegistry,
   createOhlcvRegistry,
   fetchAllFundamentals,

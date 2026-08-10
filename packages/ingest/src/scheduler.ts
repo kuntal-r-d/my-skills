@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-/** Simple scheduler: run OHLCV ingest daily, full watchlist weekly. */
+/** Scheduler: lean daily ingest + weekly slow-books (fundamentals/shareholding/OHLCV top-up). */
 import { createDb, closeDb, loadEnv } from '@stock-buddy/db';
-import { ingestWatchlist, ingestDaily } from './jobs.js';
+import { ingestDaily, ingestSlowBooks } from './jobs.js';
 
 loadEnv();
 
@@ -22,8 +22,14 @@ async function runDaily(): Promise<void> {
 async function runWeekly(): Promise<void> {
   const db = createDb();
   try {
-    console.log(`[${new Date().toISOString()}] Weekly full ingest starting`);
-    await ingestWatchlist(db, 365);
+    console.log(`[${new Date().toISOString()}] Weekly slow-books starting`);
+    const result = await ingestSlowBooks(db);
+    const fundRan = Object.values(result.fundamentals).filter((v) => v === 'ran').length;
+    const shareRan = Object.values(result.shareholding).filter((v) => v === 'ran').length;
+    const ohlcvRan = Object.values(result.ohlcv).filter((v) => typeof v === 'number').length;
+    console.log(
+      `  symbols=${result.symbols.length} fund_ran=${fundRan} share_ran=${shareRan} ohlcv_topup=${ohlcvRan}`,
+    );
   } finally {
     await closeDb(db);
   }

@@ -12,6 +12,9 @@ import {
   ingestWatchlist,
   ingestDaily,
   ingestFundamentalsUniverse,
+  ingestMarketIndexes,
+  ingestSlowBooks,
+  bootstrapTickerOnAdd,
 } from './jobs.js';
 
 function parseArgs(argv: string[]) {
@@ -78,11 +81,20 @@ async function main(): Promise<void> {
         console.log(await ingestRetagNews(db), 'news rows tagged');
         break;
       case 'daily':
-        console.log('Running daily ingest (macro + news + OHLCV for portfolio/watchlist)...');
         {
-          const result = await ingestDaily(db);
+          const runAnalysis = !args['no-analysis'];
+          console.log(
+            `Running daily ingest (macro + news + indexes + OHLCV${runAnalysis ? ' + analysis' : ''} for portfolio/watchlist)...`,
+          );
+          const result = await ingestDaily(db, { analysis: runAnalysis });
           console.log('  macro: ok');
           console.log(`  news: ${result.news_rows} rows (${result.retagged_news} retagged)`);
+          const idx = Object.entries(result.indexes ?? {});
+          if (idx.length) {
+            console.log(
+              `  indexes: ${idx.map(([s, n]) => `${s}=${n}`).join(', ')}`,
+            );
+          }
           console.log(`  symbols: ${result.symbols.length ? result.symbols.join(', ') : '(none — add portfolio or watchlist tickers)'}`);
           const failed = [];
           for (const [sym, n] of Object.entries(result.ohlcv)) {
@@ -95,7 +107,51 @@ async function main(): Promise<void> {
                 `Symbols that fail every day are usually suspended/non-trading (archive reports only a flat reference close, no OHLC) and are safe to drop from the watchlist; a symbol that recovers on the next run was a transient fetch failure.`,
             );
           }
+          if (runAnalysis) {
+            const analyzed = Object.entries(result.analysis);
+            const failedAnalysis = analyzed.filter(([, id]) => id === 0).map(([sym]) => sym);
+            console.log(
+              `  analysis: ${analyzed.length - failedAnalysis.length}/${analyzed.length} snapshots persisted`,
+            );
+            if (failedAnalysis.length) {
+              console.warn(`  ⚠ Analysis failed for: ${failedAnalysis.join(', ')}`);
+            }
+          } else {
+            console.log('  analysis: skipped (--no-analysis)');
+          }
         }
+        break;
+      case 'indexes':
+      case 'market-indexes':
+        {
+          const result = await ingestMarketIndexes(db, days);
+          console.log(
+            'Indexes:',
+            Object.entries(result)
+              .map(([s, n]) => `${s}=${n}`)
+              .join(', ') || '(none)',
+          );
+        }
+        break;
+      case 'slow-books':
+      case 'weekly-books':
+        {
+          console.log(
+            'Running lean weekly books (fundamentals + shareholding if stale, OHLCV top-up if short history)...',
+          );
+          const result = await ingestSlowBooks(db);
+          console.log(`  symbols: ${result.symbols.length ? result.symbols.join(', ') : '(none)'}`);
+          for (const sym of result.symbols) {
+            console.log(
+              `  ${sym}: fund=${result.fundamentals[sym]} share=${result.shareholding[sym]} ohlcv=${result.ohlcv[sym]}`,
+            );
+          }
+        }
+        break;
+      case 'bootstrap':
+      case 'on-add':
+        await bootstrapTickerOnAdd(db, ticker, days);
+        console.log(`Bootstrap complete for ${ticker}`);
         break;
       case 'analysis':
         const { ingestAnalysis } = await import('./analysis.js');

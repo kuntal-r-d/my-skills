@@ -74,6 +74,7 @@ import {
   enrichRiskInAnalysis,
   enrichMomentumInAnalysis,
   enrichValueChecklistInAnalysis,
+  bootstrapTickerOnAdd,
   type AnalysisMode,
 } from '@stock-buddy/ingest';
 import {
@@ -777,6 +778,14 @@ app.post('/api/watchlist', asyncHandler(async (req, res) => {
     await addToWatchlist(db, t.id, purpose);
   });
   res.json({ ok: true, symbol, purpose });
+  // Fire-and-forget: fill books for newly added names without blocking the UI.
+  void withDb(async (db) => {
+    try {
+      await bootstrapTickerOnAdd(db, symbol);
+    } catch (err) {
+      console.warn(`[on-add] watchlist bootstrap failed for ${symbol}:`, err);
+    }
+  });
 }));
 
 app.delete('/api/watchlist/:symbol', asyncHandler(async (req, res) => {
@@ -876,6 +885,8 @@ app.post('/api/portfolio/positions', asyncHandler(async (req, res) => {
   const result = await withDb(async (db) => {
     const account = await getDefaultAccount(db);
     if (!account) throw new Error('No portfolio account');
+    const before = await getPortfolioPositions(db, account.id, purpose);
+    const isNewSymbol = !before.some((r) => r.symbol === symbol);
     const t = await ensureTicker(db, symbol, { sector: req.body?.sector });
     const tradeDate = req.body?.trade_date ? String(req.body.trade_date).slice(0, 10) : undefined;
     const notes = req.body?.notes ? String(req.body.notes).trim() : undefined;
@@ -896,9 +907,19 @@ app.post('/api/portfolio/positions', asyncHandler(async (req, res) => {
       added_qty: qty,
       qty: row?.position.qty ?? qty,
       avg_cost: row?.position.avgCost ?? avgCost,
+      isNewSymbol,
     };
   });
-  res.json({ ok: true, ...result });
+  res.json({ ok: true, symbol: result.symbol, added_qty: result.added_qty, qty: result.qty, avg_cost: result.avg_cost });
+  if (result.isNewSymbol) {
+    void withDb(async (db) => {
+      try {
+        await bootstrapTickerOnAdd(db, symbol);
+      } catch (err) {
+        console.warn(`[on-add] portfolio bootstrap failed for ${symbol}:`, err);
+      }
+    });
+  }
 }));
 
 app.get('/api/portfolio/positions/:symbol/fills', asyncHandler(async (req, res) => {
