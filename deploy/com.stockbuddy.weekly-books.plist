@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.stockbuddy.weekly-books</string>
+
+  <!-- Mirrors com.stockbuddy.daily-ingest: absolute npm + Homebrew PATH.
+       Runs the lean weekly job (fundamentals + shareholding if stale,
+       OHLCV top-up if short history) — NOT full ingest:watchlist. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/npm</string>
+    <string>run</string>
+    <string>ingest:weekly-books</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/kuntal/Developer/skill/my-skills</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <!-- Sunday 10:00 local — after the Sun–Thu DSE week, offset from daily 16:00. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>0</integer>
+    <key>Hour</key>
+    <integer>10</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/kuntal/.stock-buddy/weekly-books.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/kuntal/.stock-buddy/weekly-books.log</string>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>

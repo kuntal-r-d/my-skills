@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.stockbuddy.daily-ingest</string>
+
+  <!-- launchd starts no shell and gives a minimal PATH, so pin the toolchain:
+       absolute npm + an explicit PATH that includes Homebrew (node/npm/tsx). -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/npm</string>
+    <string>run</string>
+    <string>ingest:daily</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/kuntal/Developer/skill/my-skills</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>16</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Users/kuntal/.stock-buddy/daily-ingest.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/kuntal/.stock-buddy/daily-ingest.log</string>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
